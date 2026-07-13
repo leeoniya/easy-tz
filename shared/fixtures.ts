@@ -1,3 +1,7 @@
+// curation-reviewed: 2026-07-13 | IANA NEWS through tzdata 2026c (no fixture
+// zones affected: Alberta/Morocco changes don't touch the zones below)
+// Maintained by hand — see .cursor/skills/maintain-curated-tz-data/SKILL.md
+//
 // Expected abbreviations/offsets for 2026, straddling DST boundaries in
 // several distinct regions. Transition instants for 2026:
 //   US: Mar 8 07:00 UTC (EST -> EDT), Nov 1 06:00 UTC (EDT -> EST)

@@ -5,37 +5,45 @@
 import { bundle, minify } from '@swc/core';
 import { impls } from '../impls/registry.ts';
 
-const rows: { id: string; minifiedB: number }[] = [];
+export async function minifiedSizes(): Promise<Map<string, number>> {
+  const sizes = new Map<string, number>();
 
-for (const impl of impls) {
-  const entry = new URL(`../impls/${impl.id}/index.ts`, import.meta.url).pathname;
+  for (const impl of impls) {
+    const entry = new URL(`../impls/${impl.id}/index.ts`, import.meta.url).pathname;
 
-  const out = await bundle({
-    entry: { main: entry },
-    // output/module are required by the types but unused: bundle() returns
-    // code in-memory and never writes to disk
-    output: { name: 'main', path: '.' },
-    module: {},
-    mode: 'production',
-    target: 'browser',
-    options: { jsc: { parser: { syntax: 'typescript' }, target: 'esnext' } },
-  });
+    const out = await bundle({
+      entry: { main: entry },
+      // output/module are required by the types but unused: bundle() returns
+      // code in-memory and never writes to disk
+      output: { name: 'main', path: '.' },
+      module: {},
+      mode: 'production',
+      target: 'browser',
+      options: { jsc: { parser: { syntax: 'typescript' }, target: 'esnext' } },
+    });
 
-  const minified = await minify(out['main']!.code, {
-    module: true,
-    compress: true,
-    mangle: true,
-  });
+    const minified = await minify(out['main']!.code, {
+      module: true,
+      compress: true,
+      mangle: true,
+    });
 
-  rows.push({ id: impl.id, minifiedB: Buffer.byteLength(minified.code) });
+    sizes.set(impl.id, Buffer.byteLength(minified.code));
+  }
+
+  return sizes;
 }
 
-const headers = ['impl', 'minified'];
-const cells = rows.map((r) => [r.id, `${r.minifiedB} B (${(r.minifiedB / 1024).toFixed(2)} KB)`]);
-const widths = headers.map((h, i) => Math.max(h.length, ...cells.map((c) => c[i]!.length)));
+if (process.argv[1] === new URL(import.meta.url).pathname) {
+  const sizes = await minifiedSizes();
 
-const line = (c: string[]) => c.map((v, i) => v.padEnd(widths[i]!)).join('  ');
+  const headers = ['impl', 'minified'];
+  const cells = [...sizes].map(([id, b]) => [id, `${b} B (${(b / 1024).toFixed(2)} KB)`]);
+  const widths = headers.map((h, i) => Math.max(h.length, ...cells.map((c) => c[i]!.length)));
 
-console.log(line(headers));
-console.log(widths.map((w) => '-'.repeat(w)).join('  '));
-for (const c of cells) console.log(line(c));
+  const line = (c: string[]) => c.map((v, i) => (i === 0 ? v.padEnd(widths[i]!) : v.padStart(widths[i]!))).join('  ');
+
+  console.log(line(headers));
+  console.log(widths.map((w) => '-'.repeat(w)).join('  '));
+  for (const c of cells) console.log(line(c));
+}

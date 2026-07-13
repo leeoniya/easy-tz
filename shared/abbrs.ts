@@ -1,3 +1,7 @@
+// curation-reviewed: 2026-07-13 | IANA NEWS through tzdata 2026c | CLDR 48
+// (node 26.4) / ICU 75.1 (bun 1.4) | chrome-headless-shell 150.0.7871.115
+// Maintained by hand — see .cursor/skills/maintain-curated-tz-data/SKILL.md
+//
 // Curated map of CLDR "long" metazone names (en locale) -> common tzdata-style
 // abbreviations, for names where the initials heuristic is wrong or ambiguous.
 // Names whose initials already produce the common abbreviation (e.g.

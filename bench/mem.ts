@@ -55,7 +55,7 @@ console.log(`fresh subprocess per impl, median of ${SAMPLES} runs, MB deltas (Bu
 
 const headers = ['impl', 'import', 'first call', '+25 misses', 'total rss', 'js heap', 'native (~icu)'];
 const widths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i]!.length)));
-const line = (c: string[]) => c.map((v, i) => v.padEnd(widths[i]!)).join('  ');
+const line = (c: string[]) => c.map((v, i) => (i === 0 ? v.padEnd(widths[i]!) : v.padStart(widths[i]!))).join('  ');
 
 console.log(line(headers));
 console.log(widths.map((w) => '-'.repeat(w)).join('  '));

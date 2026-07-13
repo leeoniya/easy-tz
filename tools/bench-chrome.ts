@@ -15,6 +15,7 @@ import puppeteer from 'puppeteer-core';
 import { findHeadlessShell } from './browser.ts';
 import { selectTables } from './use-tables.ts';
 import { activeVariant } from './table-files.ts';
+import { minifiedSizes } from '../bench/size.ts';
 import type { BenchResult } from './bench-browser-entry.ts';
 
 // sum of VmRSS across this browser's renderer processes (Linux /proc scan);
@@ -92,48 +93,89 @@ try {
   const implIds = (await probePage.evaluate('__implIds')) as string[];
   await probePage.close();
 
-  const results: (BenchResult & { jsHeapMB: number; rendererMB: number | null })[] = [];
+  const results: (BenchResult & { rendererMB: number | null })[] = [];
 
   for (const id of implIds) {
     const page = await browser.newPage();
 
     await page.evaluate(bundled['main']!.code);
 
-    const heapBefore = (await page.metrics()).JSHeapUsedSize ?? 0;
     const rssBefore = rendererRssBytes();
     const result = (await page.evaluate(`__bench(${JSON.stringify(id)})`)) as BenchResult;
     const rssAfter = rendererRssBytes();
-    const heapAfter = (await page.metrics()).JSHeapUsedSize ?? 0;
 
     results.push({
       ...result,
-      jsHeapMB: (heapAfter - heapBefore) / 1048576,
       rendererMB: rssBefore !== null && rssAfter !== null ? (rssAfter - rssBefore) / 1048576 : null,
     });
 
     await page.close();
   }
 
+  // deep output-equality of table-backed impls vs 04, in a fresh page so no
+  // bench was polluted by another impl's formatters
+  const verifyPage = await browser.newPage();
+
+  await verifyPage.evaluate(bundled['main']!.code);
+
+  const vs04 = new Map<string, { checked: number; mismatchCount: number; mismatches: string[] }>();
+
+  for (const id of ['08-verified-reps', '09-live-offsets', '07-precomputed']) {
+    vs04.set(
+      id,
+      (await verifyPage.evaluate(`__verifyVs04(${JSON.stringify(id)})`)) as {
+        checked: number;
+        mismatchCount: number;
+        mismatches: string[];
+      }
+    );
+  }
+
+  await verifyPage.close();
+
   console.log(`zones: ${results[0]!.zones}, miss iterations: 25, runtime: chrome-headless-shell ${version}\n`);
 
-  const headers = ['impl', 'fixtures', 'letter abbrs', 'cold ms', 'hit µs', 'miss mean ms', 'miss min ms', 'js heap MB', 'renderer rss MB'];
-  const cells = results.map((r) => [
-    r.id,
-    `${r.fixturesPassed}/${r.fixturesTotal}`,
-    `${r.letterAbbrs}/${r.zones}`,
-    r.coldMs.toFixed(3),
-    r.hitUs.toFixed(2),
-    r.missMeanMs.toFixed(3),
-    r.missMinMs.toFixed(3),
-    r.jsHeapMB.toFixed(2),
-    r.rendererMB === null ? 'n/a' : r.rendererMB.toFixed(2),
-  ]);
-  const widths = headers.map((h, i) => Math.max(h.length, ...cells.map((c) => c[i]!.length)));
-  const line = (c: string[]) => c.map((v, i) => v.padEnd(widths[i]!)).join('  ');
+  const table = (headers: string[], cells: string[][]) => {
+    const widths = headers.map((h, i) => Math.max(h.length, ...cells.map((c) => c[i]!.length)));
+    // first column (impl) left-aligned, value columns right-aligned
+    const line = (c: string[]) =>
+      c.map((v, i) => (i === 0 ? v.padEnd(widths[i]!) : v.padStart(widths[i]!))).join('  ');
 
-  console.log(line(headers));
-  console.log(widths.map((w) => '-'.repeat(w)).join('  '));
-  for (const c of cells) console.log(line(c));
+    console.log(line(headers));
+    console.log(widths.map((w) => '-'.repeat(w)).join('  '));
+    for (const c of cells) console.log(line(c));
+  };
+
+  console.log('performance:\n');
+  const sizes = await minifiedSizes();
+
+  // hit and miss are medians over the iteration loops
+  table(
+    ['impl', 'cold ms', 'hit µs', 'miss ms', 'formatters', 'rss MB', 'bundle KB'],
+    results.map((r) => [
+      r.id,
+      r.coldMs.toFixed(1),
+      r.hitUs.toFixed(2),
+      r.missMedMs.toFixed(1),
+      String(r.formatters),
+      r.rendererMB === null ? 'n/a' : r.rendererMB.toFixed(2),
+      ((sizes.get(r.id) ?? 0) / 1024).toFixed(1),
+    ])
+  );
+
+  console.log('\ncorrectness:\n');
+  table(
+    ['impl', 'fixtures', 'letter abbrs', 'vs 04'],
+    results.map((r) => {
+      const eq = vs04.get(r.id);
+      return [
+        r.id,
+        `${r.fixturesPassed}/${r.fixturesTotal}`,
+        `${r.letterAbbrs}/${r.zones}`,
+        eq === undefined ? '-' : `${eq.checked - eq.mismatchCount}/${eq.checked}`,
+      ];
+    })
+  );
 
   const init08 = results.find((r) => r.id === '08-verified-reps')?.init;
 
@@ -144,28 +186,16 @@ try {
     );
   }
 
-  // table-backed impl output-equality vs 04, in a fresh page so no bench
-  // was polluted by another impl's formatters
-  const verifyPage = await browser.newPage();
-
-  await verifyPage.evaluate(bundled['main']!.code);
-
   let failed = false;
 
-  for (const id of ['08-verified-reps', '09-live-offsets']) {
-    const eq = (await verifyPage.evaluate(`__verifyVs04(${JSON.stringify(id)})`)) as {
-      checked: number;
-      mismatches: string[];
-    };
+  for (const [id, eq] of vs04) {
+    if (eq.mismatchCount > 0) {
+      failed = true;
+      console.log(`\n${id} vs 04: ${eq.mismatchCount}/${eq.checked} MISMATCHED (first ${eq.mismatches.length}):`);
 
-    console.log(`${id} vs 04 equivalence: ${eq.checked} checks, ${eq.mismatches.length} mismatches`);
-
-    for (const m of eq.mismatches) console.log(`  MISMATCH ${m}`);
-
-    if (eq.mismatches.length > 0) failed = true;
+      for (const m of eq.mismatches) console.log(`  ${m}`);
+    }
   }
-
-  await verifyPage.close();
 
   if (failed) process.exit(1);
 } finally {

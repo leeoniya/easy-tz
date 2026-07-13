@@ -10,6 +10,7 @@ import { impls } from '../impls/registry.ts';
 import { getInitInfo, type InitInfo } from '../impls/08-verified-reps/index.ts';
 import { fixtures } from '../shared/fixtures.ts';
 import { zones } from '../shared/zones.ts';
+import { formatterCount } from '../shared/fmt.ts';
 
 const MISS_ITERATIONS = 25;
 const HIT_CALLS = 50_000;
@@ -24,32 +25,25 @@ export interface BenchResult {
   letterAbbrs: number;
   coldMs: number;
   hitUs: number;
-  missMeanMs: number;
-  missMinMs: number;
+  missMedMs: number; // median over the miss loop
+  formatters: number; // Intl.DateTimeFormat instances constructed
   init?: InitInfo | null;
 }
 
 (globalThis as { __bench?: unknown }).__bench = (implId: string): BenchResult => {
   const impl = impls.find((i) => i.id === implId)!;
 
-  // cold: very first call in this page context
+  // all timing runs FIRST, before any validation work, so correctness
+  // sweeps can't thermally throttle the CPU under the measurements
+
+  // cold: very first call in this page context (also warms all caches)
   const t0 = performance.now();
   impl.getTimeZonesAt(Date.UTC(2026, 6, 15));
   const coldMs = performance.now() - t0;
 
-  // validation (also finishes warming everything)
-  let fixturesPassed = 0;
-
-  for (const f of fixtures) {
-    const info = impl.getTimeZonesAt(f.ts).find((z) => z.name === f.zone || z.name === f.altZone);
-
-    if (info !== undefined && info.abbr === f.abbr && info.offset === f.offset) fixturesPassed++;
-  }
-
-  const summer = impl.getTimeZonesAt(Date.UTC(2026, 6, 15));
-  const letterAbbrs = summer.filter(
-    (z) => !/^(GMT|UTC?)([+-]|$)/.test(z.abbr) || z.abbr === 'GMT' || z.abbr === 'UTC'
-  ).length;
+  // brief untimed warm-up (JIT + memo paths) — replaces the warming the
+  // validation sweep used to provide, at ~2% of its cost
+  for (let i = 0; i < 5; i++) impl.getTimeZonesAt(BASE_TS - (i + 1) * HOUR_MS);
 
   // hits: aggregate loop within one hour bucket
   impl.getTimeZonesAt(BASE_TS);
@@ -71,6 +65,20 @@ export interface BenchResult {
     missTimes.push(performance.now() - m0);
   }
 
+  // validation, after all timing
+  let fixturesPassed = 0;
+
+  for (const f of fixtures) {
+    const info = impl.getTimeZonesAt(f.ts).find((z) => z.name === f.zone || z.name === f.altZone);
+
+    if (info !== undefined && info.abbr === f.abbr && info.offset === f.offset) fixturesPassed++;
+  }
+
+  const summer = impl.getTimeZonesAt(Date.UTC(2026, 6, 15));
+  const letterAbbrs = summer.filter(
+    (z) => !/^(GMT|UTC?)([+-]|$)/.test(z.abbr) || z.abbr === 'GMT' || z.abbr === 'UTC'
+  ).length;
+
   return {
     id: implId,
     zones: zones.length,
@@ -79,8 +87,8 @@ export interface BenchResult {
     letterAbbrs,
     coldMs,
     hitUs,
-    missMeanMs: missTimes.reduce((a, b) => a + b, 0) / missTimes.length,
-    missMinMs: Math.min(...missTimes),
+    missMedMs: missTimes.toSorted((a, b) => a - b)[missTimes.length >> 1]!,
+    formatters: formatterCount(),
     init: implId === '08-verified-reps' ? getInitInfo() : undefined,
   };
 };
@@ -103,6 +111,7 @@ export interface BenchResult {
   }
 
   let checked = 0;
+  let mismatchCount = 0;
   const mismatches: string[] = [];
 
   for (const ts of instants) {
@@ -115,11 +124,15 @@ export interface BenchResult {
       const x = a[k]!;
       const y = b[k]!;
 
-      if ((x.name !== y.name || x.abbr !== y.abbr || x.offset !== y.offset) && mismatches.length < 10) {
-        mismatches.push(`${x.name} @ ${new Date(ts).toISOString()}: 04=${x.abbr} ${x.offset} vs ${implId}=${y.abbr} ${y.offset}`);
+      if (x.name !== y.name || x.abbr !== y.abbr || x.offset !== y.offset) {
+        mismatchCount++;
+
+        if (mismatches.length < 10) {
+          mismatches.push(`${x.name} @ ${new Date(ts).toISOString()}: 04=${x.abbr} ${x.offset} vs ${implId}=${y.abbr} ${y.offset}`);
+        }
       }
     }
   }
 
-  return { checked, mismatches, init: getInitInfo() };
+  return { checked, mismatchCount, mismatches, init: getInitInfo() };
 };

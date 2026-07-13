@@ -42,6 +42,11 @@ the host timezone (`TZ`). Historical tzdata accuracy is a non-goal.
 - `tools/audit-abbrs.ts` — audits the curated maps in `shared/abbrs.ts`
   against current CLDR data (drift detection; abbrs themselves are curated
   by hand)
+- `.cursor/skills/maintain-curated-tz-data/` — agent skill documenting the
+  review workflow for the hand-curated files (`shared/abbrs.ts`,
+  `shared/zoneLinks.ts`, `shared/fixtures.ts`), watermarked with
+  `curation-reviewed:` headers so reviews only scan upstream changes since
+  the last pass
 - `impls/registry.ts` — list of all impls consumed by tests and the benchmark
 - `tests/dst.test.ts` — DST boundary tests (`bun test`)
 - `bench/bench.ts` — validation + benchmark summary across all impls

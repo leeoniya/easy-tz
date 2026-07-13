@@ -1,5 +1,9 @@
 import type { TimeZoneInfo } from './types.ts';
 
+// curation-reviewed: 2026-07-13 | IANA NEWS through tzdata 2026c | zone-list
+// diff: bun 1.4 (ICU 75.1) vs chrome-headless-shell 150.0.7871.115
+// Maintained by hand — see .cursor/skills/maintain-curated-tz-data/SKILL.md
+//
 // Canonicalization bridge for IANA zone spelling variants (tzdata backward
 // links). Different ICU builds enumerate different canonical names for the
 // same zone — e.g. Chrome 150 lists Asia/Calcutta and Europe/Kiev where bun
