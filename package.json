@@ -1,0 +1,27 @@
+{
+  "name": "timezones-play",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc -p tsconfig.json",
+    "test": "bun test",
+    "test:tz": "TZ=UTC bun test && TZ=America/Chicago bun test && TZ=Pacific/Kiritimati bun test",
+    "bench": "bun bench/bench.ts",
+    "bench:chrome": "bun tools/bench-chrome.ts",
+    "size": "bun bench/size.ts",
+    "mem": "bun bench/mem.ts",
+    "gen": "bun tools/gen-classes.ts",
+    "tables": "bun tools/use-tables.ts",
+    "gen:chrome": "bun tools/gen-chrome.ts",
+    "browsers:install": "bunx browsers install chrome-headless-shell@stable --path .browsers",
+    "audit": "bun tools/audit-abbrs.ts"
+  },
+  "devDependencies": {
+    "@puppeteer/browsers": "3.0.6",
+    "@swc/core": "1.15.43",
+    "@types/bun": "1.3.14",
+    "@types/node": "26.1.1",
+    "puppeteer-core": "25.3.0",
+    "typescript": "7.0.2"
+  }
+}
