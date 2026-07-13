@@ -11,7 +11,7 @@ description: >-
 
 # Maintaining Curated Timezone Data
 
-Generated tables (`shared/tables/*`, via `bun run gen` / `gen:chrome`) are
+Generated tables (`shared/tables/*`, via `bun run gen` — regenerates both the chrome and bun variants) are
 deterministic. Four files are NOT — they encode human judgment and must be
 reviewed when upstream data changes:
 
@@ -33,7 +33,7 @@ watermark in the file headers.
 2. Current runtime data versions:
    - `node -p "process.versions"` → `tz`, `cldr`, `icu`
    - `bun -e "console.log(process.versions.icu)"` (bun lags; tables track it)
-   - Chrome version: `genMeta` in `shared/tables/chrome/*` after `gen:chrome`
+   - Chrome version: `genMeta` in `shared/tables/chrome/*` after `bun run gen`
 3. tzdata changes since watermark: fetch
    `https://data.iana.org/time-zones/tzdb/NEWS` and read only releases newer
    than the watermark version. Relevant sections: "Changes to future
@@ -53,9 +53,9 @@ bun run audit        # ERRORs: diverged zoneAliases (fix or remove) — exit 1
                      #        stale abbrOverrides keys (prune)
                      # INFO:  GMT-fallback zones (candidates for new
                      #        zoneAliases / zoneAbbrOverrides entries)
-bun run gen && bun run gen:chrome   # regenerate both table variants
+bun run gen                         # regenerate both table variants
 bun test && bun run test:tz         # fixtures, oracle, table validation
-bun run bench:chrome                # "vs 04" column must be full (e.g.
+bun run bench                       # "vs 04" column must be full (e.g.
                                     # 8360/8360); "08 init ... healed" > 0
                                     # means a group diverged mid-year
 ```
@@ -114,6 +114,6 @@ bun -e "const a=new Set(Intl.supportedValuesOf('timeZone')); console.log(JSON.st
 - **Alberta (tzdata 2026c)**: mid-year move to permanent −06/CST. Expected
   blast radius when a runtime's ICU picks it up: 08 init reports healed > 0
   (Edmonton splits from the Denver group), schedule/classes equivalence
-  fails until `gen`/`gen:chrome` re-run, and any Edmonton fixture needs a
+  fails until `bun run gen` re-runs, and any Edmonton fixture needs a
   cited update. Morocco (same release) changes offsets only — groups move
   together, so only tables and fixtures are affected, not curated maps.

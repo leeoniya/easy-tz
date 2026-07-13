@@ -4,15 +4,13 @@
   "type": "module",
   "scripts": {
     "check": "tsc -p tsconfig.json",
-    "test": "bun test",
+    "test": "bun test && bun tools/test-chrome.ts",
     "test:tz": "TZ=UTC bun test && TZ=America/Chicago bun test && TZ=Pacific/Kiritimati bun test",
-    "bench": "bun bench/bench.ts",
-    "bench:chrome": "bun tools/bench-chrome.ts",
+    "bench": "bun tools/bench-all.ts",
     "size": "bun bench/size.ts",
     "mem": "bun bench/mem.ts",
-    "gen": "bun tools/gen-classes.ts",
+    "gen": "bun tools/gen-all.ts",
     "tables": "bun tools/use-tables.ts",
-    "gen:chrome": "bun tools/gen-chrome.ts",
     "browsers:install": "bunx browsers install chrome-headless-shell@stable --path .browsers",
     "audit": "bun tools/audit-abbrs.ts"
   },

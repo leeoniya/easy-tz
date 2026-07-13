@@ -2,9 +2,9 @@
 // Run: bun bench/bench.ts
 
 import { impls } from '../impls/registry.ts';
-import { fixtures } from '../shared/fixtures.ts';
 import { zones } from '../shared/zones.ts';
 import { genMeta } from '../shared/schedule.ts';
+import { minifiedSizes } from './size.ts';
 
 const ITERATIONS = 25;
 const HOUR_MS = 3_600_000;
@@ -18,21 +18,18 @@ const missTimestamps = Array.from({ length: ITERATIONS }, (_, i) => BASE_TS + (i
 
 interface Row {
   id: string;
-  fixturesPassed: string;
-  letterAbbrs: string;
   coldMs: string;
   hitMedUs: string;
   missMedMs: string;
   formatters: string;
+  rssMB: string;
 }
 
 const rows: Row[] = [];
 
 for (const impl of impls) {
-  // --- benchmark first, validation after, so the heavy correctness sweep
-  // can't thermally throttle the CPU under the measurements. the priming
-  // call below warms this impl's formatter caches; the true cold cost is
-  // measured separately in fresh subprocesses.
+  // the warm-up below primes this impl's formatter caches; the true cold
+  // cost is measured separately in fresh subprocesses.
   const timeMs = (ts: number) => {
     const t0 = Bun.nanoseconds();
     impl.getTimeZonesAt(ts);
@@ -48,29 +45,15 @@ for (const impl of impls) {
 
   const missTimes = missTimestamps.map(timeMs);
 
-  // --- validation ---
-  let passed = 0;
-
-  for (const f of fixtures) {
-    const info = impl.getTimeZonesAt(f.ts).find((z) => z.name === f.zone);
-
-    if (info !== undefined && info.abbr === f.abbr && info.offset === f.offset) passed++;
-  }
-
-  // letter-abbr coverage: zones whose abbr is not GMT/UT offset-styled
-  const summer = impl.getTimeZonesAt(Date.UTC(2026, 6, 15));
-  const letterAbbrs = summer.filter((z) => !/^(GMT|UTC?)([+-]|$)/.test(z.abbr) || z.abbr === 'GMT' || z.abbr === 'UTC').length;
-
   const median = (xs: number[]) => xs.toSorted((a, b) => a - b)[xs.length >> 1]!;
 
   rows.push({
     id: impl.id,
-    fixturesPassed: `${passed}/${fixtures.length}`,
-    letterAbbrs: `${letterAbbrs}/${zones.length}`,
     coldMs: '-',
     hitMedUs: (median(hitTimes) * 1000).toFixed(1),
     missMedMs: median(missTimes).toFixed(1),
     formatters: '-',
+    rssMB: '-',
   });
 }
 
@@ -83,17 +66,26 @@ for (const row of rows) {
       `const { impls } = await import(${JSON.stringify(new URL('../impls/registry.ts', import.meta.url).pathname)});
        const { formatterCount } = await import(${JSON.stringify(new URL('../shared/fmt.ts', import.meta.url).pathname)});
        const impl = impls.find((i) => i.id === ${JSON.stringify(row.id)});
+       Bun.gc(true);
+       const rss0 = process.memoryUsage().rss;
        const t0 = Bun.nanoseconds();
        impl.getTimeZonesAt(${Date.UTC(2026, 6, 15)});
-       console.log(JSON.stringify({ cold: +((Bun.nanoseconds() - t0) / 1e6).toFixed(1), formatters: formatterCount() }));`,
+       const cold = (Bun.nanoseconds() - t0) / 1e6;
+       for (let i = 1; i <= 25; i++) impl.getTimeZonesAt(${Date.UTC(2026, 6, 15)} + i * 3600000);
+       Bun.gc(true);
+       const rssMB = (process.memoryUsage().rss - rss0) / 1048576;
+       console.log(JSON.stringify({ cold: +cold.toFixed(1), formatters: formatterCount(), rssMB: +rssMB.toFixed(2) }));`,
     ],
   });
 
-  const parsed = JSON.parse(proc.stdout.toString() || '{}') as { cold?: number; formatters?: number };
+  const parsed = JSON.parse(proc.stdout.toString() || '{}') as { cold?: number; formatters?: number; rssMB?: number };
 
   row.coldMs = parsed.cold?.toFixed(1) ?? 'err';
   row.formatters = String(parsed.formatters ?? '-');
+  row.rssMB = parsed.rssMB?.toFixed(2) ?? 'err';
 }
+
+const sizes = await minifiedSizes();
 
 console.log(`zones: ${zones.length}, iterations: ${ITERATIONS}, runtime: bun ${Bun.version}, tables: ${genMeta.host}\n`);
 
@@ -111,17 +103,21 @@ const table = (headers: string[], cells: string[][]) => {
   for (const c of cells) console.log(line(c));
 };
 
-console.log('performance:\n');
-// hit and miss are medians over the iteration loops
+// hit and miss are medians over the iteration loops. correctness lives in
+// `bun run test` (bun suite + chrome correctness), not here. rss MB is the
+// subprocess's delta across first call + 25 misses (mirrors the chrome
+// bench's per-page semantics; excludes the memoized-result-only baseline).
 table(
-  ['impl', 'cold ms', 'hit µs', 'miss ms', 'formatters'],
-  rows.map((r) => [r.id, r.coldMs, r.hitMedUs, r.missMedMs, r.formatters])
-);
-
-console.log('\ncorrectness:\n');
-table(
-  ['impl', 'fixtures', 'letter abbrs'],
-  rows.map((r) => [r.id, r.fixturesPassed, r.letterAbbrs])
+  ['impl', 'cold ms', 'hit µs', 'miss ms', 'formatters', 'rss MB', 'bundle KB'],
+  rows.map((r) => [
+    r.id,
+    r.coldMs,
+    r.hitMedUs,
+    r.missMedMs,
+    r.formatters,
+    r.rssMB,
+    ((sizes.get(r.id) ?? 0) / 1024).toFixed(1),
+  ])
 );
 
 console.log(

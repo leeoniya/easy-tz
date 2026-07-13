@@ -1,10 +1,13 @@
-// Browser-bundle entry for tools/bench-chrome.ts: exposes __bench(implId),
-// which measures one impl inside a fresh page context (cold start is real —
-// no formatter or table state exists before the first call).
+// Browser-bundle entry for the Chrome scripts. Exposes:
+//   __bench(implId)      — pure performance measurement (tools/bench-chrome.ts)
+//   __validate(implId)   — fixtures + letter-abbr correctness (tools/test-chrome.ts)
+//   __verifyVs04(implId) — deep output-equality vs impl 04 (tools/test-chrome.ts)
+// Each runs against a fresh page context created by the host script, so cold
+// starts are real and impls don't pollute each other.
 //
-// Chrome coarsens performance.now() to ~100µs in normal contexts, so
-// cache hits (sub-µs) are timed as an aggregate loop and divided, while
-// misses (ms-scale) are timed individually like the bun bench.
+// Chrome coarsens performance.now() to ~100µs in normal contexts, so cache
+// hits (sub-µs) are timed as an aggregate loop and divided, while misses
+// (ms-scale) are timed individually like the bun bench.
 
 import { impls } from '../impls/registry.ts';
 import { getInitInfo, type InitInfo } from '../impls/08-verified-reps/index.ts';
@@ -20,29 +23,21 @@ const BASE_TS = Date.UTC(2026, 5, 1, 12, 0);
 export interface BenchResult {
   id: string;
   zones: number;
-  fixturesPassed: number;
-  fixturesTotal: number;
-  letterAbbrs: number;
   coldMs: number;
   hitUs: number;
   missMedMs: number; // median over the miss loop
   formatters: number; // Intl.DateTimeFormat instances constructed
-  init?: InitInfo | null;
 }
 
 (globalThis as { __bench?: unknown }).__bench = (implId: string): BenchResult => {
   const impl = impls.find((i) => i.id === implId)!;
-
-  // all timing runs FIRST, before any validation work, so correctness
-  // sweeps can't thermally throttle the CPU under the measurements
 
   // cold: very first call in this page context (also warms all caches)
   const t0 = performance.now();
   impl.getTimeZonesAt(Date.UTC(2026, 6, 15));
   const coldMs = performance.now() - t0;
 
-  // brief untimed warm-up (JIT + memo paths) — replaces the warming the
-  // validation sweep used to provide, at ~2% of its cost
+  // brief untimed warm-up (JIT + memo paths)
   for (let i = 0; i < 5; i++) impl.getTimeZonesAt(BASE_TS - (i + 1) * HOUR_MS);
 
   // hits: aggregate loop within one hour bucket
@@ -65,7 +60,28 @@ export interface BenchResult {
     missTimes.push(performance.now() - m0);
   }
 
-  // validation, after all timing
+  return {
+    id: implId,
+    zones: zones.length,
+    coldMs,
+    hitUs,
+    missMedMs: missTimes.toSorted((a, b) => a - b)[missTimes.length >> 1]!,
+    formatters: formatterCount(),
+  };
+};
+
+export interface ValidateResult {
+  id: string;
+  zones: number;
+  fixturesPassed: number;
+  fixturesTotal: number;
+  letterAbbrs: number;
+  init?: InitInfo | null;
+}
+
+(globalThis as { __validate?: unknown }).__validate = (implId: string): ValidateResult => {
+  const impl = impls.find((i) => i.id === implId)!;
+
   let fixturesPassed = 0;
 
   for (const f of fixtures) {
@@ -85,10 +101,6 @@ export interface BenchResult {
     fixturesPassed,
     fixturesTotal: fixtures.length,
     letterAbbrs,
-    coldMs,
-    hitUs,
-    missMedMs: missTimes.toSorted((a, b) => a - b)[missTimes.length >> 1]!,
-    formatters: formatterCount(),
     init: implId === '08-verified-reps' ? getInitInfo() : undefined,
   };
 };
@@ -96,8 +108,7 @@ export interface BenchResult {
 (globalThis as { __implIds?: string[] }).__implIds = impls.map((i) => i.id);
 
 // deep output-equality of a table-backed impl against 04 (live per-zone) at
-// monthly + transition-edge instants; run in a separate page AFTER benching
-// so 04's formatters don't pollute the other impls' measurements
+// monthly + transition-edge instants
 (globalThis as { __verifyVs04?: unknown }).__verifyVs04 = (implId: string) => {
   const i04 = impls.find((i) => i.id === '04-intl-single-fmt')!;
   const other = impls.find((i) => i.id === implId)!;
@@ -134,5 +145,5 @@ export interface BenchResult {
     }
   }
 
-  return { checked, mismatchCount, mismatches, init: getInitInfo() };
+  return { checked, mismatchCount, mismatches };
 };
