@@ -42,6 +42,13 @@ try {
 
   const init08 = rows.find((r) => r.id === '08-verified-reps')?.init;
 
+  // rollover resistance: past the generated year, 09 (coherence guard) and
+  // 07 (year-independent rules; irregular zones clamp by design and are
+  // skipped) must remain output-identical to live 04
+  type Future = Vs04 & { skipped: number };
+  const future09 = (await page.evaluate(`__verifyFuture('09-live-offsets', false)`)) as Future;
+  const future07 = (await page.evaluate(`__verifyFuture('07-precomputed', true)`)) as Future;
+
   await page.close();
 
   // no-Temporal page: Safari fallback paths under V8/Chrome ICU
@@ -90,6 +97,13 @@ try {
     console.log(`08 init (no-T): temporal=${init08NoT.temporal} (hints ignored; plain-04 fallback)`);
   }
 
+  console.log(
+    `09 rollover guard (2027 instants, table year 2026): ${future09.checked - future09.mismatchCount}/${future09.checked} match live 04`
+  );
+  console.log(
+    `07 rollover rules (2027 instants, table year 2026): ${future07.checked - future07.mismatchCount}/${future07.checked} match live 04 (${future07.skipped} irregular-zone checks clamped by design)`
+  );
+
   // --- assertions ---
   let failed = false;
 
@@ -97,6 +111,15 @@ try {
     if (r.fixturesPassed !== r.fixturesTotal) {
       failed = true;
       console.error(`FAIL ${r.label}: fixtures ${r.fixturesPassed}/${r.fixturesTotal}`);
+    }
+  }
+
+  for (const [label, f] of [['09 rollover guard', future09], ['07 rollover rules', future07]] as const) {
+    if (f.mismatchCount > 0) {
+      failed = true;
+      console.error(`\nFAIL ${label}: ${f.mismatchCount}/${f.checked} mismatched (first ${f.mismatches.length}):`);
+
+      for (const m of f.mismatches) console.error(`  ${m}`);
     }
   }
 

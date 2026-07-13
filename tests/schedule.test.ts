@@ -2,7 +2,6 @@ import { describe, test, expect } from 'bun:test';
 import { getTimeZonesAt as precomputed, clearCache as clear07 } from '../impls/07-precomputed/index.ts';
 import { getTimeZonesAt as baseline, clearCache as clear04 } from '../impls/04-intl-single-fmt/index.ts';
 import { scheduleClasses, genMeta } from '../shared/schedule.ts';
-import { scheduleOffsets } from '../shared/offsets.ts';
 import { zones } from '../shared/zones.ts';
 import { fixtures } from '../shared/fixtures.ts';
 
@@ -27,18 +26,34 @@ function both(ts: number) {
 }
 
 describe('07-precomputed equivalence with 04 baseline', () => {
-  testIfAligned('schedule table covers exactly the runtime zone list, no duplicates', () => {
+  testIfAligned('schedule table covers exactly the runtime zone list, well-formed classes', () => {
     const seen = new Set<string>();
     const known = new Set(zones);
 
-    expect(scheduleOffsets.length).toBe(scheduleClasses.length);
+    for (const c of scheduleClasses) {
+      if (c.kind === 0) {
+        expect(c.states.length).toBe(1);
+      } else if (c.kind === 1) {
+        expect(c.states.length).toBe(2);
+        expect(c.rules.length).toBe(2);
+        expect(c.rules[0].month).toBeLessThan(c.rules[1].month);
 
-    for (let ci = 0; ci < scheduleClasses.length; ci++) {
-      const c = scheduleClasses[ci]!;
+        for (const r of c.rules) {
+          expect(r.month).toBeGreaterThanOrEqual(1);
+          expect(r.month).toBeLessThanOrEqual(12);
+          expect(r.nth).toBeGreaterThanOrEqual(1);
+          expect(r.nth).toBeLessThanOrEqual(5);
+          expect(r.dow).toBeGreaterThanOrEqual(0);
+          expect(r.dow).toBeLessThanOrEqual(6);
+        }
 
-      expect(c.starts.length).toBe(c.abbrs.length);
-      expect(c.starts.length).toBe(scheduleOffsets[ci]!.length);
-      expect(c.starts[0]).toBe(0); // every class covers the year start
+        // the two rules must switch to different states
+        expect(c.rules[0].to).not.toBe(c.rules[1].to);
+      } else {
+        expect(c.starts[0]).toBe(0);
+        expect(c.starts.length).toBe(c.abbrs.length);
+        expect(c.starts.length).toBe(c.offMins.length);
+      }
 
       for (const z of c.zones) {
         expect(known.has(z)).toBe(true);
@@ -86,17 +101,36 @@ describe('07-precomputed equivalence with 04 baseline', () => {
     }
   });
 
-  test('timestamps outside the generated year clamp instead of throwing', () => {
+  // the payoff of year-independent rules: 07 stays correct past the table's
+  // generation year for rule/static zones. irregular zones (non-Gregorian
+  // rules: Morocco, Palestine) clamp outside the generated year by design
+  // and are excluded here.
+  testIfAligned('identical output to 04 in the NEXT year (rules, not clamping)', () => {
+    const irregular = new Set<string>();
+
+    for (const c of scheduleClasses) {
+      if (c.kind === 2) for (const z of c.zones) irregular.add(z);
+    }
+
+    for (const ts of [
+      Date.UTC(YEAR + 1, 0, 15, 12), // winter
+      Date.UTC(YEAR + 1, 6, 15, 12), // summer — post-US/EU spring-forward
+      Date.UTC(YEAR + 1, 2, 14, 8), // 1h after US spring-forward 2027 (Mar 14)
+      Date.UTC(YEAR + 1, 2, 28, 2), // 1h after EU spring-forward 2027 (Mar 28)
+    ]) {
+      const [a, b] = both(ts);
+
+      expect(a.filter((z) => !irregular.has(z.name))).toEqual(b.filter((z) => !irregular.has(z.name)));
+    }
+  });
+
+  test('timestamps outside the probed range do not throw', () => {
     clear07();
     const before = precomputed(Date.UTC(YEAR - 1, 11, 31, 23));
     clear07();
-    const after = precomputed(Date.UTC(YEAR + 1, 0, 1, 1));
+    const after = precomputed(Date.UTC(YEAR + 5, 0, 1, 1));
 
     expect(before.length).toBe(zones.length);
     expect(after.length).toBe(zones.length);
-
-    // clamped edges resolve to the year's first/last segments
-    clear07();
-    expect(before).toEqual(precomputed(Date.UTC(YEAR, 0, 1, 0)));
   });
 });

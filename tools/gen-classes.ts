@@ -8,7 +8,7 @@
 // Run: bun run gen
 
 import { generateTables, verifyTables } from './gen-core.ts';
-import { emitClassesTs, emitScheduleTs, emitOffsetsTs, type GenMeta } from './emitters.ts';
+import { emitClassesTs, emitScheduleTs, type GenMeta } from './emitters.ts';
 import { writeTableSet } from './table-files.ts';
 
 const tables = generateTables();
@@ -28,13 +28,12 @@ const meta: GenMeta = {
 const active = writeTableSet('bun', {
   classes: emitClassesTs(tables, meta),
   schedule: emitScheduleTs(tables, meta),
-  offsets: emitOffsetsTs(tables, meta),
 });
 
 const s = tables.stats;
 
 console.log(
   `wrote shared/tables/bun/{classes,schedule}.ts (host: ${meta.host}, icu ${meta.icu}, active variant: ${active}):\n` +
-    `  ${s.zones} zones -> ${s.sigClasses} classes / ${s.schedClasses} schedule classes, ${s.totalSegs} segments, probe ${s.probeMs}ms\n` +
+    `  ${s.zones} zones -> ${s.sigClasses} classes / ${s.schedClasses} schedule classes (${s.staticClasses} static, ${s.ruleClasses} rule, ${s.irregularClasses} irregular w/ ${s.irregularZones} zones), probe ${s.probeMs}ms\n` +
     `  self-verified: ${verification.checks} checks at ${verification.instants} instants, 0 mismatches`
 );

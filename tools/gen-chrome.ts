@@ -10,7 +10,7 @@
 import { bundle } from '@swc/core';
 import puppeteer from 'puppeteer-core';
 import { findHeadlessShell } from './browser.ts';
-import { emitClassesTs, emitScheduleTs, emitOffsetsTs, type GenMeta } from './emitters.ts';
+import { emitClassesTs, emitScheduleTs, type GenMeta } from './emitters.ts';
 import { writeTableSet } from './table-files.ts';
 import type { GeneratedTables, Verification } from './gen-core.ts';
 
@@ -57,14 +57,13 @@ try {
   const active = writeTableSet('chrome', {
     classes: emitClassesTs(tables, meta),
     schedule: emitScheduleTs(tables, meta),
-    offsets: emitOffsetsTs(tables, meta),
   });
 
   const s = tables.stats;
 
   console.log(
     `wrote shared/tables/chrome/{classes,schedule}.ts (host: ${meta.host}, active variant: ${active}):\n` +
-      `  ${s.zones} zones -> ${s.sigClasses} classes / ${s.schedClasses} schedule classes, ${s.totalSegs} segments, probe ${s.probeMs}ms\n` +
+      `  ${s.zones} zones -> ${s.sigClasses} classes / ${s.schedClasses} schedule classes (${s.staticClasses} static, ${s.ruleClasses} rule, ${s.irregularClasses} irregular w/ ${s.irregularZones} zones), probe ${s.probeMs}ms\n` +
       `  in-browser verified: ${verification.checks} checks at ${verification.instants} instants, 0 mismatches`
   );
 } finally {

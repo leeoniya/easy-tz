@@ -81,8 +81,13 @@ matter how stale the table. Zone-name canonicalization skew across runtimes
 tzdata-links map in `shared/zoneLinks.ts`; zones missing from the table even
 after bridging (e.g. genuinely new zones like `America/Coyhaique`) and
 non-Temporal runtimes (Safari) fall back to live Intl formatting (04's
-path). Residual risk: under tzdata skew the label can go stale while the
-offset stays correct ("MST" next to a correct "-06:00").
+path). Baked labels are guarded by a live-offset coherence check: a segment
+whose baked offset disagrees with the live Temporal offset is stale (mid-year
+tzdata change or year rollover), and that zone falls back to live Intl
+formatting — so staleness degrades toward 04's cost per affected zone instead
+of producing incoherent pairs like "EST -04:00". Residual: a stale label
+whose offset coincides with the live one (MDT vs CST, both -06:00) passes the
+guard.
 
 All impls memoize the full response per UTC hour bucket
 (`shared/hourCache.ts`): a single global
@@ -132,14 +137,16 @@ tables must be regenerated when tzdata/CLDR changes or the year rolls
 over**; `tests/classes.test.ts` validates the table's groups against live
 Intl across the year and around every 2026 transition.
 
-`07-precomputed` takes that to its logical end: the generator also emits
-`shared/schedule.ts` — every class's (abbr, offset) segments with transition
-instants for the whole year — so a call is pure data lookup with zero Intl
-usage. Cold start ~0.7ms, miss ~0.03ms, ~2MB RSS (vs ~63ms / ~4ms / ~50MB
-for 04), at ~20KB minified. Same regeneration caveat as 06, but stronger:
-abbrs/offsets themselves are baked in, not just groupings.
-`tests/schedule.test.ts` asserts output-equality with 04. Out-of-year
-timestamps clamp to the year's first/last segment.
+`07-precomputed` takes that to its logical end: the generator emits
+`shared/schedule.ts` — a YEAR-INDEPENDENT schedule fitted by probing three
+consecutive years: static states, two-state nth-weekday-of-month rules
+("second Sunday of March at 02:00 wall"), and current-year segments for the
+few zones whose rules aren't Gregorian (Morocco/Palestine Ramadan rules) —
+so a call is pure date math with zero Intl usage, and stays correct across
+year boundaries until a country actually changes policy. Regeneration is
+needed on tzdata/CLDR changes (and yearly only for the irregular zones).
+`tests/schedule.test.ts` asserts output-equality with 04 including
+next-year instants; irregular zones clamp outside the generated year.
 
 ## Running
 

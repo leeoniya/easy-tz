@@ -1,49 +1,57 @@
-// Attempt 7: zero-Intl implementation. The entire year's (abbr, offset)
-// schedule is precomputed by tools/gen-classes.ts into shared/schedule.ts;
-// a call is just a segment lookup per class — no Intl.DateTimeFormat is ever
-// constructed, so there is no formatter cold start and no ICU memory. The
-// full response is memoized per UTC hour bucket (see shared/hourCache.ts).
+// Attempt 7: zero-Intl implementation. The generated schedule (static states,
+// year-independent nth-weekday rules, and current-year irregular segments —
+// see shared/rules.ts) is baked by tools/gen-core.ts into shared/schedule.ts;
+// a call resolves each class's state with pure date math — no
+// Intl.DateTimeFormat is ever constructed, so there is no formatter cold
+// start and no ICU memory. The full response is memoized per UTC hour bucket
+// (see shared/hourCache.ts).
 //
-// Timestamps outside the generated year clamp to its first/last segment.
+// Year rollover: static and rule classes stay correct in future years until
+// a country changes policy; only irregular zones (non-Gregorian rules) clamp
+// to their current-year segments outside the generated year.
 //
-// CAVEAT: abbrs and offsets are baked at generation time — regenerate with
-// `bun run gen` on tzdata/CLDR changes and year rollover.
-// tests/schedule.test.ts asserts output-equality with impl 04.
+// CAVEAT: values are baked at generation time — regenerate with `bun run gen`
+// on tzdata/CLDR changes. tests/schedule.test.ts asserts output-equality
+// with impl 04, including next-year instants.
 
 import type { TimeZoneInfo } from '../../shared/types.ts';
 import { zones } from '../../shared/zones.ts';
 import { scheduleClasses, YEAR_START, STEP_MS } from '../../shared/schedule.ts';
-import { scheduleOffsets } from '../../shared/offsets.ts';
+import { resolveClass, buildScheduleIndex } from '../../shared/rules.ts';
+import { formatOffsetMinutes } from '../../shared/fmt.ts';
 import { hourBucketMemo } from '../../shared/hourCache.ts';
 import { makeInfo } from '../../shared/zoneLinks.ts';
 
-// zones-list order -> schedule class index, resolved once at module load.
-// -1 marks zones the runtime knows but the generated table doesn't (only
-// possible when the table is stale); they fall back to UTC rather than throw.
-const classIdxByZone = new Map<string, number>();
+// zones-list order -> schedule class index, resolved once at module load,
+// bridging spelling variants (Asia/Kolkata <-> Asia/Calcutta) so tables from
+// a different runtime's zone list still serve this one. -1 marks zones the
+// table doesn't cover even after bridging (genuinely new zones on a stale
+// table); with no Intl available here they fall back to UTC rather than throw.
+const classIdx = buildScheduleIndex(zones, scheduleClasses);
 
-for (let c = 0; c < scheduleClasses.length; c++) {
-  for (const z of scheduleClasses[c]!.zones) classIdxByZone.set(z, c);
+const offsetStrCache = new Map<number, string>();
+
+function offsetStr(offMin: number): string {
+  let s = offsetStrCache.get(offMin);
+
+  if (s === undefined) {
+    s = formatOffsetMinutes(offMin);
+    offsetStrCache.set(offMin, s);
+  }
+
+  return s;
 }
 
-const classIdx = zones.map((z) => classIdxByZone.get(z) ?? -1);
-
 function compute(timestamp: number): TimeZoneInfo[] {
-  const step = Math.max(0, Math.floor((timestamp - YEAR_START) / STEP_MS));
-
-  // resolve the active segment per class (classes have 1-4 segments)
   const nClasses = scheduleClasses.length;
   const abbrNow = new Array<string>(nClasses);
   const offsetNow = new Array<string>(nClasses);
 
   for (let c = 0; c < nClasses; c++) {
-    const { starts, abbrs } = scheduleClasses[c]!;
-    let i = starts.length - 1;
+    const st = resolveClass(scheduleClasses[c]!, timestamp, YEAR_START, STEP_MS);
 
-    while (i > 0 && starts[i]! > step) i--;
-
-    abbrNow[c] = abbrs[i]!;
-    offsetNow[c] = scheduleOffsets[c]![i]!;
+    abbrNow[c] = st.abbr;
+    offsetNow[c] = offsetStr(st.offMin);
   }
 
   const out: TimeZoneInfo[] = [];
