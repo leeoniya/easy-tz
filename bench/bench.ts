@@ -2,6 +2,7 @@
 // Run: bun bench/bench.ts
 
 import { impls } from '../impls/registry.ts';
+import { libImpls } from '../impls/lib-registry.ts';
 import { printTable } from '../tools/print-table.ts';
 import { zones } from '../shared/zones.ts';
 import { genMeta } from '../shared/schedule.ts';
@@ -28,7 +29,9 @@ interface Row {
 
 const rows: Row[] = [];
 
-for (const impl of impls) {
+const benchImpls = [...impls, ...libImpls];
+
+for (const impl of benchImpls) {
   // the warm-up below primes this impl's formatter caches; the true cold
   // cost is measured separately in fresh subprocesses.
   const timeMs = (ts: number) => {
@@ -65,8 +68,9 @@ for (const row of rows) {
       process.execPath,
       '-e',
       `const { impls } = await import(${JSON.stringify(new URL('../impls/registry.ts', import.meta.url).pathname)});
+       const { libImpls } = await import(${JSON.stringify(new URL('../impls/lib-registry.ts', import.meta.url).pathname)});
        const { formatterCount } = await import(${JSON.stringify(new URL('../shared/fmt.ts', import.meta.url).pathname)});
-       const impl = impls.find((i) => i.id === ${JSON.stringify(row.id)});
+       const impl = [...impls, ...libImpls].find((i) => i.id === ${JSON.stringify(row.id)});
        Bun.gc(true);
        const rss0 = process.memoryUsage().rss;
        const t0 = Bun.nanoseconds();

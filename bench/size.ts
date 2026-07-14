@@ -4,12 +4,13 @@
 // Run: bun bench/size.ts
 
 import { impls } from '../impls/registry.ts';
+import { libImpls } from '../impls/lib-registry.ts';
 import { printTable } from '../tools/print-table.ts';
 
 export async function minifiedSizes(): Promise<Map<string, number>> {
   const sizes = new Map<string, number>();
 
-  for (const impl of impls) {
+  for (const impl of [...impls, ...libImpls]) {
     const entry = new URL(`../impls/${impl.id}/index.ts`, import.meta.url).pathname;
 
     const result = await Bun.build({

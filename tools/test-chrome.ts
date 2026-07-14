@@ -6,9 +6,10 @@
 //
 // Run: bun run test (chained after bun's unit tests)
 
-import { bundleBrowserEntry, launchChrome, KILL_TEMPORAL, NO_TEMPORAL_IDS } from './chrome-harness.ts';
+import { bundleBrowserEntry, bundleLibBrowserEntry, launchChrome, KILL_TEMPORAL, NO_TEMPORAL_IDS } from './chrome-harness.ts';
 import { printTable } from './print-table.ts';
 import type { ValidateResult } from './bench-browser-entry.ts';
+import type { InitInfo } from '../impls/08-verified-sharing/index.ts';
 
 interface Vs04 {
   checked: number;
@@ -41,7 +42,7 @@ try {
     vs04.set(id, (await page.evaluate(`__verifyVs04(${JSON.stringify(id)})`)) as Vs04);
   }
 
-  const init08 = rows.find((r) => r.id === '08-verified-sharing')?.init;
+  const init08 = rows.find((r) => r.id === '08-verified-sharing')?.init as InitInfo | null | undefined;
 
   // rollover resistance: past the generated year, 10 and 07 must remain
   // output-identical to live 04 for rule/static zones (irregular zones are
@@ -58,13 +59,13 @@ try {
   await noTempPage.evaluate(KILL_TEMPORAL);
   await noTempPage.evaluate(code);
 
-  let init08NoT: ValidateResult['init'];
+  let init08NoT: InitInfo | null | undefined;
 
   for (const id of NO_TEMPORAL_IDS) {
     const r = (await noTempPage.evaluate(`__validate(${JSON.stringify(id)})`)) as ValidateResult;
     rows.push({ ...r, label: `${id} (no-T)` });
 
-    if (id === '08-verified-sharing') init08NoT = r.init;
+    if (id === '08-verified-sharing') init08NoT = r.init as InitInfo | null | undefined;
 
     vs04.set(`${id} (no-T)`, (await noTempPage.evaluate(`__verifyVs04(${JSON.stringify(id)})`)) as Vs04);
   }
@@ -137,6 +138,45 @@ try {
   if (failed) process.exit(1);
 
   console.log('\nchrome correctness: all checks passed');
+
+  // ---- library comparison impls: INFORMATIONAL, never gates the exit ----
+  // same fixtures + letter-abbr + vs-04 checks run against the bundled-tzdata
+  // libraries; failures here reflect their data vintage and tzdata-vs-CLDR
+  // abbreviation conventions, not bugs in this repo
+  const libPage = await browser.newPage();
+  await libPage.evaluate(await bundleLibBrowserEntry());
+
+  const libIds = (await libPage.evaluate('__benchIds')) as string[];
+
+  if (libIds.length > 0) {
+    const libRows: string[][] = [];
+    const details: string[] = [];
+
+    for (const id of libIds) {
+      const v = (await libPage.evaluate(`__validate(${JSON.stringify(id)})`)) as ValidateResult;
+      const eq = (await libPage.evaluate(`__verifyVs04(${JSON.stringify(id)})`)) as Vs04;
+
+      libRows.push([
+        id,
+        `${v.fixturesPassed}/${v.fixturesTotal}`,
+        `${v.letterAbbrs}/${v.zones}`,
+        `${eq.checked - eq.mismatchCount}/${eq.checked}`,
+      ]);
+
+      for (const f of v.fixtureFailures) details.push(`  ${id}: fixture ${f}`);
+      for (const m of eq.mismatches.slice(0, 3)) details.push(`  ${id}: vs04 ${m}`);
+    }
+
+    console.log('\nlibrary correctness (informational, non-gating):\n');
+    printTable(['library impl', 'fixtures', 'letter abbrs', 'vs 04'], libRows);
+
+    if (details.length > 0) {
+      console.log('\nsample failures:');
+      for (const d of details) console.log(d);
+    }
+  }
+
+  await libPage.close();
 } finally {
   await browser.close();
 }

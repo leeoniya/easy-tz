@@ -10,6 +10,7 @@
 // Run: bun bench/mem.ts
 
 import { impls } from '../impls/registry.ts';
+import { libImpls } from '../impls/lib-registry.ts';
 import { printTable } from '../tools/print-table.ts';
 
 const SAMPLES = 5;
@@ -27,7 +28,7 @@ const probePath = new URL('./mem-probe.ts', import.meta.url).pathname;
 
 const rows: string[][] = [];
 
-for (const impl of impls) {
+for (const impl of [...impls, ...libImpls]) {
   const samples: Probe[] = [];
 
   for (let i = 0; i < SAMPLES; i++) {

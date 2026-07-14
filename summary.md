@@ -43,8 +43,15 @@ results are shared arrays — treat as immutable. Chrome numbers:
 |---|---|---|---|---|---|
 | `04-live-intl` | none — always live | ~40ms (~130x) | ~1.5ms | +26MB | 6.2KB |
 | `08-verified-sharing` | near-none (rename corner) | ~22ms (~70x) | ~0.6ms | +19MB | 10.4KB |
-| `10-audited-rules` | near-none (audited at init) | ~2.5ms (~8x) | ~0.05ms | +7MB | 11.7KB |
-| `07-baked-rules` | low: few zones/yr until regen | ~0.3ms (1x) | ~0.05ms | +6MB | 10.2KB |
+| `10-audited-rules` | near-none (audited at init) | ~2.5ms (~8x) | ~0.05ms | +7.5MB | 11.7KB |
+| `07-baked-rules` | low: few zones/yr until regen | ~0.3ms (1x) | ~0.05ms | +5.7MB | 10.2KB |
+
+These match the anchors in `impls/registry.ts` (idle machine, outside the
+dev sandbox); `comparison.html` uses an in-sandbox idle run, which carries a
+slight across-the-board penalty. Cold is the median over 5 fresh page
+contexts. Our impls and the comparison libraries are bundled separately
+(`bench-browser-entry` vs `lib-browser-entry`), so the libraries' ~4MB of
+tzdata never inflates our impls' cold readings.
 
 - **04-live-intl** — everything from live Intl (one formatter + one
   `formatToParts` per zone, arithmetic offsets). The baseline, the test

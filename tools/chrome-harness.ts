@@ -45,6 +45,12 @@ export async function bundleBrowserEntry(): Promise<string> {
   }
 }
 
+// bundles tools/lib-browser-entry.ts (comparison libraries + impl-04
+// baseline); no table flip needed since nothing in it imports the tables
+export async function bundleLibBrowserEntry(): Promise<string> {
+  return bundleForBrowser(new URL('./lib-browser-entry.ts', import.meta.url).pathname);
+}
+
 export async function launchChrome(): Promise<Browser> {
   return puppeteer.launch({
     executablePath: await findHeadlessShell(),
