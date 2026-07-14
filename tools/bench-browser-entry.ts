@@ -76,6 +76,7 @@ export interface ValidateResult {
   zones: number;
   fixturesPassed: number;
   fixturesTotal: number;
+  fixtureFailures: string[];
   letterAbbrs: number;
   init?: InitInfo | null | undefined;
 }
@@ -84,11 +85,18 @@ export interface ValidateResult {
   const impl = impls.find((i) => i.id === implId)!;
 
   let fixturesPassed = 0;
+  const fixtureFailures: string[] = [];
 
   for (const f of fixtures) {
     const info = impl.getTimeZonesAt(f.ts).find((z) => z.name === f.zone || z.name === f.altZone);
 
-    if (info !== undefined && info.abbr === f.abbr && info.offset === f.offset) fixturesPassed++;
+    if (info !== undefined && info.abbr === f.abbr && info.offset === f.offset) {
+      fixturesPassed++;
+    } else if (fixtureFailures.length < 10) {
+      fixtureFailures.push(
+        `${f.zone} (${f.desc}): expected ${f.abbr} ${f.offset}, got ${info === undefined ? 'missing' : `${info.abbr} ${info.offset}`}`
+      );
+    }
   }
 
   const summer = impl.getTimeZonesAt(Date.UTC(2026, 6, 15));
@@ -101,6 +109,7 @@ export interface ValidateResult {
     zones: zones.length,
     fixturesPassed,
     fixturesTotal: fixtures.length,
+    fixtureFailures,
     letterAbbrs,
     init: implId === '08-verified-sharing' ? getInitInfo() : undefined,
   };

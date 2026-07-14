@@ -140,6 +140,38 @@ for (const { id, getTimeZonesAt, clearCache } of variants) {
   });
 }
 
+describe('hour-bucket quantization window (Australia/Lord_Howe)', () => {
+  // Lord Howe is the only zone whose transition falls MID-HOUR in UTC: its
+  // +10:30 base offset puts the 2026 spring-forward at Oct 3 15:30Z. Since
+  // the memo evaluates each bucket at its start, calls in 15:30-16:00Z
+  // return the pre-transition value — a KNOWN design tradeoff (bounded at
+  // 30 min, for this single zone), pinned here so a future change to the
+  // bucketing strategy revisits it deliberately.
+  for (const { id, getTimeZonesAt, clearCache } of variants) {
+    const liveValues =
+      id === '04-live-intl' ||
+      (id === '08-verified-sharing' && typeof Temporal === 'undefined') ||
+      tablesAligned;
+    const testValues = liveValues ? test : test.skip;
+
+    testValues(`${id}: mid-hour transition quantizes to the bucket start`, () => {
+      const zone = (ts: number) => {
+        clearCache();
+        return getTimeZonesAt(ts).find((z) => z.name === 'Australia/Lord_Howe')!;
+      };
+
+      // 15:45Z is after the 15:30Z transition, but the bucket evaluates at
+      // 15:00Z -> still reports pre-transition LHST +10:30
+      const quantized = zone(Date.UTC(2026, 9, 3, 15, 45));
+      expect(`${quantized.abbr} ${quantized.offset}`).toBe('LHST +10:30');
+
+      // the next bucket sees the new offset
+      const nextBucket = zone(Date.UTC(2026, 9, 3, 16, 0));
+      expect(`${nextBucket.abbr} ${nextBucket.offset}`).toBe('LHDT +11:00');
+    });
+  }
+});
+
 describe('cache-hit vs cache-miss ratio', () => {
   test('hits are at least 10x faster than misses (all impls)', () => {
     for (const { getTimeZonesAt, clearCache } of variants) {
