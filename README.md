@@ -40,7 +40,7 @@ the host timezone (`TZ`). Historical tzdata accuracy is a non-goal.
 - `tools/audit-abbrs.ts` — audits the curated maps in `shared/abbrs.ts`
   against current CLDR data (drift detection; abbrs themselves are curated
   by hand)
-- `comparison.html` — third-party library comparison: 12 candidates
+- `comparison.md` — third-party library comparison: 12 candidates
   validated for built-in DST-aware abbreviations, plus correctness/benchmark
   results for the 4 that qualified (see `tools/validate-libs.ts` and the
   informational section of `bun run test`)

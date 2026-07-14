@@ -47,7 +47,7 @@ results are shared arrays — treat as immutable. Chrome numbers:
 | `07-baked-rules` | low: few zones/yr until regen | ~0.3ms (1x) | ~0.05ms | +5.7MB | 10.2KB |
 
 These match the anchors in `impls/registry.ts` (idle machine, outside the
-dev sandbox); `comparison.html` uses an in-sandbox idle run, which carries a
+dev sandbox); `comparison.md` uses an in-sandbox idle run, which carries a
 slight across-the-board penalty. Cold is the median over 5 fresh page
 contexts. Our impls and the comparison libraries are bundled separately
 (`bench-browser-entry` vs `lib-browser-entry`), so the libraries' ~4MB of

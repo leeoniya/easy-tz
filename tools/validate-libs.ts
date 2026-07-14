@@ -7,7 +7,7 @@
 // passthroughs emitting "GMT+2"; @tubular/time — GMT±n outside North
 // America; @vvo/tzdb — static standard-time abbrs, no timestamp API;
 // spacetime — no abbreviation API; @js-joda — errors without the locale
-// plugin, generic non-DST names with it) is recorded in comparison.html.
+// plugin, generic non-DST names with it) is recorded in comparison.md.
 // Those packages were uninstalled after evaluation; this script keeps the
 // qualifying probes reproducible.
 //
