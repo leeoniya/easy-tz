@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "check": "tsc -p tsconfig.json",
+    "build": "bun tools/build-dist.ts",
     "test": "bun test && bun tools/test-chrome.ts",
     "test:tz": "TZ=UTC bun test && TZ=America/Chicago bun test && TZ=Pacific/Kiritimati bun test",
     "bench": "bun tools/bench-all.ts",
