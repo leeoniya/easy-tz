@@ -13,5 +13,5 @@
     "lib": ["esnext"],
     "types": ["bun"]
   },
-  "include": ["shared", "impls", "tests", "bench"]
+  "include": ["shared", "impls", "tests", "bench", "tools"]
 }

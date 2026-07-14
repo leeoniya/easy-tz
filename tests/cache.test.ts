@@ -1,8 +1,8 @@
 import { describe, test, expect } from 'bun:test';
-import * as impl04 from '../impls/04-intl-single-fmt/index.ts';
-import * as impl07 from '../impls/07-precomputed/index.ts';
-import * as impl08 from '../impls/08-verified-reps/index.ts';
-import * as impl09 from '../impls/09-live-offsets/index.ts';
+import * as impl04 from '../impls/04-live-intl/index.ts';
+import * as impl07 from '../impls/07-baked-rules/index.ts';
+import * as impl08 from '../impls/08-verified-sharing/index.ts';
+import * as impl09 from '../impls/09-guarded-hybrid/index.ts';
 import { genMeta } from '../shared/schedule.ts';
 
 // value-asserting tests for table-based impls only run when the tables were
@@ -21,10 +21,10 @@ const timeMs = (fn: () => void) => {
 };
 
 const variants = [
-  { id: '04-intl-single-fmt', ...impl04 },
-  { id: '07-precomputed', ...impl07 },
-  { id: '08-verified-reps', ...impl08 },
-  { id: '09-live-offsets', ...impl09 },
+  { id: '04-live-intl', ...impl04 },
+  { id: '07-baked-rules', ...impl07 },
+  { id: '08-verified-sharing', ...impl08 },
+  { id: '09-guarded-hybrid', ...impl09 },
 ];
 
 for (const { id, getTimeZonesAt, clearCache } of variants) {
@@ -75,8 +75,8 @@ for (const { id, getTimeZonesAt, clearCache } of variants) {
     });
 
     const liveValues =
-      id === '04-intl-single-fmt' ||
-      ((id === '08-verified-reps' || id === '09-live-offsets') && typeof Temporal === 'undefined') ||
+      id === '04-live-intl' ||
+      ((id === '08-verified-sharing' || id === '09-guarded-hybrid') && typeof Temporal === 'undefined') ||
       tablesAligned;
     const testValues = liveValues ? test : test.skip;
 
@@ -141,7 +141,7 @@ for (const { id, getTimeZonesAt, clearCache } of variants) {
 }
 
 describe('cache-hit vs cache-miss ratio', () => {
-  test('hits are at least 10x faster than misses (both impls)', () => {
+  test('hits are at least 10x faster than misses (all impls)', () => {
     for (const { getTimeZonesAt, clearCache } of variants) {
       clearCache();
 

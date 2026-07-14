@@ -26,7 +26,7 @@ const partsFmt = fmtCache({
 
 const abbrCache = new Map<string, string>();
 
-export function resolveAbbr(longName: string): string {
+function resolveAbbr(longName: string): string {
   let abbr = abbrCache.get(longName);
 
   if (abbr === undefined) {

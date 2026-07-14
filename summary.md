@@ -1,113 +1,122 @@
 # Summary: `getTimeZonesAt()` implementation experiments
 
-_2026-07-12 — bun 1.4.0, typescript 7.0.2, 445 IANA zones_
+_updated 2026-07-13 — bun 1.4.0, chrome-headless-shell 150, typescript 7.0.2_
 
-The project contains three retained implementations of `getTimeZonesAt(timestamp)`, a DST/equivalence test suite (114 tests), and validation, benchmark, bundle-size, and audit tooling. The implementations have zero runtime dependencies; devDependencies (`typescript` for type checking, `@types/bun`/`@types/node` for tooling types, `@swc/core` for the size assessment) were installed with `--ignore-scripts`. Bun is the runtime since it runs TS natively and has a built-in test runner.
+Four retained implementations of `getTimeZonesAt(timestamp)` spanning a
+live-to-baked trust spectrum, a two-stage test suite (151 bun tests + an
+in-Chrome correctness stage), and unified generation/benchmark tooling.
+Implementations have zero runtime dependencies; devDependencies
+(`typescript`, `@types/*`, `puppeteer-core`, `@puppeteer/browsers`)
+are installed with `--ignore-scripts`. Chrome (headless shell) is the primary
+generation/benchmark target; bun runs transparently as tool host, fast test
+runner, and no-Temporal (Safari) fallback proxy.
 
 ## Key findings
 
-- `Intl.DateTimeFormat` alone can't give you real abbreviations — with `timeZoneName: 'short'` the `en` CLDR data only has letter abbreviations for ~113 of 445 zones (mostly North America); everything else comes back as `GMT+3`. The working approach: take the `'long'` name ("Eastern European Summer Time"), derive initials, and correct the cases where the convention breaks (EET, MSK, WAT, …) with a ~1.5KB curated map (`shared/abbrs.ts`). No dependency needed.
-- Formatter construction dominates all runtime cost (~100x more expensive than `format()`), so the optimization ladder is: cache formatters per zone → share formatters across behavior-identical zones (only 188 distinct behaviors exist in 2026) → precompute the whole year at build time and use no Intl at all.
-- The 43 zones without letter abbreviations (`Etc/GMT±n`, `Asia/Urumqi`, Russian oblast zones, …) genuinely use numeric abbreviations in modern tzdata too, so they fall back to a compact `GMT+3` form; `Europe/Istanbul` → TRT and the Channel Islands → `Europe/London` are special-cased.
+- `Intl.DateTimeFormat` alone can't give real abbreviations — `en` CLDR only
+  has letter abbreviations for ~113 of 445 zones with `timeZoneName:'short'`.
+  Fix: derive initials from the `'long'` name and correct the exceptions
+  (EET, MSK, WAT, …) with a ~1.5KB curated map (`shared/abbrs.ts`).
+- Formatter construction dominates runtime cost (~100x a `format()` call).
+  The optimization ladder: cache per zone → share across verified
+  behavior-identical groups → bake everything and use no Intl at all.
+- DST transitions are expressible as year-independent nth-weekday rules for
+  every zone on earth except religious-calendar rules (Morocco, Palestine —
+  4 zones). Probing 3 consecutive years lets the generator fit these rules,
+  making baked tables survive year rollover.
+- Temporal (Chrome/Firefox, not Safari/bun) enables cheap exactness: offset
+  queries without formatters, and exact transition-walk verification of
+  grouping hints (~2-5ms for all zones).
+- Runtimes genuinely disagree: bun (ICU 75) vs Chrome 150 differ in zone
+  count (445 vs 418), canonical spellings (`Asia/Kolkata` vs `Asia/Calcutta`
+  — bridged by `shared/zoneLinks.ts`), tzdata vintage, and CLDR names.
+  Tables must be generated inside the target runtime; provenance (`genMeta`)
+  gates which tests may compare them against live Intl.
 
 ## Current implementations
 
-All three memoize the full response per UTC hour bucket in a single global slot (`shared/hourCache.ts`): compute runs at the bucket start, hits return the shared array (treat as immutable), and only same-bucket repeats hit.
+All memoize the full response per UTC hour bucket (`shared/hourCache.ts`);
+results are shared arrays — treat as immutable. Chrome numbers:
 
-| impl | strategy | cold | hit median | miss mean | RSS (1st call + 25 misses) | minified |
-|---|---|---|---|---|---|---|
-| `04-intl-single-fmt` | one cached formatter + one `formatToParts` per zone; offset derived arithmetically from wall-clock fields | ~63ms | 0.3µs | ~4.0ms | +51MB | 5,100 B |
-| `06-class-reps` | 04, but zones with identical (long name, offset) behavior share one representative formatter and parse result, via generated `shared/classes.ts` (445 zones → 188 classes) | ~29ms | 0.1µs | ~1.2ms | +24MB | 11,321 B |
-| `07-precomputed` | zero Intl: the whole year's (abbr, offset) segments are baked into generated `shared/schedule.ts` (185 classes, 253 segments); a call is a segment lookup | ~0.7ms | 0.1µs | ~0.03ms | +2.4MB | 20,264 B |
+| impl | staleness risk | cold | miss | rss | bundle |
+|---|---|---|---|---|---|
+| `04-live-intl` | none — always live | ~65ms (~130x) | ~2.6ms | +26MB | 6.0KB |
+| `08-verified-sharing` | near-none (rename corner) | ~35ms (~70x) | ~1.1ms | +19MB | 10.2KB |
+| `09-guarded-hybrid` | near-none (stale goes live) | ~2ms (~4x) | ~0.7ms | +9MB | 14.8KB |
+| `07-baked-rules` | low: few zones/yr until regen | ~0.5ms (1x) | ~0.05ms | +6MB | 10.1KB |
 
-All three: 26/26 fixtures, 402/445 letter abbreviations. The spectrum is bundle size vs runtime cost vs trust: 04 is smallest and needs no generated data; 06 needs the class groupings regenerated on tzdata/CLDR changes; 07 is fastest and leanest at runtime but bakes abbrs/offsets themselves into the bundle, so stale data means wrong (not just slow) results. See "tzdata change frequency" below for how often that trust is tested in practice.
+- **04-live-intl** — everything from live Intl (one formatter + one
+  `formatToParts` per zone, arithmetic offsets). The baseline, the test
+  oracle, and the only impl needing no generated data. Runs anywhere.
+- **08-verified-sharing** — live values through formatters shared across
+  zone groups whose equivalence is PROVEN at first call via Temporal's
+  transition walk (~2-5ms); diverged groups split and self-heal. Re-verifies
+  for whatever year it runs in. Without Temporal: identical to 04.
+- **09-guarded-hybrid** — baked labels (rule schedule) + live Temporal
+  offsets, with a per-call coherence guard: any zone whose baked offset
+  disagrees with the live one falls back to live Intl. Never wrong about
+  time; staleness degrades cost, not correctness. Zone-name skew bridged;
+  unknown zones go live. Without Temporal: identical to 04.
+- **07-baked-rules** — zero Intl: static states + nth-weekday rules resolved
+  by pure date math (irregular zones clamp outside the generated year).
+  Fastest and leanest; wrong (coherently) for affected zones between a
+  policy change and regeneration+redeploy. Zone-name skew bridged; unknown
+  zones return a UTC sentinel.
 
-Earlier attempts (naive `timeZoneName: 'short'`, uncorrected long-name initials, a two-formatters-per-zone variant, and a standalone hour-cache wrapper) were evaluated and removed; their useful parts live on as the initials fallback, the test-suite `longOffset` oracle, and `shared/hourCache.ts`.
+The trust/perf asymmetry is the headline: 04→07 buys ~130x cold start while
+risk moves only from "none" to "low and bounded" (~1-4 tzdata events/year ×
+1-3 zones, window = regen cadence; see next section).
+
+Removed attempts (naive `'short'` names, uncorrected initials,
+two-formatters-per-zone, standalone hour-cache, trusted-sharing
+`06-class-reps`) live on as the initials fallback, the `longOffset` oracle,
+`shared/hourCache.ts`, and 08's class-group hints.
 
 ## tzdata change frequency and staleness exposure
 
-How often does tzdata actually change in ways that would invalidate the
-generated tables? From the IANA release history (as of 2026-07-12):
+From the IANA release history: ~5 releases/year over the last decade,
+trending to 2-4/year; the dangerous subset — a country changing rules
+*within the current year* — runs at **~1-4 events/year touching 1-3 zones**
+(2026: Alberta permanent −06, Morocco permanent +00; 2024: Kazakhstan,
+Paraguay; 2023: Egypt, Lebanon with days of notice; 2022 worst: Jordan,
+Syria, Mexico, Iran, Chile, Fiji). Notice can be negative: Alberta's change
+took effect Jun 18 but tzdata 2026c landed Jul 8 — even live-Intl impls were
+wrong ~3 weeks because upstream lagged.
 
-- Overall cadence: ~5 releases/year over the last decade (2015: 7, 2016: 10,
-  2017: 3, 2018: 9, 2019: 3, 2020: 6, 2021: 5, 2022: 7, 2023: 4, 2024: 2,
-  2025: 3, 2026: 3 so far), trending toward 2-4/year. Most releases only
-  touch historical data or future years.
-- The dangerous subset — a country changing its offset/DST rules *within the
-  current year* — has run at **~1-4 events/year, each touching 1-3 zones**:
-  2026: Alberta permanent −06 (eff. Jun 18), Morocco permanent +00 (eff.
-  Sep 20); 2024: Kazakhstan +05, Paraguay permanent DST; 2023: Egypt DST
-  reintroduction (~1 month notice), Lebanon reversal (*days* of notice);
-  2022 (worst recent year): Jordan, Syria, Mexico, Iran, Chile, Fiji.
-- Notice can be negative: Alberta's change took effect Jun 18 but the tzdata
-  release documenting it (2026c) landed Jul 8 — even live-Intl impls were
-  wrong for ~3 weeks because upstream data itself lagged.
+Exposure once the runtime's ICU picks up a change: 04 self-heals; 08
+self-heals (verification splits diverged groups); 09's offsets self-heal and
+stale labels demote to live formatting; 07 is wrong for affected zones until
+regenerated. Year rollover is a non-event for all four (rules hold; only the
+4 irregular zones need the January regen). The equivalence tests and the
+in-Chrome vs-04 sweeps are the tripwire that makes table staleness loud.
 
-Exposure per impl once the runtime's ICU picks up a change:
+## Tooling (unified; bun runs underneath transparently)
 
-- **04** — fully self-healing; no generated data. In browsers, end users'
-  evergreen ICU updates apply automatically.
-- **06** — values self-heal (live Intl); only the *groupings* are frozen. A
-  change is harmless when it moves a whole group together (Morocco:
-  Casablanca + El_Aaiun share a class) but poisonous when a zone diverges
-  from its group: Edmonton is grouped with Boise/Denver/etc., so with a
-  stale table it would report MST −07:00 after Nov 1 when Alberta is really
-  CST −06:00 — a silently wrong offset.
-- **07** — everything is baked; every affected zone is wrong (values
-  included) until regenerated and redeployed. Also has a guaranteed annual
-  staleness event at year rollover (clamping holds only until the new
-  year's first transition, ~mid-February at the earliest).
+- `bun run gen` — regenerates BOTH table variants: Chrome-aligned (primary,
+  verified in-browser, ~195k checks over 3 probed years — the shippable
+  artifact) and bun-aligned (keeps the local suite fully covered). ~2.5s per
+  variant. Required on tzdata/CLDR changes; January matters only for the 4
+  irregular zones.
+- `bun run test` — 151 bun tests (DST boundaries, oracle, cache semantics,
+  cross-variant zone-name bridge, next-year rule correctness) + the Chrome
+  stage: fixtures, letter-abbr coverage, vs-04 deep equality (8,360 checks ×
+  5 including no-Temporal Safari-fallback pages), and 2027 rollover checks
+  for 07/09.
+- `bun run bench` — performance only: Chrome table (cold/hit/miss,
+  formatter counts, renderer RSS, bundle KB) + supplementary bun pass
+  (Safari-fallback proxy) + the feature comparison matrix.
+- `bun run size` / `bun run mem` — bundle sizes; phase-split memory with
+  JS-heap vs native (~ICU) attribution.
+- `bun run audit` — curated-map drift detection against current CLDR.
+- `bun run tables <bun|chrome>` — (plumbing) switch the active variant.
+- Curated files (`shared/abbrs.ts`, `shared/zoneLinks.ts`,
+  `shared/fixtures.ts`) carry `curation-reviewed` watermarks; the agent
+  skill `.cursor/skills/maintain-curated-tz-data/` documents the review
+  workflow driven by IANA NEWS diffs since the watermark.
 
-The equivalence tests (`tests/classes.test.ts`, `tests/schedule.test.ts`)
-are the tripwire: they compare 06/07 against live-Intl 04, so an ICU update
-that invalidates the tables fails the suite loudly (the 2026c release, four
-days before this was written, will do exactly that for Edmonton once this
-runtime's ICU catches up — the 2026 tables generated today already bake in
-the outdated Alberta and Morocco rules).
+## Verification snapshot
 
-> **Update 6 (2026-07-13):** the implementation set has evolved well beyond
-> the table above — see README.md and `bun run bench` / `bench:chrome` for
-> current standings. Notable: `08-verified-reps` (formatter sharing with
-> Temporal-verified grouping hints) superseded and replaced `06-class-reps`
-> (same speed, verified instead of trusted); `09-live-offsets` (baked abbrs
-> + live Temporal offsets) joined as the portable middle ground; generated
-> tables are packed (22-53% smaller minified) and dual-variant
-> (bun/Chrome, switchable via `bun run tables`).
-
-## Tooling
-
-- `bun run gen` — regenerates `shared/classes.ts` + `shared/schedule.ts` by probing every zone daily across the current year and binary-searching transitions to 15-min resolution (~1s). **Required on tzdata/CLDR changes and year rollover.**
-- `bun run audit` — checks the curated maps in `shared/abbrs.ts` against current CLDR: errors on diverged zone aliases (exit 1), warns on new initials-resolved long names and stale override entries, lists GMT-fallback zones.
-- `bun run bench` — fixtures validation + cold (fresh subprocess) / cache-hit loop / cache-miss loop timings per impl, 25 iterations.
-- `bun run size` — minified bundle size per impl (swc bundle + minify, no gzip).
-
-## Chrome-aligned generation (scoped reliability)
-
-For the "reliable in latest stable Chrome" scope, tables are generated
-*inside* chrome-headless-shell so alignment with Chrome's ICU is guaranteed
-by construction: `bun run gen:chrome` bundles the generator core (swc),
-evaluates it in the browser (puppeteer-core), verifies both tables against
-that same browser's live Intl (~90k checks), and writes the files with
-Chrome provenance. `bun run gen` remains the bun-aligned path for local dev.
-
-Key mechanics:
-
-- Generated files export `genMeta` (host + ICU version). Live-Intl
-  equivalence tests skip with a warning when the executing runtime doesn't
-  match — preventing spurious failures — while Chrome tables get their
-  verification in-browser during generation.
-- The bun (ICU 75) vs Chrome 150 diff is real and material: 445 vs 418
-  enumerated zones (Chrome uses legacy canonical names like `Asia/Calcutta`
-  and omits `Etc/GMT±n`), newer tzdata (bun's misses Paraguay's 2024 move to
-  permanent -03: bun says PYST/PYT with transitions, Chrome says PYT -03:00
-  year-round), and CLDR name changes (`West Kazakhstan Time` -> unified
-  Kazakhstan metazone).
-- Impl 06 tolerates cross-runtime tables: representatives are re-picked at
-  module load from group members the current runtime actually enumerates.
-  Impl 07 falls back to UTC for table-unknown zones (tripwire, not silent).
-
-## Verification
-
-- `bun run check` — `tsc` (TS 7) type-checks clean.
-- `bun test` — 114 tests pass: 1-minute-before/after checks at both 2026 US and EU transitions, Egypt DST (Cairo EET/EEST), southern-hemisphere Sydney (AEDT in January), half-hour-offset Kolkata, an Intl `'longOffset'` oracle validating every zone's offset, deep output-equality of 06 and 07 against 04 across the year and around every 2026 transition, and hour-bucket cache behavior/perf (hit vs miss loops) for all impls.
-- `bun run test:tz` — the full suite passes identically under `TZ=UTC`, `TZ=America/Chicago`, and `TZ=Pacific/Kiritimati`, confirming host-timezone independence.
+`bun run check` clean; 151/151 bun tests under TZ=UTC / America/Chicago /
+Pacific/Kiritimati; Chrome stage all green including rollover (09:
+1672/1672, 07: 1656/1656 vs live 04 at 2027 instants); generator
+self-verification 0 mismatches across all probed years in both runtimes.

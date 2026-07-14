@@ -23,10 +23,10 @@ import { abbrOverrides, zoneAliases, zoneAbbrOverrides } from '../shared/abbrs.t
 import { fmtCache, formatOffsetMinutes, initialsAbbr, compactGmt } from '../shared/fmt.ts';
 import { ruleInstant, resolveClass, type ScheduleClass, type ZoneState, type Rule } from '../shared/rules.ts';
 
-export const YEAR = new Date().getUTCFullYear();
-export const YEARS = [YEAR, YEAR + 1, YEAR + 2];
-export const YEAR_START = Date.UTC(YEAR, 0, 1);
-export const STEP_MS = 900_000; // 15 min
+const YEAR = new Date().getUTCFullYear();
+const YEARS = [YEAR, YEAR + 1, YEAR + 2];
+const YEAR_START = Date.UTC(YEAR, 0, 1);
+const STEP_MS = 900_000; // 15 min
 const STEPS_PER_DAY = 96;
 
 export interface GeneratedTables {
@@ -200,7 +200,12 @@ function fitRule(perYear: EffSeg[][], years: number[], ti: number, to: 0 | 1): R
 
     const cands = new Set(nthCandidates(years[yi]!, m, wall.getUTCDate()));
 
-    nthSet = nthSet === null ? cands : new Set([...nthSet].filter((n) => cands.has(n)));
+    if (nthSet === null) {
+      nthSet = cands;
+    } else {
+      const prev: Set<number> = nthSet;
+      nthSet = new Set([...prev].filter((n) => cands.has(n)));
+    }
 
     if (nthSet.size === 0) return null;
   }

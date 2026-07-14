@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test';
-import { getTimeZonesAt as precomputed, clearCache as clear07 } from '../impls/07-precomputed/index.ts';
-import { getTimeZonesAt as baseline, clearCache as clear04 } from '../impls/04-intl-single-fmt/index.ts';
+import { getTimeZonesAt as precomputed, clearCache as clear07 } from '../impls/07-baked-rules/index.ts';
+import { getTimeZonesAt as baseline, clearCache as clear04 } from '../impls/04-live-intl/index.ts';
 import { scheduleClasses, genMeta } from '../shared/schedule.ts';
 import { zones } from '../shared/zones.ts';
 import { fixtures } from '../shared/fixtures.ts';
@@ -25,7 +25,7 @@ function both(ts: number) {
   return [precomputed(ts), baseline(ts)] as const;
 }
 
-describe('07-precomputed equivalence with 04 baseline', () => {
+describe('07-baked-rules equivalence with 04 baseline', () => {
   testIfAligned('schedule table covers exactly the runtime zone list, well-formed classes', () => {
     const seen = new Set<string>();
     const known = new Set(zones);

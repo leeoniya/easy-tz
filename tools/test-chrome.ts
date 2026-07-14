@@ -6,7 +6,8 @@
 //
 // Run: bun run test (chained after bun's unit tests)
 
-import { bundleBrowserEntry, launchChrome, printTable, KILL_TEMPORAL, NO_TEMPORAL_IDS } from './chrome-harness.ts';
+import { bundleBrowserEntry, launchChrome, KILL_TEMPORAL, NO_TEMPORAL_IDS } from './chrome-harness.ts';
+import { printTable } from './print-table.ts';
 import type { ValidateResult } from './bench-browser-entry.ts';
 
 interface Vs04 {
@@ -15,7 +16,7 @@ interface Vs04 {
   mismatches: string[];
 }
 
-const VS04_IDS = ['08-verified-reps', '09-live-offsets', '07-precomputed'];
+const VS04_IDS = ['08-verified-sharing', '09-guarded-hybrid', '07-baked-rules'];
 
 const code = await bundleBrowserEntry();
 const browser = await launchChrome();
@@ -40,14 +41,14 @@ try {
     vs04.set(id, (await page.evaluate(`__verifyVs04(${JSON.stringify(id)})`)) as Vs04);
   }
 
-  const init08 = rows.find((r) => r.id === '08-verified-reps')?.init;
+  const init08 = rows.find((r) => r.id === '08-verified-sharing')?.init;
 
   // rollover resistance: past the generated year, 09 (coherence guard) and
   // 07 (year-independent rules; irregular zones clamp by design and are
   // skipped) must remain output-identical to live 04
   type Future = Vs04 & { skipped: number };
-  const future09 = (await page.evaluate(`__verifyFuture('09-live-offsets', false)`)) as Future;
-  const future07 = (await page.evaluate(`__verifyFuture('07-precomputed', true)`)) as Future;
+  const future09 = (await page.evaluate(`__verifyFuture('09-guarded-hybrid', false)`)) as Future;
+  const future07 = (await page.evaluate(`__verifyFuture('07-baked-rules', true)`)) as Future;
 
   await page.close();
 
@@ -62,7 +63,7 @@ try {
     const r = (await noTempPage.evaluate(`__validate(${JSON.stringify(id)})`)) as ValidateResult;
     rows.push({ ...r, label: `${id} (no-T)` });
 
-    if (id === '08-verified-reps') init08NoT = r.init;
+    if (id === '08-verified-sharing') init08NoT = r.init;
 
     vs04.set(`${id} (no-T)`, (await noTempPage.evaluate(`__verifyVs04(${JSON.stringify(id)})`)) as Vs04);
   }

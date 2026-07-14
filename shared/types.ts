@@ -20,6 +20,8 @@ export type GetTimeZonesAt = (timestamp: number) => TimeZoneInfo[];
 export interface Impl {
   id: string;
   label: string;
-  notes: string;
+  // strategy/optimization feature matrix, printed as a comparison table by
+  // the benchmark; all impls must use the same keys in the same order
+  features: Record<string, string>;
   getTimeZonesAt: GetTimeZonesAt;
 }

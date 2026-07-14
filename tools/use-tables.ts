@@ -1,7 +1,7 @@
 // Switches which generated table variant the impls use, by rewriting the
 // selector re-exports in shared/classes.ts and shared/schedule.ts.
 // Variants live side by side in shared/tables/{bun,chrome}/ (generate them
-// with `bun run gen` and `bun run gen:chrome`), so switching is instant.
+// with `bun run gen`, which regenerates both), so switching is instant.
 //
 // Run: bun run tables <bun|chrome>
 

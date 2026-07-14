@@ -10,6 +10,7 @@
 // Run: bun bench/mem.ts
 
 import { impls } from '../impls/registry.ts';
+import { printTable } from '../tools/print-table.ts';
 
 const SAMPLES = 5;
 
@@ -53,10 +54,4 @@ for (const impl of impls) {
 
 console.log(`fresh subprocess per impl, median of ${SAMPLES} runs, MB deltas (Bun.gc before each reading), runtime: bun ${Bun.version}\n`);
 
-const headers = ['impl', 'import', 'first call', '+25 misses', 'total rss', 'js heap', 'native (~icu)'];
-const widths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i]!.length)));
-const line = (c: string[]) => c.map((v, i) => (i === 0 ? v.padEnd(widths[i]!) : v.padStart(widths[i]!))).join('  ');
-
-console.log(line(headers));
-console.log(widths.map((w) => '-'.repeat(w)).join('  '));
-for (const r of rows) console.log(line(r));
+printTable(['impl', 'import', 'first call', '+25 misses', 'total rss', 'js heap', 'native (~icu)'], rows);

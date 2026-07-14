@@ -10,7 +10,7 @@
 // (ms-scale) are timed individually like the bun bench.
 
 import { impls } from '../impls/registry.ts';
-import { getInitInfo, type InitInfo } from '../impls/08-verified-reps/index.ts';
+import { getInitInfo, type InitInfo } from '../impls/08-verified-sharing/index.ts';
 import { fixtures } from '../shared/fixtures.ts';
 import { zones } from '../shared/zones.ts';
 import { scheduleClasses } from '../shared/schedule.ts';
@@ -77,7 +77,7 @@ export interface ValidateResult {
   fixturesPassed: number;
   fixturesTotal: number;
   letterAbbrs: number;
-  init?: InitInfo | null;
+  init?: InitInfo | null | undefined;
 }
 
 (globalThis as { __validate?: unknown }).__validate = (implId: string): ValidateResult => {
@@ -102,7 +102,7 @@ export interface ValidateResult {
     fixturesPassed,
     fixturesTotal: fixtures.length,
     letterAbbrs,
-    init: implId === '08-verified-reps' ? getInitInfo() : undefined,
+    init: implId === '08-verified-sharing' ? getInitInfo() : undefined,
   };
 };
 
@@ -113,7 +113,7 @@ export interface ValidateResult {
 // by design outside the generated year) are skipped; 09's coherence guard
 // must handle them via live fallback, so nothing is skipped there.
 (globalThis as { __verifyFuture?: unknown }).__verifyFuture = (implId: string, skipIrregular: boolean) => {
-  const i04 = impls.find((i) => i.id === '04-intl-single-fmt')!;
+  const i04 = impls.find((i) => i.id === '04-live-intl')!;
   const other = impls.find((i) => i.id === implId)!;
 
   const irregular = new Set<string>();
@@ -164,7 +164,7 @@ export interface ValidateResult {
 };
 
 (globalThis as { __verifyVs04?: unknown }).__verifyVs04 = (implId: string) => {
-  const i04 = impls.find((i) => i.id === '04-intl-single-fmt')!;
+  const i04 = impls.find((i) => i.id === '04-live-intl')!;
   const other = impls.find((i) => i.id === implId)!;
 
   const instants: number[] = [];

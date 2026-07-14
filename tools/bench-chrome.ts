@@ -12,7 +12,8 @@
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { minifiedSizes } from '../bench/size.ts';
-import { bundleBrowserEntry, launchChrome, printTable } from './chrome-harness.ts';
+import { bundleBrowserEntry, launchChrome } from './chrome-harness.ts';
+import { printTable } from './print-table.ts';
 import type { BenchResult } from './bench-browser-entry.ts';
 
 // sum of VmRSS across this browser's renderer processes (Linux /proc scan)

@@ -21,7 +21,7 @@ the host timezone (`TZ`). Historical tzdata accuracy is a non-goal.
   metazone-name -> abbreviation map, test fixtures
 - `impls/NN-*/index.ts` — one directory per implementation attempt
 - `tools/gen-core.ts` — pure, browser-safe generator core: probes Intl and
-  produces the class groupings (impl 06) + resolved year schedule (impl 07),
+  produces the class groupings (impl 08's hints) + the rule schedule (07/09),
   plus an in-runtime verification pass against live Intl
 - `tools/gen-classes.ts` — bun CLI: runs the core against bun's own ICU and
   writes the `shared/tables/bun/` variant
@@ -34,11 +34,9 @@ the host timezone (`TZ`). Historical tzdata accuracy is a non-goal.
 - `tools/emitters.ts` — shared file emitters so both paths produce
   byte-comparable output, stamped with `genMeta` provenance (host + ICU).
   Tables are emitted PACKED (zone-name prefix dictionary, delimited-string
-  columns, abbr dictionary with base36 indices, offsets as signed minutes in
-  a separate `offsets.ts` so impl 09 doesn't bundle them) and decoded once
-  at module load by `shared/decode.ts` — this cut minified bundles 22-53%
-  (07: 18.8 -> 8.8KB, 09: 21.9 -> 13.4KB) since minifiers can't compress
-  string contents or object keys
+  columns, offsets as signed minutes) and decoded once at module load by
+  `shared/decode.ts` — packing cut minified bundles 22-53% since minifiers
+  can't compress string contents or object keys
 - `tools/audit-abbrs.ts` — audits the curated maps in `shared/abbrs.ts`
   against current CLDR data (drift detection; abbrs themselves are curated
   by hand)
@@ -55,12 +53,12 @@ the host timezone (`TZ`). Historical tzdata accuracy is a non-goal.
 
 | impl | abbr strategy | offset strategy |
 |---|---|---|
-| `04-intl-single-fmt` | `'long'` name -> curated map, initials fallback | derived arithmetically from zone-local wall-clock fields (1 Intl call/zone) |
-| `07-precomputed` | baked into generated year schedule | baked into generated year schedule (zero Intl at runtime) |
-| `08-verified-reps` | same as 04, via rep formatters whose groups are Temporal-verified at first call | same as 04 |
-| `09-live-offsets` | baked from generated schedule table | live via Temporal (never stale, zero formatters) |
+| `04-live-intl` | `'long'` name -> curated map, initials fallback | derived arithmetically from zone-local wall-clock fields (1 Intl call/zone) |
+| `07-baked-rules` | baked into generated year schedule | baked into generated year schedule (zero Intl at runtime) |
+| `08-verified-sharing` | same as 04, via rep formatters whose groups are Temporal-verified at first call | same as 04 |
+| `09-guarded-hybrid` | baked from generated schedule table | live via Temporal (never stale, zero formatters) |
 
-`08-verified-reps` shares one formatter across zones the generated class
+`08-verified-sharing` shares one formatter across zones the generated class
 table groups as behavior-identical (188 formatters instead of 445), without
 trusting the table: values always come from live Intl, and the groupings are
 only a *hint* — at first call each group member's exact offset behavior for the
@@ -72,7 +70,7 @@ Residual risk: a CLDR metazone rename without an offset change passes offset
 verification (rare; regenerating tables fixes it). The Chrome bench reports
 its init stats and asserts deep output-equality with 04 in-browser.
 
-`09-live-offsets` ("07 with live offsets") inverts 08's trade: abbreviations
+`09-guarded-hybrid` ("07 with live offsets") inverts 08's trade: abbreviations
 come baked from the schedule table (segment-resolved by date), but offsets
 come live from Temporal — zero formatters on the fast path, ~2ms cold start,
 and it can never report a wrong TIME in any Temporal-capable browser no
@@ -97,8 +95,8 @@ queries near "now". The underlying compute always runs at the bucket start,
 so DST transitions (hour-aligned in UTC for nearly all zones) resolve
 deterministically at bucket boundaries. Cache hits return the same array
 reference — treat results as immutable. Hits cost ~0.2µs vs ~1-4ms for a
-miss; `tests/cache.test.ts` benches hit and miss loops separately for both
-impls.
+miss; `tests/cache.test.ts` benches hit and miss loops separately for every
+impl.
 
 (Earlier attempts — raw `timeZoneName: 'short'`, uncorrected long-name
 initials, a two-formatters-per-zone variant, a standalone hour-cache
@@ -137,7 +135,7 @@ tables must be regenerated when tzdata/CLDR changes or the year rolls
 over**; `tests/classes.test.ts` validates the table's groups against live
 Intl across the year and around every 2026 transition.
 
-`07-precomputed` takes that to its logical end: the generator emits
+`07-baked-rules` takes that to its logical end: the generator emits
 `shared/schedule.ts` — a YEAR-INDEPENDENT schedule fitted by probing three
 consecutive years: static states, two-state nth-weekday-of-month rules
 ("second Sunday of March at 02:00 wall"), and current-year segments for the
@@ -152,9 +150,9 @@ next-year instants; irregular zones clamp outside the generated year.
 
 Requires bun (used for its speed, built-in test runner, and native TS
 execution) and typescript 7 (native compiler) for type checking, plus
-`@types/bun` / `@types/node` for the test/bench tooling types and `@swc/core`
-for the bundle size assessment. The implementations themselves have zero
-dependencies.
+`@types/bun` / `@types/node` for the test/bench tooling types; bundling and
+minification (size assessment, browser-harness bundles) use bun's native
+`Bun.build`. The implementations themselves have zero dependencies.
 
 Chrome (headless shell) is the primary generation and benchmarking target;
 bun runs transparently underneath as the tool host, the fast test runner,
@@ -178,7 +176,7 @@ bun run bench    # PERFORMANCE ONLY: chrome benchmark (primary) +
                  # supplementary bun pass (whose numbers double as the
                  # Safari-fallback perf proxy). correctness incl. the
                  # no-Temporal fallback paths lives in `bun run test`
-bun run size     # minified bundle size per impl (swc bundle + minify)
+bun run size     # minified bundle size per impl (Bun.build, minified)
 bun run mem      # memory: fresh subprocess per impl, median of 5 runs,
                  # phase deltas (import / first call / +25 misses) and a
                  # JS-heap vs native (~ICU) split via bun:jsc heapStats

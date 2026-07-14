@@ -5,11 +5,11 @@
 // which variant is active — switch with: bun run tables <bun|chrome>.
 //
 // Requires the browser once: bunx browsers install chrome-headless-shell@stable --path .browsers
-// Run: bun run gen:chrome
+// Run via `bun run gen` (tools/gen-all.ts); not exposed as its own script.
 
-import { bundle } from '@swc/core';
 import puppeteer from 'puppeteer-core';
 import { findHeadlessShell } from './browser.ts';
+import { bundleForBrowser } from './chrome-harness.ts';
 import { emitClassesTs, emitScheduleTs, type GenMeta } from './emitters.ts';
 import { writeTableSet } from './table-files.ts';
 import type { GeneratedTables, Verification } from './gen-core.ts';
@@ -17,15 +17,7 @@ import type { GeneratedTables, Verification } from './gen-core.ts';
 const executablePath = await findHeadlessShell();
 
 // self-contained script for the browser: defines globalThis.__gen
-const entry = new URL('./gen-browser-entry.ts', import.meta.url).pathname;
-const bundled = await bundle({
-  entry: { main: entry },
-  output: { name: 'main', path: '.' },
-  module: {},
-  mode: 'production',
-  target: 'browser',
-  options: { jsc: { parser: { syntax: 'typescript' }, target: 'es2022' } },
-});
+const code = await bundleForBrowser(new URL('./gen-browser-entry.ts', import.meta.url).pathname);
 
 const browser = await puppeteer.launch({
   executablePath,
@@ -36,7 +28,7 @@ try {
   const version = await browser.version(); // e.g. "HeadlessChrome/150.0.7871.115"
   const page = await browser.newPage();
 
-  await page.evaluate(bundled['main']!.code);
+  await page.evaluate(code);
 
   const { tables, verification } = (await page.evaluate('__gen()')) as {
     tables: GeneratedTables;
