@@ -1,4 +1,4 @@
-// curation-reviewed: 2026-07-13 | IANA NEWS through tzdata 2026c | CLDR 48
+// curation-reviewed: 2026-07-14 | IANA NEWS through tzdata 2026c | CLDR 48
 // (node 26.4) / ICU 75.1 (bun 1.4) | chrome-headless-shell 150.0.7871.115
 // Maintained by hand — see .cursor/skills/maintain-curated-tz-data/SKILL.md
 //
@@ -131,6 +131,11 @@ export const abbrOverrides: Record<string, string> = {
   'French Southern & Antarctic Time': 'TFT',
 
   // Pacific
+  // CLDR 48+ (Chrome 150) renamed the Pago_Pago/Midway metazone to
+  // "American Samoa Standard Time" (initials would give ASST); older CLDR
+  // (bun/ICU 75) still says "Samoa Standard Time" whose initials already
+  // yield SST, the established tzdata abbreviation for -11
+  'American Samoa Standard Time': 'SST',
   'Chamorro Standard Time': 'ChST',
   'Fiji Standard Time': 'FJT',
   'Papua New Guinea Time': 'PGT',

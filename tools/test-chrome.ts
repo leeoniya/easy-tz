@@ -114,6 +114,8 @@ try {
     if (r.fixturesPassed !== r.fixturesTotal) {
       failed = true;
       console.error(`FAIL ${r.label}: fixtures ${r.fixturesPassed}/${r.fixturesTotal}`);
+
+      for (const f of r.fixtureFailures) console.error(`  ${f}`);
     }
   }
 

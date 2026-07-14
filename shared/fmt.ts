@@ -63,7 +63,10 @@ export function initialsAbbr(longName: string): string | null {
 
 // last-resort abbr for zones with no CLDR metazone: "GMT+03:00" -> "GMT+3",
 // "GMT+05:30" -> "GMT+5:30", "GMT" -> "GMT". these zones genuinely have no
-// common letter abbreviation in modern tzdata.
+// common letter abbreviation in modern tzdata. A zero offset normalizes to
+// plain "GMT": some CLDR versions emit "GMT" and others "GMT+00:00" for the
+// same instant (e.g. Africa/Casablanca during Ramadan in Chrome vs bun).
 export function compactGmt(longName: string): string {
-  return longName.replace(/([+-])0?(\d+):00/, '$1$2').replace(/([+-])0?(\d+):(\d+)/, '$1$2:$3');
+  const out = longName.replace(/([+-])0?(\d+):00/, '$1$2').replace(/([+-])0?(\d+):(\d+)/, '$1$2:$3');
+  return out === 'GMT+0' || out === 'GMT-0' ? 'GMT' : out;
 }
