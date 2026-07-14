@@ -18,6 +18,11 @@ export const zoneAliases: Record<string, string> = {
   'Europe/Guernsey': 'Europe/London',
   'Europe/Jersey': 'Europe/London',
   'Europe/Isle_of_Man': 'Europe/London',
+  // Northern Cyprus rejoined EU DST rules in Oct 2017 but CLDR never assigned
+  // a metazone; tzdata labels it EET/EEST, identical to Nicosia
+  'Asia/Famagusta': 'Asia/Nicosia',
+  // Kirov oblast observes Moscow time (no CLDR metazone); tzdata labels it MSK
+  'Europe/Kirov': 'Europe/Moscow',
 };
 
 // zone-level abbr overrides for zones with a well-known letter abbreviation

@@ -1,5 +1,6 @@
 // curation-reviewed: 2026-07-14 | IANA NEWS through tzdata 2026c (no fixture
-// zones affected: Alberta/Morocco changes don't touch the zones below)
+// zones affected: Alberta/Morocco changes don't touch the zones below);
+// tzdata cross-check via moment-timezone added Famagusta/Kirov/Troll coverage
 // Maintained by hand — see .cursor/skills/maintain-curated-tz-data/SKILL.md
 //
 // Expected abbreviations/offsets for 2026, straddling DST boundaries in
@@ -122,6 +123,20 @@ export const fixtures: Fixture[] = [
   { zone: 'America/Santiago', ts: utc(4, 5, 3, 1), abbr: 'CLT', offset: '-04:00', desc: '1 min after fall-back' },
   { zone: 'America/Santiago', ts: utc(9, 6, 3, 59), abbr: 'CLT', offset: '-04:00', desc: '1 min before spring-forward' },
   { zone: 'America/Santiago', ts: utc(9, 6, 4, 1), abbr: 'CLST', offset: '-03:00', desc: '1 min after spring-forward' },
+
+  // no-metazone zones borrowing a reference zone's CLDR names (zoneAliases):
+  // Famagusta = Nicosia (EU rules since Oct 2017), Kirov = Moscow time
+  { zone: 'Asia/Famagusta', ts: utc(1, 15), abbr: 'EET', offset: '+02:00', desc: 'no CLDR metazone, aliased to Nicosia' },
+  { zone: 'Asia/Famagusta', ts: utc(7, 15), abbr: 'EEST', offset: '+03:00', desc: 'no CLDR metazone, aliased to Nicosia' },
+  { zone: 'Europe/Kirov', ts: utc(7, 15), abbr: 'MSK', offset: '+03:00', desc: 'no CLDR metazone, aliased to Moscow' },
+
+  // Antarctica/Troll: the world's only TWO-hour DST delta (+00 <-> +02),
+  // transitioning on the EU instants; tzdata uses numeric abbrs, so the
+  // compact-GMT labels are the correct convention here
+  { zone: 'Antarctica/Troll', ts: utc(3, 29, 0, 59), abbr: 'GMT', offset: '+00:00', desc: '2-hour DST delta, before spring-forward' },
+  { zone: 'Antarctica/Troll', ts: utc(3, 29, 1, 1), abbr: 'GMT+2', offset: '+02:00', desc: '2-hour DST delta, after spring-forward' },
+  { zone: 'Antarctica/Troll', ts: utc(10, 25, 0, 59), abbr: 'GMT+2', offset: '+02:00', desc: '2-hour DST delta, before fall-back' },
+  { zone: 'Antarctica/Troll', ts: utc(10, 25, 1, 1), abbr: 'GMT', offset: '+00:00', desc: '2-hour DST delta, after fall-back' },
 
   // Lord Howe Island: the world's only 30-minute DST delta (+10:30/+11:00).
   // Fall-back lands on a whole UTC hour (Apr 4 15:00Z); spring-forward is
