@@ -10,7 +10,7 @@ import { activeVariant } from './table-files.ts';
 
 // impls with a Temporal fast path; each gets a second no-Temporal pass that
 // exercises its Safari fallback under real V8/Chrome ICU
-export const NO_TEMPORAL_IDS = ['08-verified-sharing', '09-guarded-hybrid'];
+export const NO_TEMPORAL_IDS = ['08-verified-sharing', '10-audited-rules'];
 
 // evaluate BEFORE the bundle so module-load feature detection sees no Temporal
 export const KILL_TEMPORAL = 'globalThis.Temporal = undefined; delete globalThis.Temporal;';

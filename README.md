@@ -56,7 +56,7 @@ the host timezone (`TZ`). Historical tzdata accuracy is a non-goal.
 | `04-live-intl` | `'long'` name -> curated map, initials fallback | derived arithmetically from zone-local wall-clock fields (1 Intl call/zone) |
 | `07-baked-rules` | baked into generated year schedule | baked into generated year schedule (zero Intl at runtime) |
 | `08-verified-sharing` | same as 04, via rep formatters whose groups are Temporal-verified at first call | same as 04 |
-| `09-guarded-hybrid` | baked from generated schedule table | live via Temporal (never stale, zero formatters) |
+| `10-audited-rules` | baked rule schedule, audited at first call | baked (audited); Temporal-live for recovered zones |
 
 `08-verified-sharing` shares one formatter across zones the generated class
 table groups as behavior-identical (188 formatters instead of 445), without
@@ -65,27 +65,24 @@ only a *hint* — at first call each group member's exact offset behavior for th
 year is compared against its representative's via Temporal's transition walk
 (`getTimeZoneTransition`, no formatters, ~4-5ms once), and diverged members
 are split out to format themselves. One-time cost, no per-call overhead.
-Without Temporal (Safari, bun, node 26) it degrades to exactly impl 04.
+Without Temporal (Safari, bun, Temporal-less Node builds) it degrades to
+exactly impl 04.
 Residual risk: a CLDR metazone rename without an offset change passes offset
 verification (rare; regenerating tables fixes it). The Chrome bench reports
 its init stats and asserts deep output-equality with 04 in-browser.
 
-`09-guarded-hybrid` ("07 with live offsets") inverts 08's trade: abbreviations
-come baked from the schedule table (segment-resolved by date), but offsets
-come live from Temporal — zero formatters on the fast path, ~2ms cold start,
-and it can never report a wrong TIME in any Temporal-capable browser no
-matter how stale the table. Zone-name canonicalization skew across runtimes
-(Chrome's `Asia/Calcutta` vs bun's `Asia/Kolkata`) is bridged by the ~0.5KB
-tzdata-links map in `shared/zoneLinks.ts`; zones missing from the table even
-after bridging (e.g. genuinely new zones like `America/Coyhaique`) and
-non-Temporal runtimes (Safari) fall back to live Intl formatting (04's
-path). Baked labels are guarded by a live-offset coherence check: a segment
-whose baked offset disagrees with the live Temporal offset is stale (mid-year
-tzdata change or year rollover), and that zone falls back to live Intl
-formatting — so staleness degrades toward 04's cost per affected zone instead
-of producing incoherent pairs like "EST -04:00". Residual: a stale label
-whose offset coincides with the live one (MDT vs CST, both -06:00) passes the
-guard.
+`10-audited-rules` is 07's rule schedule with 08's verification pointed at
+it: at first call (sound once per process — browsers never hot-swap tzdata)
+every zone's current-year behavior predicted by the baked schedule is
+audited against Temporal's exact transition walk (~2-5ms, no formatters).
+Zones that fail — a policy change in a stale table, unknown zones, irregular
+zones outside their generated year — are recovered for the session with live
+Temporal offsets and generic GMT-style labels; everything else runs pure
+baked at 07's miss cost. Never a wrong offset on Temporal runtimes; without
+Temporal it degrades to exactly 07. (It superseded `09-guarded-hybrid`,
+which achieved the same protection with a per-call guard and a bundled
+live-Intl fallback: ~0.8ms misses and +3.4KB for curated-quality recovery
+labels.)
 
 All impls memoize the full response per UTC hour bucket
 (`shared/hourCache.ts`): a single global

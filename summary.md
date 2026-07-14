@@ -24,7 +24,8 @@ runner, and no-Temporal (Safari) fallback proxy.
   every zone on earth except religious-calendar rules (Morocco, Palestine —
   4 zones). Probing 3 consecutive years lets the generator fit these rules,
   making baked tables survive year rollover.
-- Temporal (Chrome/Firefox, not Safari/bun) enables cheap exactness: offset
+- Temporal (Chrome/Firefox and official Node >= 26; not Safari, bun, or
+  Node builds lacking the optional Temporal component) enables cheap exactness: offset
   queries without formatters, and exact transition-walk verification of
   grouping hints (~2-5ms for all zones).
 - Runtimes genuinely disagree: bun (ICU 75) vs Chrome 150 differ in zone
@@ -42,7 +43,7 @@ results are shared arrays — treat as immutable. Chrome numbers:
 |---|---|---|---|---|---|
 | `04-live-intl` | none — always live | ~65ms (~130x) | ~2.6ms | +26MB | 6.0KB |
 | `08-verified-sharing` | near-none (rename corner) | ~35ms (~70x) | ~1.1ms | +19MB | 10.2KB |
-| `09-guarded-hybrid` | near-none (stale goes live) | ~2ms (~4x) | ~0.7ms | +9MB | 14.8KB |
+| `10-audited-rules` | near-none (audited at init) | ~5ms (~10x) | ~0.1ms | +8MB | 11.7KB |
 | `07-baked-rules` | low: few zones/yr until regen | ~0.5ms (1x) | ~0.05ms | +6MB | 10.1KB |
 
 - **04-live-intl** — everything from live Intl (one formatter + one
@@ -52,11 +53,13 @@ results are shared arrays — treat as immutable. Chrome numbers:
   zone groups whose equivalence is PROVEN at first call via Temporal's
   transition walk (~2-5ms); diverged groups split and self-heal. Re-verifies
   for whatever year it runs in. Without Temporal: identical to 04.
-- **09-guarded-hybrid** — baked labels (rule schedule) + live Temporal
-  offsets, with a per-call coherence guard: any zone whose baked offset
-  disagrees with the live one falls back to live Intl. Never wrong about
-  time; staleness degrades cost, not correctness. Zone-name skew bridged;
-  unknown zones go live. Without Temporal: identical to 04.
+- **10-audited-rules** — 07's baked schedule audited at first call against
+  Temporal's exact transition walk (once per process; ~2-5ms). Audit
+  failures (stale table, unknown zones) are recovered for the session with
+  live Temporal offsets + generic GMT labels; the rest runs pure baked at
+  07's miss cost. Never a wrong offset on Temporal runtimes. Without
+  Temporal (Safari, bun, Temporal-less Node builds): identical to 07. (Superseded 09-guarded-hybrid: same protection
+  via per-call guard + bundled live-Intl fallback, ~0.8ms misses, 15.1KB.)
 - **07-baked-rules** — zero Intl: static states + nth-weekday rules resolved
   by pure date math (irregular zones clamp outside the generated year).
   Fastest and leanest; wrong (coherently) for affected zones between a
@@ -84,9 +87,9 @@ took effect Jun 18 but tzdata 2026c landed Jul 8 — even live-Intl impls were
 wrong ~3 weeks because upstream lagged.
 
 Exposure once the runtime's ICU picks up a change: 04 self-heals; 08
-self-heals (verification splits diverged groups); 09's offsets self-heal and
-stale labels demote to live formatting; 07 is wrong for affected zones until
-regenerated. Year rollover is a non-event for all four (rules hold; only the
+self-heals (verification splits diverged groups); 10's init audit catches
+divergence per session and recovers those zones via Temporal; 07 is wrong
+for affected zones until regenerated. Year rollover is a non-event for all four (rules hold; only the
 4 irregular zones need the January regen). The equivalence tests and the
 in-Chrome vs-04 sweeps are the tripwire that makes table staleness loud.
 
@@ -101,7 +104,7 @@ in-Chrome vs-04 sweeps are the tripwire that makes table staleness loud.
   cross-variant zone-name bridge, next-year rule correctness) + the Chrome
   stage: fixtures, letter-abbr coverage, vs-04 deep equality (8,360 checks ×
   5 including no-Temporal Safari-fallback pages), and 2027 rollover checks
-  for 07/09.
+  for 07/10.
 - `bun run bench` — performance only: Chrome table (cold/hit/miss,
   formatter counts, renderer RSS, bundle KB) + supplementary bun pass
   (Safari-fallback proxy) + the feature comparison matrix.
@@ -117,6 +120,6 @@ in-Chrome vs-04 sweeps are the tripwire that makes table staleness loud.
 ## Verification snapshot
 
 `bun run check` clean; 151/151 bun tests under TZ=UTC / America/Chicago /
-Pacific/Kiritimati; Chrome stage all green including rollover (09:
-1672/1672, 07: 1656/1656 vs live 04 at 2027 instants); generator
+Pacific/Kiritimati; Chrome stage all green including rollover (10 and 07:
+1656/1656 vs live 04 at 2027 instants, irregular zones excluded by design); generator
 self-verification 0 mismatches across all probed years in both runtimes.

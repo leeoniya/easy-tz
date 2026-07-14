@@ -13,8 +13,7 @@ const tablesAligned = genMeta.host === `bun ${Bun.version}` && genMeta.icu === p
 // 08 ignores the tables when Temporal is unavailable (plain-04 fallback), so
 // it stays live-checkable under misaligned tables in such runtimes
 const tableIndependent = (id: string) =>
-  id === '04-live-intl' ||
-  ((id === '08-verified-sharing' || id === '09-guarded-hybrid') && typeof Temporal === 'undefined');
+  id === '04-live-intl' || (id === '08-verified-sharing' && typeof Temporal === 'undefined');
 const liveCheckedImpls = tablesAligned ? impls : impls.filter((i) => tableIndependent(i.id));
 
 if (liveCheckedImpls.length < impls.length) {

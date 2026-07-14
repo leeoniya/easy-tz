@@ -16,7 +16,7 @@ interface Vs04 {
   mismatches: string[];
 }
 
-const VS04_IDS = ['08-verified-sharing', '09-guarded-hybrid', '07-baked-rules'];
+const VS04_IDS = ['08-verified-sharing', '10-audited-rules', '07-baked-rules'];
 
 const code = await bundleBrowserEntry();
 const browser = await launchChrome();
@@ -43,11 +43,12 @@ try {
 
   const init08 = rows.find((r) => r.id === '08-verified-sharing')?.init;
 
-  // rollover resistance: past the generated year, 09 (coherence guard) and
-  // 07 (year-independent rules; irregular zones clamp by design and are
-  // skipped) must remain output-identical to live 04
+  // rollover resistance: past the generated year, 10 and 07 must remain
+  // output-identical to live 04 for rule/static zones (irregular zones are
+  // skipped: 07 clamps them by design; 10 recovers them with correct
+  // offsets but generic GMT-style labels)
   type Future = Vs04 & { skipped: number };
-  const future09 = (await page.evaluate(`__verifyFuture('09-guarded-hybrid', false)`)) as Future;
+  const future10 = (await page.evaluate(`__verifyFuture('10-audited-rules', true)`)) as Future;
   const future07 = (await page.evaluate(`__verifyFuture('07-baked-rules', true)`)) as Future;
 
   await page.close();
@@ -99,7 +100,7 @@ try {
   }
 
   console.log(
-    `09 rollover guard (2027 instants, table year 2026): ${future09.checked - future09.mismatchCount}/${future09.checked} match live 04`
+    `10 rollover audit (2027 instants, table year 2026): ${future10.checked - future10.mismatchCount}/${future10.checked} match live 04 (${future10.skipped} irregular-zone checks recovered w/ generic labels)`
   );
   console.log(
     `07 rollover rules (2027 instants, table year 2026): ${future07.checked - future07.mismatchCount}/${future07.checked} match live 04 (${future07.skipped} irregular-zone checks clamped by design)`
@@ -115,7 +116,7 @@ try {
     }
   }
 
-  for (const [label, f] of [['09 rollover guard', future09], ['07 rollover rules', future07]] as const) {
+  for (const [label, f] of [['10 rollover audit', future10], ['07 rollover rules', future07]] as const) {
     if (f.mismatchCount > 0) {
       failed = true;
       console.error(`\nFAIL ${label}: ${f.mismatchCount}/${f.checked} mismatched (first ${f.mismatches.length}):`);

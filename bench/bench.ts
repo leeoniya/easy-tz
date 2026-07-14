@@ -115,10 +115,18 @@ printTable(
 // (all left-aligned — these are text values, not numbers)
 console.log('\nfeatures:\n');
 
+// summary rows (risk / cold / bundle) first, separator, then the details
 const featureKeys = Object.keys(impls[0]!.features);
+const summaryKeys = ['staleness risk', 'cold cost'];
+const featureRow = (k: string) => [k, ...impls.map((i) => i.features[k] ?? '-')];
 
 printTable(
   ['feature', ...impls.map((i) => i.id)],
-  featureKeys.map((k) => [k, ...impls.map((i) => i.features[k] ?? '-')]),
+  [
+    ...summaryKeys.map(featureRow),
+    ['bundle', ...impls.map((i) => `${((sizes.get(i.id) ?? 0) / 1024).toFixed(1)} KB`)],
+    null,
+    ...featureKeys.filter((k) => !summaryKeys.includes(k)).map(featureRow),
+  ],
   true // text matrix: all left-aligned
 );

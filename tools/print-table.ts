@@ -2,8 +2,11 @@
 // mem/size tools). Default alignment: first column (impl/feature name) left,
 // value columns right — pass allLeft for text matrices.
 
-export function printTable(headers: string[], rows: string[][], allLeft = false): void {
-  const widths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i]!.length)));
+// a `null` row renders as a separator line (same dashes as under the header)
+export function printTable(headers: string[], rows: (string[] | null)[], allLeft = false): void {
+  const dataRows = rows.filter((r): r is string[] => r !== null);
+  const widths = headers.map((h, i) => Math.max(h.length, ...dataRows.map((r) => r[i]!.length)));
+  const separator = widths.map((w) => '-'.repeat(w)).join('  ');
 
   const line = (cells: string[]) =>
     cells
@@ -12,6 +15,6 @@ export function printTable(headers: string[], rows: string[][], allLeft = false)
       .trimEnd();
 
   console.log(line(headers));
-  console.log(widths.map((w) => '-'.repeat(w)).join('  '));
-  for (const r of rows) console.log(line(r));
+  console.log(separator);
+  for (const r of rows) console.log(r === null ? separator : line(r));
 }

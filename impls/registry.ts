@@ -2,8 +2,8 @@ import type { Impl } from '../shared/types.ts';
 
 import { getTimeZonesAt as intlSingleFmt } from './04-live-intl/index.ts';
 import { getTimeZonesAt as verifiedReps } from './08-verified-sharing/index.ts';
-import { getTimeZonesAt as liveOffsets } from './09-guarded-hybrid/index.ts';
 import { getTimeZonesAt as precomputed } from './07-baked-rules/index.ts';
+import { getTimeZonesAt as auditedRules } from './10-audited-rules/index.ts';
 
 // all impls memoize the full response per UTC hour bucket (shared/hourCache)
 export const impls: Impl[] = [
@@ -17,7 +17,7 @@ export const impls: Impl[] = [
       'offset source': 'live (wall-clock math)',
       'Intl formatters': 'one per zone',
       'generated data': 'none',
-      'runtime guard': '- (is the baseline)',
+      'runtime guard': 'not needed',
       'staleness healing': 'always live',
       'year rollover': 'immune',
       'Temporal use': 'none',
@@ -42,21 +42,21 @@ export const impls: Impl[] = [
     getTimeZonesAt: verifiedReps,
   },
   {
-    id: '09-guarded-hybrid',
-    label: 'baked abbrs (rule schedule) + live Temporal offsets',
+    id: '10-audited-rules',
+    label: 'baked rule schedule audited against Temporal at first call',
     features: {
-      'staleness risk': 'near-none (stale goes live)',
-      'cold cost': '~2ms (~4x of 07)',
+      'staleness risk': 'near-none (audited at init)',
+      'cold cost': '~5ms (~10x of 07)',
       'abbr source': 'baked rule schedule',
-      'offset source': 'live (Temporal)',
-      'Intl formatters': 'fallback zones only',
+      'offset source': 'baked (audited); live for recovered',
+      'Intl formatters': 'none',
       'generated data': 'rule schedule + links',
-      'runtime guard': 'offset coherence per call',
-      'staleness healing': 'stale zones go live',
-      'year rollover': 'immune (rules + guard)',
-      'Temporal use': 'fast path (else = 04)',
+      'runtime guard': 'transition audit at init',
+      'staleness healing': 'recovered zones go Temporal-live',
+      'year rollover': 'immune (rules re-audited)',
+      'Temporal use': 'audit + recovery (else = 07)',
     },
-    getTimeZonesAt: liveOffsets,
+    getTimeZonesAt: auditedRules,
   },
   {
     id: '07-baked-rules',

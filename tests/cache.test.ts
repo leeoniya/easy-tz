@@ -2,7 +2,7 @@ import { describe, test, expect } from 'bun:test';
 import * as impl04 from '../impls/04-live-intl/index.ts';
 import * as impl07 from '../impls/07-baked-rules/index.ts';
 import * as impl08 from '../impls/08-verified-sharing/index.ts';
-import * as impl09 from '../impls/09-guarded-hybrid/index.ts';
+import * as impl10 from '../impls/10-audited-rules/index.ts';
 import { genMeta } from '../shared/schedule.ts';
 
 // value-asserting tests for table-based impls only run when the tables were
@@ -24,7 +24,7 @@ const variants = [
   { id: '04-live-intl', ...impl04 },
   { id: '07-baked-rules', ...impl07 },
   { id: '08-verified-sharing', ...impl08 },
-  { id: '09-guarded-hybrid', ...impl09 },
+  { id: '10-audited-rules', ...impl10 },
 ];
 
 for (const { id, getTimeZonesAt, clearCache } of variants) {
@@ -76,7 +76,7 @@ for (const { id, getTimeZonesAt, clearCache } of variants) {
 
     const liveValues =
       id === '04-live-intl' ||
-      ((id === '08-verified-sharing' || id === '09-guarded-hybrid') && typeof Temporal === 'undefined') ||
+      (id === '08-verified-sharing' && typeof Temporal === 'undefined') ||
       tablesAligned;
     const testValues = liveValues ? test : test.skip;
 
