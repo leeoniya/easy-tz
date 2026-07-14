@@ -125,7 +125,11 @@ GMT/UTC offset label. Qualification check: Europe/Kyiv at 2026-01-15 (winter, ex
 <h2>Table 2 — correctness &amp; benchmarks (qualified libraries vs this repo's impls)</h2>
 
 <p class="note">
-Correctness: fixtures = 26 DST-boundary expectations across Europe/America/Africa/Asia/Australia;
+Correctness: fixtures = 55 expectations — DST boundaries across Europe/America/Africa/Asia/Australia
+plus tricky edge cases: the world's only 30-min DST delta (Lord Howe), 45-min offsets (Kathmandu,
+Chatham), negative DST (Dublin), the Ramadan-based rule (Casablanca), Saturday-local (Nuuk) and
+24:00-local (Santiago) transitions, exact transition instants, and the ±offset extremes
+(Kiritimati +14, Pago&nbsp;Pago −11).
 vs&nbsp;04 = deep output-equality against live-Intl impl <code>04-live-intl</code> at 20 instants ×
 418 zones. Benchmarks: chrome-headless-shell 150 on an idle machine inside the dev sandbox
 (slight uniform penalty vs bare metal; compare rows relatively); cold is the median over 5
@@ -151,7 +155,7 @@ Reproducible via <code>bun run test</code> / <code>bun run bench</code> / <code>
   <tbody>
     <tr class="ours">
       <td><code>04-live-intl</code></td>
-      <td class="num"><span class="ok">26/26</span></td>
+      <td class="num"><span class="ok">55/55</span></td>
       <td class="num">baseline</td>
       <td>—</td>
       <td class="num">43.4</td>
@@ -161,7 +165,7 @@ Reproducible via <code>bun run test</code> / <code>bun run bench</code> / <code>
     </tr>
     <tr class="ours">
       <td><code>08-verified-sharing</code></td>
-      <td class="num"><span class="ok">26/26</span></td>
+      <td class="num"><span class="ok">55/55</span></td>
       <td class="num"><span class="ok">8360/8360</span></td>
       <td>—</td>
       <td class="num">25.9</td>
@@ -171,7 +175,7 @@ Reproducible via <code>bun run test</code> / <code>bun run bench</code> / <code>
     </tr>
     <tr class="ours">
       <td><code>10-audited-rules</code></td>
-      <td class="num"><span class="ok">26/26</span></td>
+      <td class="num"><span class="ok">55/55</span></td>
       <td class="num"><span class="ok">8360/8360</span></td>
       <td>—</td>
       <td class="num">2.7</td>
@@ -181,7 +185,7 @@ Reproducible via <code>bun run test</code> / <code>bun run bench</code> / <code>
     </tr>
     <tr class="ours">
       <td><code>07-baked-rules</code></td>
-      <td class="num"><span class="ok">26/26</span></td>
+      <td class="num"><span class="ok">55/55</span></td>
       <td class="num"><span class="ok">8360/8360</span></td>
       <td>—</td>
       <td class="num">0.5</td>
@@ -191,9 +195,9 @@ Reproducible via <code>bun run test</code> / <code>bun run bench</code> / <code>
     </tr>
     <tr class="qualified">
       <td><code>lib-moment-timezone</code></td>
-      <td class="num">24/26</td>
-      <td class="num">4916/8360</td>
-      <td>Istanbul "+03" vs curated TRT (×2); ~170 zones use tzdata numeric abbrs ("−03") where CLDR has names ("BRT")</td>
+      <td class="num">36/55</td>
+      <td class="num">4956/8360</td>
+      <td>all 19 misses are abbr <i>convention</i>, zero wrong offsets — even Lord Howe, Ramadan, Nuuk, and exact instants are right; tzdata numerics ("+1030", "−03") where CLDR has names</td>
       <td class="num">27.3</td>
       <td class="num">0.8</td>
       <td class="num">21.8</td>
@@ -201,9 +205,9 @@ Reproducible via <code>bun run test</code> / <code>bun run bench</code> / <code>
     </tr>
     <tr class="qualified">
       <td><code>lib-timezone-support</code></td>
-      <td class="num">23/26</td>
-      <td class="num">4838/8360</td>
-      <td>as moment, plus stale 2022 data: Cairo <b>EET&nbsp;+02:00 in July</b> (wrong offset); Ciudad_Juarez unknown</td>
+      <td class="num">35/55</td>
+      <td class="num">4878/8360</td>
+      <td>as moment, plus stale 2022 data now caught twice: Cairo <b>EET&nbsp;+02:00 in July</b> and Nuuk <b>−03/−02</b> (true −02/−01; predates Greenland's base-offset move) — both wrong offsets; Ciudad_Juarez unknown</td>
       <td class="num">24.9</td>
       <td class="num">0.3</td>
       <td class="num">16.4</td>
@@ -211,9 +215,9 @@ Reproducible via <code>bun run test</code> / <code>bun run bench</code> / <code>
     </tr>
     <tr class="qualified">
       <td><code>lib-timezonecomplete</code></td>
-      <td class="num">19/26</td>
-      <td class="num">4737/8360</td>
-      <td>abbr lags offset at all 4 transition-boundary fixtures ("EST&nbsp;−04:00"); Cairo wrong despite current data; "UTC+0300"-style numerics</td>
+      <td class="num">28/55</td>
+      <td class="num">4777/8360</td>
+      <td>label/offset incoherence at 8 boundary fixtures incl. the <i>exact</i> transition instant ("EST&nbsp;−04:00"), and the label can also <i>lead</i> the offset (Lord Howe pre-transition: "UTC+1100" beside +10:30); Cairo wrong despite current data; "UTC+0300"-style numerics</td>
       <td class="num">178.7</td>
       <td class="num">72.8</td>
       <td class="num">29.1</td>
@@ -221,9 +225,9 @@ Reproducible via <code>bun run test</code> / <code>bun run bench</code> / <code>
     </tr>
     <tr class="qualified">
       <td><code>lib-bigeasy-timezone</code></td>
-      <td class="num">23/26</td>
-      <td class="num">4683/8360</td>
-      <td>2019 data: modern names (Europe/Kyiv) silently "UTC"; Cairo pre-2023 rules; Istanbul convention</td>
+      <td class="num">35/55</td>
+      <td class="num">4723/8360</td>
+      <td>2019 data: zones named after 2019 silently return "UTC&nbsp;+00:00" — now caught twice (Europe/Kyiv, America/Nuuk, renamed 2020); Cairo pre-2023 rules</td>
       <td class="num">24.1</td>
       <td class="num">15.2</td>
       <td class="num">10.4</td>
@@ -233,14 +237,20 @@ Reproducible via <code>bun run test</code> / <code>bun run bench</code> / <code>
 </table>
 
 <p class="note">
-Reading notes: the libraries' vs-04 scores (~56-59%) are dominated by a legitimate convention
-split, not bugs — modern tzdata removed most invented abbreviations in 2017 (numeric "+05"),
-while this repo's output follows CLDR/user-facing names ("PKT"); Istanbul TRT is a curated
-choice on our side. The genuine defects surfaced: stale bundled data producing wrong
-<i>offsets</i> (timezone-support, bigeasy), transition-boundary label/offset incoherence
-(timezonecomplete), and silent "UTC" for unknown zones (bigeasy). Chrome timer quantization
-(~100µs) makes the baked impls' sub-0.1ms misses read as 0.1. Generated: 2026-07-14
-(benchmarks re-run same day on an idle machine).
+Reading notes: the libraries' vs-04 scores (~56-59%) and most fixture misses are a legitimate
+convention split, not bugs — modern tzdata removed most invented abbreviations in 2017 (numeric
+"+05", "+1030"), while this repo's output follows CLDR/user-facing names ("PKT", "LHST");
+Istanbul TRT is a curated choice on our side. Notably, all four libraries compute the tricky
+<i>mechanics</i> correctly (30-min DST delta, 45-min offsets, negative DST, the Ramadan rule,
+24:00-local and exact-instant transitions) wherever their data vintage covers the zone. The
+genuine defects the edge cases surfaced or confirmed: stale bundled data producing wrong
+<i>offsets</i> (timezone-support: Cairo + Nuuk), silent "UTC" for zones newer than the bundled
+data (bigeasy: Kyiv + Nuuk), and transition-boundary label/offset incoherence in both directions
+(timezonecomplete, incl. at the exact transition instant). moment-timezone emerged cleanest on
+data quality: every miss is abbreviation convention, never a wrong offset. Chrome timer
+quantization (~100µs) makes the baked impls' sub-0.1ms misses read as 0.1. Generated: 2026-07-14
+(fixtures expanded 26 → 55 and library findings updated same day; benchmarks from an idle-machine
+run, unchanged by the fixture expansion).
 </p>
 
 </body>
