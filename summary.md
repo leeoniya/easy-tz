@@ -1,6 +1,6 @@
 # Summary: `getTimeZonesAt()` implementation experiments
 
-_updated 2026-07-13 — bun 1.4.0, chrome-headless-shell 150, typescript 7.0.2_
+_updated 2026-07-13 — bun 1.4.0, chrome-headless-shell 150, typescript 7.0.2; perf numbers from an idle machine_
 
 Four retained implementations of `getTimeZonesAt(timestamp)` spanning a
 live-to-baked trust spectrum, a two-stage test suite (151 bun tests + an
@@ -41,10 +41,10 @@ results are shared arrays — treat as immutable. Chrome numbers:
 
 | impl | staleness risk | cold | miss | rss | bundle |
 |---|---|---|---|---|---|
-| `04-live-intl` | none — always live | ~65ms (~130x) | ~2.6ms | +26MB | 6.0KB |
-| `08-verified-sharing` | near-none (rename corner) | ~35ms (~70x) | ~1.1ms | +19MB | 10.2KB |
-| `10-audited-rules` | near-none (audited at init) | ~5ms (~10x) | ~0.1ms | +8MB | 11.7KB |
-| `07-baked-rules` | low: few zones/yr until regen | ~0.5ms (1x) | ~0.05ms | +6MB | 10.1KB |
+| `04-live-intl` | none — always live | ~40ms (~130x) | ~1.5ms | +26MB | 6.2KB |
+| `08-verified-sharing` | near-none (rename corner) | ~22ms (~70x) | ~0.6ms | +19MB | 10.4KB |
+| `10-audited-rules` | near-none (audited at init) | ~2.5ms (~8x) | ~0.05ms | +7MB | 11.7KB |
+| `07-baked-rules` | low: few zones/yr until regen | ~0.3ms (1x) | ~0.05ms | +6MB | 10.2KB |
 
 - **04-live-intl** — everything from live Intl (one formatter + one
   `formatToParts` per zone, arithmetic offsets). The baseline, the test

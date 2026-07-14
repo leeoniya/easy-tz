@@ -117,7 +117,7 @@ console.log('\nfeatures:\n');
 
 // summary rows (risk / cold / bundle) first, separator, then the details
 const featureKeys = Object.keys(impls[0]!.features);
-const summaryKeys = ['staleness risk', 'cold cost'];
+const summaryKeys = ['staleness risk', 'cold cost', 'rss'];
 const featureRow = (k: string) => [k, ...impls.map((i) => i.features[k] ?? '-')];
 
 printTable(

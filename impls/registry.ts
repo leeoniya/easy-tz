@@ -12,7 +12,8 @@ export const impls: Impl[] = [
     label: 'single formatToParts + arithmetic offset + hour-bucket memo',
     features: {
       'staleness risk': 'none (always live)',
-      'cold cost': '~65ms (~130x of 07)',
+      'cold cost': '~40ms',
+      'rss': '~26MB',
       'abbr source': 'live CLDR name',
       'offset source': 'live (wall-clock math)',
       'Intl formatters': 'one per zone',
@@ -29,7 +30,8 @@ export const impls: Impl[] = [
     label: 'live Intl + class-table hints verified via Temporal at first call',
     features: {
       'staleness risk': 'near-none (rename corner)',
-      'cold cost': '~35ms (~70x of 07)',
+      'cold cost': '~22ms',
+      'rss': '~19MB',
       'abbr source': 'live CLDR name (shared rep)',
       'offset source': 'live (wall-clock math)',
       'Intl formatters': 'one per verified group',
@@ -46,7 +48,8 @@ export const impls: Impl[] = [
     label: 'baked rule schedule audited against Temporal at first call',
     features: {
       'staleness risk': 'near-none (audited at init)',
-      'cold cost': '~5ms (~10x of 07)',
+      'cold cost': '~2.5ms',
+      'rss': '~7.5MB',
       'abbr source': 'baked rule schedule',
       'offset source': 'baked (audited); live for recovered',
       'Intl formatters': 'none',
@@ -63,7 +66,8 @@ export const impls: Impl[] = [
     label: 'zero-Intl lookup of generated rule schedule',
     features: {
       'staleness risk': 'low: few zones/yr until regen',
-      'cold cost': '~0.5ms (1x)',
+      'cold cost': '~0.3ms',
+      'rss': '~5.7MB',
       'abbr source': 'baked rule schedule',
       'offset source': 'baked rule schedule',
       'Intl formatters': 'none',
