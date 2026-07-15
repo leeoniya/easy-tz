@@ -65,46 +65,60 @@ Kiritimati LINT, Lord Howe LHST/LHDT, Istanbul TRT, …).
 
 ## Implementations
 
+Ordered fastest to slowest — which is also most-baked to most-live: each
+step down trusts the generated data less (adding runtime rigor and cost),
+until `04-live-intl` ships no generated data at all.
+
 | impl | abbr strategy | offset strategy |
 |---|---|---|
-| `04-live-intl` | `'long'` name -> curated map, initials fallback | derived arithmetically from zone-local wall-clock fields (1 Intl call/zone) |
 | `07-baked-rules` | baked into generated year schedule | baked into generated year schedule (zero Intl at runtime) |
+| `10-audited-rules` | 07's baked schedule, audited at first call | baked (audited); Temporal-live for recovered zones |
 | `08-verified-sharing` | same as 04, via rep formatters whose groups are Temporal-verified at first call | same as 04 |
-| `10-audited-rules` | baked rule schedule, audited at first call | baked (audited); Temporal-live for recovered zones |
+| `04-live-intl` | `'long'` name -> curated map, initials fallback | derived arithmetically from zone-local wall-clock fields (1 Intl call/zone) |
 
-`08-verified-sharing` shares one formatter across zones the generated class
-table groups as behavior-identical (188 formatters instead of 445), without
-trusting the table: values always come from live Intl, and the groupings are
-only a *hint* — at first call each group member's exact offset behavior for the
-year is compared against its representative's via Temporal's transition walk
-(`getTimeZoneTransition`, no formatters, ~4-5ms once), and diverged members
-are split out to format themselves. One-time cost, no per-call overhead.
-Without Temporal (Safari, bun, Temporal-less Node builds) it degrades to
-exactly impl 04.
-
-`10-audited-rules` is 07's rule schedule with 08's verification pointed at
-it: at first call (sound once per process — browsers never hot-swap tzdata)
-every zone's current-year behavior predicted by the baked schedule is
-audited against Temporal's exact transition walk (~2-5ms, no formatters).
-Zones that fail — a policy change in a stale table, unknown zones, irregular
-zones outside their generated year — are recovered for the session with live
-Temporal offsets and generic GMT-style labels; everything else runs pure
-baked at 07's miss cost. Never a wrong offset on Temporal runtimes; without
-Temporal it degrades to exactly 07. (It superseded `09-guarded-hybrid`,
-which achieved the same protection with a per-call guard and a bundled
-live-Intl fallback: ~0.8ms misses and +3.4KB for curated-quality recovery
-labels.)
-
-`07-baked-rules` takes that to its logical end: the generator emits
+`07-baked-rules` trusts the generated data completely: the generator emits
 `shared/schedule.ts` — a YEAR-INDEPENDENT schedule fitted by probing three
 consecutive years: static states, two-state nth-weekday-of-month rules
 ("second Sunday of March at 02:00 wall"), and current-year segments for the
 few zones whose rules aren't Gregorian (Morocco/Palestine Ramadan rules) —
 so a call is pure date math with zero Intl usage, and stays correct across
-year boundaries until a country actually changes policy. Regeneration is
-needed on tzdata/CLDR changes (and yearly only for the irregular zones).
-`tests/schedule.test.ts` asserts output-equality with 04 including
-next-year instants; irregular zones clamp outside the generated year.
+year boundaries until a country actually changes policy. Fastest cold start
+and smallest memory of the four, but least resilient: a stale table means
+wrong answers until regeneration (needed on tzdata/CLDR changes, and yearly
+only for the irregular zones). `tests/schedule.test.ts` asserts
+output-equality with 04 including next-year instants; irregular zones clamp
+outside the generated year.
+
+`10-audited-rules` builds on 07, adding a first-call audit for rigor: once
+per process (sound — browsers never hot-swap tzdata) every zone's
+current-year behavior predicted by the baked schedule is checked against
+Temporal's exact transition walk (~2-5ms, no formatters). Zones that fail —
+a policy change in a stale table, unknown zones, irregular zones outside
+their generated year — are recovered for the session with live Temporal
+offsets and generic GMT-style labels; everything else runs pure baked at
+07's miss cost. Never a wrong offset on Temporal runtimes; without Temporal
+(Safari, bun, Temporal-less Node builds) it degrades to exactly 07. (It
+superseded `09-guarded-hybrid`, which achieved the same protection with a
+per-call guard and a bundled live-Intl fallback: ~0.8ms misses and +3.4KB
+for curated-quality recovery labels.)
+
+`08-verified-sharing` applies the same verify-at-first-call idea but flips
+the trust model: values always come from live Intl, and the generated class
+table is demoted to a *hint* about which zones can share one formatter (188
+formatters instead of 445, cutting 04's cold start roughly in half). At
+first call each group member's exact offset behavior for the year is
+compared against its representative's via Temporal's transition walk
+(`getTimeZoneTransition`, no formatters, ~4-5ms once), and diverged members
+are split out to format themselves. One-time cost, no per-call overhead; a
+stale table can only cost speed, never correctness. Without Temporal it
+degrades to exactly impl 04.
+
+`04-live-intl` is the fully live baseline: no generated data at all — a
+curated long-name -> abbreviation map plus one Intl formatter per zone,
+with offsets derived arithmetically from zone-local wall-clock fields.
+Slowest cold start and heaviest memory (one formatter per zone forces the
+full ICU cost), but nothing can go stale except the small curated abbr map;
+it's the reference the other three are tested against.
 
 All impls memoize the full response per UTC hour bucket
 (`shared/hourCache.ts`): a single global
