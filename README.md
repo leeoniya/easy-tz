@@ -1,6 +1,22 @@
 # timezones-play
 
-```text
+Experiments in implementing a fast, dependency-free `getTimeZonesAt(timestamp)`. Scope: current-year accuracy in modern runtimes; results are independent of
+the host timezone (`TZ`). Historical tzdata accuracy is a non-goal.
+
+```ts
+function getTimeZonesAt(timestamp: number): TimeZoneInfo[];
+
+interface TimeZoneInfo {
+  name: string;     // "America/New_York"
+  abbr: string;     // "EST" / "EDT" (not "GMT-5" where avoidable)
+  offset: string;   // "-05:00"
+  aliasOf?: string; // canonical id when `name` is a legacy spelling ("Asia/Kolkata")
+}
+```
+
+## Why this exists
+
+<pre>
 ┌──────────────────────────────────────────────────────────────┐
 │ Type to search (name, city, abbreviation)                 🔍 │
 ├──────────────────────────────────────────────────────────────┤
@@ -15,25 +31,7 @@
 │    Algiers  CET                                [UTC+01:00]  ░│
 │    Asmara  EAT                                 [UTC+03:00]  ▼│
 └──────────────────────────────────────────────────────────────┘
-```
-
-Experiments in implementing a fast, dependency-free `getTimeZonesAt(timestamp)`:
-
-```ts
-interface TimeZoneInfo {
-  name: string;     // "America/New_York"
-  abbr: string;     // "EST" / "EDT" (not "GMT-5" where avoidable)
-  offset: string;   // "-05:00"
-  aliasOf?: string; // canonical id when `name` is a legacy spelling ("Asia/Kolkata")
-}
-
-function getTimeZonesAt(timestamp: number): TimeZoneInfo[];
-```
-
-Scope: current-year accuracy in modern runtimes; results are independent of
-the host timezone (`TZ`). Historical tzdata accuracy is a non-goal.
-
-## Why this exists
+</pre>
 
 While swapping a codebase from 295KB `moment` to 68KB `luxon`, I also
 wanted to drop the 770KB `moment-timezone` dependency from a time zone picker
@@ -83,9 +81,6 @@ year is compared against its representative's via Temporal's transition walk
 are split out to format themselves. One-time cost, no per-call overhead.
 Without Temporal (Safari, bun, Temporal-less Node builds) it degrades to
 exactly impl 04.
-Residual risk: a CLDR metazone rename without an offset change passes offset
-verification (rare; regenerating tables fixes it). The Chrome bench reports
-its init stats and asserts deep output-equality with 04 in-browser.
 
 `10-audited-rules` is 07's rule schedule with 08's verification pointed at
 it: at first call (sound once per process — browsers never hot-swap tzdata)
@@ -100,54 +95,6 @@ which achieved the same protection with a per-call guard and a bundled
 live-Intl fallback: ~0.8ms misses and +3.4KB for curated-quality recovery
 labels.)
 
-All impls memoize the full response per UTC hour bucket
-(`shared/hourCache.ts`): a single global
-slot keeps the last bucket's result and is refreshed whenever a timestamp
-falls outside it, so only same-bucket repeats hit — suited to clock-driven
-queries near "now". The underlying compute always runs at the bucket start,
-so DST transitions (hour-aligned in UTC for nearly all zones) resolve
-deterministically at bucket boundaries. Cache hits return the same array
-reference — treat results as immutable. Hits cost ~0.1-0.3µs vs a miss's
-~1-4ms (live impls) or ~0.05-0.1ms (baked impls); `tests/cache.test.ts`
-benches hit and miss loops separately for every impl.
-
-(Earlier attempts — raw `timeZoneName: 'short'`, uncorrected long-name
-initials, a two-formatters-per-zone variant, a standalone hour-cache
-wrapper, and `06-class-reps` (trusted formatter sharing, superseded by 08's
-verified sharing at near-identical speed) — were evaluated and removed; the
-numbering of the survivors is kept. Their useful parts live on as the
-initials fallback, the test suite's Intl `'longOffset'` oracle,
-`shared/hourCache.ts`, and the class table now consumed by 08.)
-
-Why not just `timeZoneName: 'short'`? CLDR only defines short abbreviations
-for a handful of metazones in the `en` locale (mostly North America, 113 of
-445 zones); the rest come back as `GMT+3`.
-
-Why a curated map? Initials of the long name ("Eastern European Summer Time"
--> EEST) work for ~80% of metazones but break where the convention drops words
-(Eastern European **Standard** Time -> EET, Moscow Standard Time -> MSK,
-West Africa Standard Time -> WAT). The map in `shared/abbrs.ts` (~1.5KB)
-covers every CLDR metazone where initials are wrong; initials remain the
-fallback for unmapped names.
-
-Zones with no CLDR metazone at all (Etc/GMT±n, Asia/Urumqi, Europe/Astrakhan,
-...) mostly use numeric abbreviations in modern tzdata too, so they fall back
-to a compact `GMT+3` form; a few exceptions are special-cased
-(`Europe/Guernsey` et al. alias `Europe/London`, `Europe/Istanbul` -> TRT).
-
-The impl caches one `Intl.DateTimeFormat` per zone — constructing formatters
-is ~100x more expensive than calling `format()`, so the first call pays
-~50-60ms for ~445 zones and warm calls take single-digit milliseconds.
-
-The class table (`shared/classes.ts`) encodes the fact that only 188
-distinct (long name, offset) behaviors exist across the 445 zones in the
-current year. It's generated by `bun run gen`
-(probing every zone daily, binary-searching transition instants to 15-minute
-resolution) and consumed by impl 08 as verified grouping hints. **Generated
-tables must be regenerated when tzdata/CLDR changes or the year rolls
-over**; `tests/classes.test.ts` validates the table's groups against live
-Intl across the year and around every 2026 transition.
-
 `07-baked-rules` takes that to its logical end: the generator emits
 `shared/schedule.ts` — a YEAR-INDEPENDENT schedule fitted by probing three
 consecutive years: static states, two-state nth-weekday-of-month rules
@@ -158,6 +105,17 @@ year boundaries until a country actually changes policy. Regeneration is
 needed on tzdata/CLDR changes (and yearly only for the irregular zones).
 `tests/schedule.test.ts` asserts output-equality with 04 including
 next-year instants; irregular zones clamp outside the generated year.
+
+All impls memoize the full response per UTC hour bucket
+(`shared/hourCache.ts`): a single global
+slot keeps the last bucket's result and is refreshed whenever a timestamp
+falls outside it, so only same-bucket repeats hit — suited to clock-driven
+queries near "now". The underlying compute always runs at the bucket start,
+so DST transitions (hour-aligned in UTC for nearly all zones) resolve
+deterministically at bucket boundaries. Cache hits return the same array
+reference — treat results as immutable. Hits cost ~0.1-0.3µs vs a miss's
+~1-4ms (live impls) or ~0.05-0.1ms (baked impls); `tests/cache.test.ts`
+benches hit and miss loops separately for every impl.
 
 ## Layout
 
