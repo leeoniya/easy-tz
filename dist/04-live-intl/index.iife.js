@@ -27,7 +27,9 @@
   var zoneAliases = {
     "Europe/Guernsey": "Europe/London",
     "Europe/Jersey": "Europe/London",
-    "Europe/Isle_of_Man": "Europe/London"
+    "Europe/Isle_of_Man": "Europe/London",
+    "Asia/Famagusta": "Asia/Nicosia",
+    "Europe/Kirov": "Europe/Moscow"
   };
   var zoneAbbrOverrides = {
     "Europe/Istanbul": "TRT"
@@ -99,7 +101,7 @@
     "Hovd Standard Time": "HOVT",
     "Ulaanbaatar Standard Time": "ULAT",
     "Samara Standard Time": "SAMT",
-    "Volgograd Standard Time": "VOLT",
+    "Volgograd Standard Time": "MSK",
     "Yekaterinburg Standard Time": "YEKT",
     "Omsk Standard Time": "OMST",
     "Novosibirsk Standard Time": "NOVT",
@@ -193,7 +195,6 @@
   }
 
   // shared/fmt.ts
-  var constructed = 0;
   function fmtCache(options) {
     const cache = new Map;
     return (zone) => {
@@ -201,7 +202,6 @@
       if (fmt === undefined) {
         fmt = new Intl.DateTimeFormat("en-US", { ...options, timeZone: zone });
         cache.set(zone, fmt);
-        constructed++;
       }
       return fmt;
     };
@@ -306,7 +306,7 @@
   var getTimeZonesAt = memo.get;
   var clearCache = memo.clear;
 
-  // dist/.entries/04-live-intl.iife.ts
+  // ../../../../../../../tmp/tz-dist-5hSrRS/04-live-intl.iife.ts
   getTimeZonesAt.clearCache = clearCache;
   globalThis.getTimeZonesAt = getTimeZonesAt;
 })();

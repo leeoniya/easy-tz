@@ -292,7 +292,7 @@
   var getTimeZonesAt = memo.get;
   var clearCache = memo.clear;
 
-  // dist/.entries/10-audited-rules.iife.ts
+  // ../../../../../../../tmp/tz-dist-5hSrRS/10-audited-rules.iife.ts
   getTimeZonesAt.clearCache = clearCache;
   globalThis.getTimeZonesAt = getTimeZonesAt;
 })();
