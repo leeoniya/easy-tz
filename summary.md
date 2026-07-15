@@ -41,15 +41,15 @@ results are shared arrays — treat as immutable. Chrome numbers:
 
 | impl | staleness risk | cold | miss | rss | bundle |
 |---|---|---|---|---|---|
-| `04-live-intl` | none — always live | ~40ms (~130x) | ~1.5ms | +26MB | 6.2KB |
-| `08-verified-sharing` | near-none (rename corner) | ~22ms (~70x) | ~0.6ms | +19MB | 10.4KB |
-| `10-audited-rules` | near-none (audited at init) | ~2.5ms (~8x) | ~0.05ms | +7.5MB | 11.7KB |
-| `07-baked-rules` | low: few zones/yr until regen | ~0.3ms (1x) | ~0.05ms | +5.7MB | 10.2KB |
+| `04-live-intl` | none — always live | ~40ms (~130x) | ~1.4ms | +26MB | 6.3KB |
+| `08-verified-sharing` | near-none (rename corner) | ~22ms (~70x) | ~0.6ms | +18MB | 10.6KB |
+| `10-audited-rules` | near-none (audited at init) | ~2.3ms (~8x) | ~0.05ms | +7.4MB | 11.7KB |
+| `07-baked-rules` | low: few zones/yr until regen | ~0.3ms (1x) | ~0.05ms | +6.5MB | 10.2KB |
 
-These match the anchors in `impls/registry.ts` (idle machine, outside the
-dev sandbox); `comparison.md` uses an in-sandbox idle run, which carries a
-slight across-the-board penalty. Cold is the median over 5 fresh page
-contexts. Our impls and the comparison libraries are bundled separately
+These match the anchors in `impls/registry.ts` and the table in
+`comparison.md` — all from the same idle-machine run outside the dev
+sandbox (2026-07-15). Cold is the median over 5 fresh page contexts. Our
+impls and the comparison libraries are bundled separately
 (`bench-browser-entry` vs `lib-browser-entry`), so the libraries' ~4MB of
 tzdata never inflates our impls' cold readings.
 

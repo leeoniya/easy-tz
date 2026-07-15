@@ -35,25 +35,25 @@ Qualified libraries (✅) first; disqualified (❌) below.
 > transitions, exact transition instants, the ±offset extremes (Kiritimati +14, Pago Pago −11),
 > and no-CLDR-metazone zones curated via aliases (Famagusta→EET/EEST, Kirov→MSK).
 > vs 04 = deep output-equality against live-Intl impl `04-live-intl` at 20 instants × 418 zones.
-> Benchmarks: chrome-headless-shell 150 inside the dev sandbox under light ambient load (uniform
-> penalty vs bare metal; compare rows relatively); cold is the median over 5 fresh page contexts;
-> this repo's impls and the libraries are bundled separately so the libraries' ~4MB of tzdata
-> never inflates our impls' pages. Bundle = `Bun.build` minified, no gzip. Reproducible via
-> `bun run test` / `bun run bench` / `bun run size`.
+> Benchmarks: chrome-headless-shell 150 on an idle machine outside the dev sandbox (consistent
+> with the anchors in `impls/registry.ts` / `summary.md`); cold is the median over 5 fresh page
+> contexts; this repo's impls and the libraries are bundled separately so the libraries' ~4MB of
+> tzdata never inflates our impls' pages. Bundle = `Bun.build` minified, no gzip. Reproducible
+> via `bun run test` / `bun run bench` / `bun run size`.
 
 This repo's implementations (🔷) vs qualified libraries (📦).
 
 | impl | fixtures | vs 04 | notable failures | cold ms | miss ms | rss MB | bundle KB |
 |---|--:|--:|---|--:|--:|--:|--:|
-| 🔷 `04-live-intl` | **62/62** | baseline | — | 80.1 | 2.8 | 26.1 | 6.3 |
-| 🔷 `08-verified-sharing` | **62/62** | **8360/8360** | — | 50.0 | 1.1 | 19.5 | 10.6 |
-| 🔷 `10-audited-rules` | **62/62** | **8360/8360** | — | 4.3 | 0.1 | 7.8 | 11.7 |
-| 🔷 `07-baked-rules` | **62/62** | **8360/8360** | — | 0.6 | 0.1 | 7.8 | 10.2 |
-| 📦 `lib-leeoniya-timezones` | 39/62 | 4958/8360 | best library score, tied with moment at a fraction of the size; 22 of 23 misses are abbr *convention* (tzdata numerics "+03"/"+1030" where CLDR/our curation has TRT/LHST), zero wrong offsets; the one genuine quirk: inside the Casablanca Ramadan window the label falls back to "+01" beside the (correct) +00:00 offset — the generated lookup lacks that zone's Ramadan entry | 15.0 | 0.4 | 10.3 | 20.6 |
-| 📦 `lib-moment-timezone` | 39/62 | 4956/8360 | all 23 misses are abbr *convention*, zero wrong offsets — even Lord Howe, Troll, Ramadan, Nuuk, and exact instants are right; tzdata numerics ("+1030", "−03") where CLDR has names | 45.1 | 1.3 | 22.8 | 773.5 |
-| 📦 `lib-timezone-support` | 37/62 | 4878/8360 | as moment, plus stale 2022 data now caught twice: Cairo **EET +02:00 in July** and Nuuk **−03/−02** (true −02/−01; predates Greenland's base-offset move) — both wrong offsets; Ciudad_Juarez unknown | 33.5 | 0.4 | 16.3 | 753.5 |
-| 📦 `lib-timezonecomplete` | 31/62 | 4777/8360 | label/offset incoherence at 8 boundary fixtures incl. the *exact* transition instant ("EST −04:00"), and the label can also *lead* the offset (Lord Howe pre-transition: "UTC+1100" beside +10:30); Cairo wrong despite current data; "UTC+0300"-style numerics | 265.1 | 94.8 | 28.3 | 327.6 |
-| 📦 `lib-bigeasy-timezone` | 37/62 | 4723/8360 | 2019 data: zones named after 2019 silently return "UTC +00:00" — now caught twice (Europe/Kyiv, America/Nuuk, renamed 2020); Cairo pre-2023 rules | 32.9 | 21.8 | 11.0 | 1781.4 |
+| 🔷 `04-live-intl` | **62/62** | baseline | — | 38.9 | 1.4 | 25.6 | 6.3 |
+| 🔷 `08-verified-sharing` | **62/62** | **8360/8360** | — | 22.2 | 0.6 | 18.4 | 10.6 |
+| 🔷 `10-audited-rules` | **62/62** | **8360/8360** | — | 2.3 | 0.0 | 7.4 | 11.7 |
+| 🔷 `07-baked-rules` | **62/62** | **8360/8360** | — | 0.3 | 0.0 | 6.5 | 10.2 |
+| 📦 `lib-leeoniya-timezones` | 39/62 | 4958/8360 | best library score, tied with moment at a fraction of the size; 22 of 23 misses are abbr *convention* (tzdata numerics "+03"/"+1030" where CLDR/our curation has TRT/LHST), zero wrong offsets; the one genuine quirk: inside the Casablanca Ramadan window the label falls back to "+01" beside the (correct) +00:00 offset — the generated lookup lacks that zone's Ramadan entry | 7.5 | 0.3 | 10.3 | 20.6 |
+| 📦 `lib-moment-timezone` | 39/62 | 4956/8360 | all 23 misses are abbr *convention*, zero wrong offsets — even Lord Howe, Troll, Ramadan, Nuuk, and exact instants are right; tzdata numerics ("+1030", "−03") where CLDR has names | 24.8 | 0.8 | 22.0 | 773.5 |
+| 📦 `lib-timezone-support` | 37/62 | 4878/8360 | as moment, plus stale 2022 data now caught twice: Cairo **EET +02:00 in July** and Nuuk **−03/−02** (true −02/−01; predates Greenland's base-offset move) — both wrong offsets; Ciudad_Juarez unknown | 22.8 | 0.2 | 16.3 | 753.5 |
+| 📦 `lib-timezonecomplete` | 31/62 | 4777/8360 | label/offset incoherence at 8 boundary fixtures incl. the *exact* transition instant ("EST −04:00"), and the label can also *lead* the offset (Lord Howe pre-transition: "UTC+1100" beside +10:30); Cairo wrong despite current data; "UTC+0300"-style numerics | 164.0 | 68.6 | 28.1 | 327.6 |
+| 📦 `lib-bigeasy-timezone` | 37/62 | 4723/8360 | 2019 data: zones named after 2019 silently return "UTC +00:00" — now caught twice (Europe/Kyiv, America/Nuuk, renamed 2020); Cairo pre-2023 rules | 22.4 | 14.9 | 10.8 | 1781.4 |
 
 > Reading notes: the libraries' vs-04 scores (~56-59%) and most fixture misses are a legitimate
 > convention split, not bugs — modern tzdata removed most invented abbreviations in 2017 (numeric
@@ -72,8 +72,7 @@ This repo's implementations (🔷) vs qualified libraries (📦).
 > performance standout among the libraries — its generated-lookup-plus-live-Intl-offsets design
 > is the same hybrid shape as this repo's `08`/`10` impls, and it lands between them on cold
 > start and bundle size while using tzdata (not CLDR) abbreviation conventions. Chrome timer
-> quantization (~100µs) makes the baked impls' sub-0.1ms misses read as 0.1. Generated:
+> quantization (~100µs) makes the baked impls' sub-0.1ms misses read as 0.0. Generated:
 > 2026-07-14 (fixtures expanded 26 → 55 and library findings updated same day); updated
-> 2026-07-15: fixtures 55 → 62 (Troll, Famagusta, Kirov), added `leeoniya-timezones` and
-> re-ran all benchmarks in one session — ambient load differed from the 07-14 run, so numbers
-> shifted uniformly; compare within the table only.
+> 2026-07-15: fixtures 55 → 62 (Troll, Famagusta, Kirov), added `leeoniya-timezones`, and
+> re-ran all benchmarks on an idle machine.

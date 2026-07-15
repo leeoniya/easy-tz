@@ -31,7 +31,7 @@ export const impls: Impl[] = [
     features: {
       'staleness risk': 'near-none (rename corner)',
       'cold cost': '~22ms',
-      'rss': '~19MB',
+      'rss': '~18MB',
       'abbr source': 'live CLDR name (shared rep)',
       'offset source': 'live (wall-clock math)',
       'Intl formatters': 'one per verified group',
@@ -48,8 +48,8 @@ export const impls: Impl[] = [
     label: 'baked rule schedule audited against Temporal at first call',
     features: {
       'staleness risk': 'near-none (audited at init)',
-      'cold cost': '~2.5ms',
-      'rss': '~7.5MB',
+      'cold cost': '~2.3ms',
+      'rss': '~7.4MB',
       'abbr source': 'baked rule schedule',
       'offset source': 'baked (audited); live for recovered',
       'Intl formatters': 'none',
@@ -67,7 +67,7 @@ export const impls: Impl[] = [
     features: {
       'staleness risk': 'low: few zones/yr until regen',
       'cold cost': '~0.3ms',
-      'rss': '~5.7MB',
+      'rss': '~6.5MB',
       'abbr source': 'baked rule schedule',
       'offset source': 'baked rule schedule',
       'Intl formatters': 'none',
