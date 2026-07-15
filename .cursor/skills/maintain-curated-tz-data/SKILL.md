@@ -12,7 +12,7 @@ description: >-
 # Maintaining Curated Timezone Data
 
 Generated tables (`shared/tables/*`, via `bun run gen` — regenerates both the chrome and bun variants) are
-deterministic. Four files are NOT — they encode human judgment and must be
+deterministic. Three files are NOT — they encode human judgment and must be
 reviewed when upstream data changes:
 
 | file | manual content |
@@ -54,10 +54,12 @@ bun run audit        # ERRORs: diverged zoneAliases (fix or remove) — exit 1
                      # INFO:  GMT-fallback zones (candidates for new
                      #        zoneAliases / zoneAbbrOverrides entries)
 bun run gen                         # regenerate both table variants
-bun test && bun run test:tz         # fixtures, oracle, table validation
-bun run bench                       # "vs 04" column must be full (e.g.
-                                    # 8360/8360); "08 init ... healed" > 0
-                                    # means a group diverged mid-year
+bun run test                        # bun suite + Chrome stage: fixtures,
+                                    # oracle, table validation; the "vs 04"
+                                    # column must be full (e.g. 8360/8360)
+                                    # and "08 init ... healed" > 0 means a
+                                    # group diverged mid-year
+bun run test:tz                     # bun suite under 3 host TZs
 ```
 
 New spelling divergences between runtimes (feeds `zoneLinkPairs`):

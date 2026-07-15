@@ -1,11 +1,7 @@
 // Shared Intl helpers. All impls cache one Intl.DateTimeFormat per zone,
 // since formatter construction is ~100x more expensive than format().
-
-let constructed = 0;
-
-// total Intl.DateTimeFormat instances constructed via fmtCache (all impls);
-// benches report this per isolated process/page
-export const formatterCount = (): number => constructed;
+// (Benchmark formatter counts come from shared/intl-count.ts's constructor
+// proxy, which also sees library-internal constructions.)
 
 export function fmtCache(
   options: Omit<Intl.DateTimeFormatOptions, 'timeZone'>
@@ -18,7 +14,6 @@ export function fmtCache(
     if (fmt === undefined) {
       fmt = new Intl.DateTimeFormat('en-US', { ...options, timeZone: zone });
       cache.set(zone, fmt);
-      constructed++;
     }
 
     return fmt;

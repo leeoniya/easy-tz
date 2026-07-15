@@ -3,6 +3,9 @@
 // plus deep output-equality of table-backed impls against impl 04 (live
 // Intl) — each also under a no-Temporal page that exercises the Safari
 // fallback paths. Exits 1 on any fixture failure or vs-04 mismatch.
+// The comparison libraries (separate bundle) run afterward as an
+// INFORMATIONAL, non-gating pass: their scores and sample failures are
+// printed but never fail the suite (findings live in comparison.md).
 //
 // Run: bun run test (chained after bun's unit tests)
 

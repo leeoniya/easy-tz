@@ -1,12 +1,13 @@
 # Summary: `getTimeZonesAt()` implementation experiments
 
-_updated 2026-07-13 — bun 1.4.0, chrome-headless-shell 150, typescript 7.0.2; perf numbers from an idle machine_
+_updated 2026-07-15 — bun 1.4.0, chrome-headless-shell 150, typescript 7.0.2; perf numbers from an idle machine_
 
 Four retained implementations of `getTimeZonesAt(timestamp)` spanning a
-live-to-baked trust spectrum, a two-stage test suite (151 bun tests + an
+live-to-baked trust spectrum, a two-stage test suite (299 bun tests + an
 in-Chrome correctness stage), and unified generation/benchmark tooling.
 Implementations have zero runtime dependencies; devDependencies
-(`typescript`, `@types/*`, `puppeteer-core`, `@puppeteer/browsers`)
+(`typescript`, `@types/*`, `puppeteer-core`, `@puppeteer/browsers`, plus the
+five comparison libraries benchmarked in `comparison.md`)
 are installed with `--ignore-scripts`. Chrome (headless shell) is the primary
 generation/benchmark target; bun runs transparently as tool host, fast test
 runner, and no-Temporal (Safari) fallback proxy.
@@ -107,14 +108,18 @@ in-Chrome vs-04 sweeps are the tripwire that makes table staleness loud.
   artifact) and bun-aligned (keeps the local suite fully covered). ~2.5s per
   variant. Required on tzdata/CLDR changes; January matters only for the 4
   irregular zones.
-- `bun run test` — 151 bun tests (DST boundaries, oracle, cache semantics,
+- `bun run test` — 299 bun tests (DST boundaries, oracle, cache semantics,
   cross-variant zone-name bridge, next-year rule correctness) + the Chrome
   stage: fixtures, letter-abbr coverage, vs-04 deep equality (8,360 checks ×
-  5 including no-Temporal Safari-fallback pages), and 2027 rollover checks
-  for 07/10.
+  5 including no-Temporal Safari-fallback pages), 2027 rollover checks for
+  07/10, and an informational (non-gating) pass over the 5 comparison
+  libraries.
 - `bun run bench` — performance only: Chrome table (cold/hit/miss,
-  formatter counts, renderer RSS, bundle KB) + supplementary bun pass
-  (Safari-fallback proxy) + the feature comparison matrix.
+  formatter counts, renderer RSS, bundle KB) for our impls + the comparison
+  libraries + supplementary bun pass (Safari-fallback proxy) + the feature
+  comparison matrix. Formatter counts come from a counting proxy over the
+  global Intl.DateTimeFormat constructor (`shared/intl-count.ts`), so
+  library-internal formatters are measured too.
 - `bun run size` / `bun run mem` — bundle sizes; phase-split memory with
   JS-heap vs native (~ICU) attribution.
 - `bun run audit` — curated-map drift detection against current CLDR.
@@ -126,7 +131,8 @@ in-Chrome vs-04 sweeps are the tripwire that makes table staleness loud.
 
 ## Verification snapshot
 
-`bun run check` clean; 151/151 bun tests under TZ=UTC / America/Chicago /
+`bun run check` clean; 299/299 bun tests under TZ=UTC / America/Chicago /
 Pacific/Kiritimati; Chrome stage all green including rollover (10 and 07:
-1656/1656 vs live 04 at 2027 instants, irregular zones excluded by design); generator
+1656/1656 vs live 04 at 2027 instants; the 16 irregular-zone checks are
+recovered with generic labels by 10 and clamped by design in 07); generator
 self-verification 0 mismatches across all probed years in both runtimes.

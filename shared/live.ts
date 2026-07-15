@@ -1,5 +1,5 @@
 // Shared live-Intl resolution path, used by impl 04 for everything and by
-// impls 08/09 as their fallback: one cached full-fields formatter per zone,
+// impl 08 for self-formatting zones: one cached full-fields formatter per zone,
 // one formatToParts() call, offset derived arithmetically from the
 // zone-local wall-clock fields, abbr resolved from the CLDR long name
 // (curated overrides -> initials -> compact GMT).

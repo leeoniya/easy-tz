@@ -1,4 +1,6 @@
-// CPU/memory benchmark of all impls inside chrome-headless-shell (stable),
+// CPU/memory benchmark of all impls + the comparison libraries (bundled
+// separately so their ~4MB of tzdata never inflates our impls' pages)
+// inside chrome-headless-shell (stable),
 // PERFORMANCE ONLY — correctness lives in tools/test-chrome.ts (bun run
 // test), which also covers the no-Temporal (Safari) fallback paths; their
 // perf is not re-benched here since the fallback is impl 04's path and

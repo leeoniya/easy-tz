@@ -11,15 +11,22 @@
 //   WARN   abbrOverrides entries for long names no longer observed (stale)
 //   INFO   zones falling back to compact GMT abbrs (no CLDR metazone) —
 //          candidates for new zoneAliases / zoneAbbrOverrides entries
+//   INFO   letter abbrs that DISAGREE with tzdata's letter abbrs (via
+//          moment-timezone's bundled data) — catches curation gone stale
+//          against reality, e.g. VOLT after Volgograd rejoined Moscow time
+//          in 2020 (tzdata: MSK). Zones where tzdata switched to numeric
+//          abbrs (+03) are the expected convention split and NOT flagged.
 //
 // Exits 1 on ERROR, 0 otherwise. Run: bun run audit
 //
 // Long names are collected at semi-monthly instants across the current year,
 // which covers every seasonal metazone variant (DST periods all span months).
 
+import moment from 'moment-timezone';
 import { zones } from '../shared/zones.ts';
 import { abbrOverrides, zoneAliases, zoneAbbrOverrides } from '../shared/abbrs.ts';
 import { fmtCache, tzNameFromFormat, initialsAbbr, compactGmt } from '../shared/fmt.ts';
+import { getTimeZonesAt, clearCache } from '../impls/04-live-intl/index.ts';
 
 const YEAR = new Date().getUTCFullYear();
 
@@ -118,6 +125,33 @@ if (gmtZones.length > 0) {
   const uniq = [...new Set(gmtZones)].sort();
   report.push(`INFO ${uniq.length} zones use compact GMT abbrs (no CLDR metazone; expected for Etc/* etc.):`);
   for (const z of uniq) report.push(`  ${z}`);
+}
+
+// --- letter abbrs vs tzdata (moment-timezone's bundled data) ---
+// tzdata-numeric zones ("+03") are the known 2017 convention split and are
+// skipped; a LETTER-vs-LETTER disagreement means our curation (or CLDR's
+// metazone mapping) is stale against a real-world change
+const isLetterAbbr = (a: string) => /^[A-Za-z]{2,6}$/.test(a) && a !== 'GMT' && a !== 'UTC';
+const tzdataDisagreements: string[] = [];
+
+for (const ts of [Date.UTC(YEAR, 0, 15, 12), Date.UTC(YEAR, 6, 15, 12)]) {
+  clearCache();
+
+  for (const z of getTimeZonesAt(ts)) {
+    if (!isLetterAbbr(z.abbr)) continue;
+
+    const tzAbbr = moment.tz(ts, z.name).format('z');
+
+    if (isLetterAbbr(tzAbbr) && tzAbbr !== z.abbr) {
+      tzdataDisagreements.push(`${z.name}: ours=${z.abbr}, tzdata=${tzAbbr} (${new Date(ts).toISOString().slice(0, 10)})`);
+    }
+  }
+}
+
+if (tzdataDisagreements.length > 0) {
+  const uniq = [...new Set(tzdataDisagreements)];
+  report.push(`INFO ${uniq.length} letter abbrs disagree with tzdata ${moment.tz.dataVersion} (stale curation?):`);
+  for (const line of uniq) report.push(`  ${line}`);
 }
 
 console.log(`audited ${zones.length} zones, ${observed.size} distinct long names in ${YEAR}\n`);

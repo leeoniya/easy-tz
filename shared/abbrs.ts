@@ -1,5 +1,6 @@
-// curation-reviewed: 2026-07-14 | IANA NEWS through tzdata 2026c | CLDR 48
+// curation-reviewed: 2026-07-15 | IANA NEWS through tzdata 2026c | CLDR 48
 // (node 26.4) / ICU 75.1 (bun 1.4) | chrome-headless-shell 150.0.7871.115
+// | letter abbrs cross-checked against tzdata via moment-timezone (audit)
 // Maintained by hand — see .cursor/skills/maintain-curated-tz-data/SKILL.md
 //
 // Curated map of CLDR "long" metazone names (en locale) -> common tzdata-style
@@ -113,7 +114,11 @@ export const abbrOverrides: Record<string, string> = {
 
   // Russia (east of Moscow)
   'Samara Standard Time': 'SAMT',
-  'Volgograd Standard Time': 'VOLT',
+  // Volgograd rejoined Moscow time 2020-12-27 (tzdata 2020e): a distinct
+  // "Volgograd time" no longer exists, tzdata labels the zone MSK. Newer
+  // CLDR (48 / Chrome 150) merged the metazone into Moscow; this entry only
+  // fires on older CLDR (ICU 75 / bun) that still emits the long name
+  'Volgograd Standard Time': 'MSK',
   'Yekaterinburg Standard Time': 'YEKT',
   'Omsk Standard Time': 'OMST',
   'Novosibirsk Standard Time': 'NOVT',

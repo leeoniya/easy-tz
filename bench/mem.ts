@@ -1,7 +1,8 @@
 // Memory benchmark: runs bench/mem-probe.ts in a fresh subprocess per impl,
 // SAMPLES times each, and reports per-phase medians:
 //
-//   import      — module load (generated table data for 06/07)
+//   import      — module load (generated table data for 07/08/10; the
+//                 libraries' bundled tzdata)
 //   first call  — formatter construction (Intl-based impls) / first lookup
 //   +25 misses  — sustained growth across cache-miss calls (ICU internals)
 //   js heap     — the JS-heap share of the total; the remainder is native

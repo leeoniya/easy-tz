@@ -7,7 +7,7 @@
 // genuine policy changes (and the rare non-Gregorian rule, kept as
 // 'irregular' with current-year segments) can stale it.
 //
-// Browser-safe; used by impls 07/09, the decoder, and the generator's
+// Browser-safe; used by impls 07/10, the decoder, and the generator's
 // self-verification (the SAME resolver is verified and shipped).
 
 import { zoneLinks } from './zoneLinks.ts';

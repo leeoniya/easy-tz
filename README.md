@@ -4,9 +4,10 @@ Experiments in implementing a fast, dependency-free `getTimeZonesAt(timestamp)`:
 
 ```ts
 interface TimeZoneInfo {
-  name: string;   // "America/New_York"
-  abbr: string;   // "EST" / "EDT" (not "GMT-5" where avoidable)
-  offset: string; // "-05:00"
+  name: string;     // "America/New_York"
+  abbr: string;     // "EST" / "EDT" (not "GMT-5" where avoidable)
+  offset: string;   // "-05:00"
+  aliasOf?: string; // canonical id when `name` is a legacy spelling ("Asia/Kolkata")
 }
 
 function getTimeZonesAt(timestamp: number): TimeZoneInfo[];
@@ -15,43 +16,37 @@ function getTimeZonesAt(timestamp: number): TimeZoneInfo[];
 Scope: current-year accuracy in modern runtimes; results are independent of
 the host timezone (`TZ`). Historical tzdata accuracy is a non-goal.
 
-## Layout
+## Why this exists
 
-- `shared/` — `TimeZoneInfo` type, zone list, Intl helpers, curated
-  metazone-name -> abbreviation map, test fixtures
-- `impls/NN-*/index.ts` — one directory per implementation attempt
-- `tools/gen-core.ts` — pure, browser-safe generator core: probes Intl and
-  produces the class groupings (impl 08's hints) + the rule schedule (07/09),
-  plus an in-runtime verification pass against live Intl
-- `tools/gen-classes.ts` — bun CLI: runs the core against bun's own ICU and
-  writes the `shared/tables/bun/` variant
-- `tools/gen-chrome.ts` — Chrome CLI: bundles the core, evaluates it inside
-  chrome-headless-shell (stable), verifies in the same browser session, and
-  writes the `shared/tables/chrome/` variant
-- `tools/use-tables.ts` (`bun run tables <bun|chrome>`) — instantly switches
-  which variant the impls use: `shared/classes.ts` + `shared/schedule.ts`
-  are one-line selector re-exports, and both variants coexist on disk
-- `tools/emitters.ts` — shared file emitters so both paths produce
-  byte-comparable output, stamped with `genMeta` provenance (host + ICU).
-  Tables are emitted PACKED (zone-name prefix dictionary, delimited-string
-  columns, offsets as signed minutes) and decoded once at module load by
-  `shared/decode.ts` — packing cut minified bundles 22-53% since minifiers
-  can't compress string contents or object keys
-- `tools/audit-abbrs.ts` — audits the curated maps in `shared/abbrs.ts`
-  against current CLDR data (drift detection; abbrs themselves are curated
-  by hand)
-- `comparison.md` — third-party library comparison: 13 candidates
-  validated for built-in DST-aware abbreviations, plus correctness/benchmark
-  results for the 5 that qualified (see `tools/validate-libs.ts` and the
-  informational section of `bun run test`)
-- `.cursor/skills/maintain-curated-tz-data/` — agent skill documenting the
-  review workflow for the hand-curated files (`shared/abbrs.ts`,
-  `shared/zoneLinks.ts`, `shared/fixtures.ts`), watermarked with
-  `curation-reviewed:` headers so reviews only scan upstream changes since
-  the last pass
-- `impls/registry.ts` — list of all impls consumed by tests and the benchmark
-- `tests/dst.test.ts` — DST boundary tests (`bun test`)
-- `bench/bench.ts` — validation + benchmark summary across all impls
+While swapping a codebase from 295KB `moment` to 68KB `luxon`, I also
+wanted to drop the 770KB `moment-timezone` dependency from a time zone picker
+component. A
+small, fast replacement did not exist for this purpose (see
+[comparison.md](comparison.md) for the full 13-library evaluation):
+
+- `Intl` provides offsets, but not reliable abbreviations: `en` CLDR only
+  defines short names for a handful of mostly North American metazones, so
+  Intl-backed formatters (luxon, date-fns, dayjs) emit "GMT+2"-style labels
+  for most of the world.
+- Relying on `Intl` at runtime is also slow to initialize and memory-heavy:
+  constructing a formatter per zone is ~100x the cost of calling one, so the
+  first full-list call pays tens of milliseconds and tens of MB of ICU state.
+- Libraries with real abbreviations built in (moment-timezone,
+  timezone-support, timezonecomplete, bigeasy/timezone) bundle full tzdata —
+  0.3-1.8 MB minified — carrying deep historical transition data this use
+  case doesn't need.
+- Bundled data also goes stale silently: wrong offsets after a rule change,
+  or "UTC" for zones renamed after the data vintage.
+
+My [first attempt](https://github.com/leeoniya/timezones) split the
+difference with a generated offset→abbreviation lookup plus live Intl
+offsets. The implementations here further explore the full live-to-baked spectrum,
+ending in `07-baked-rules`: vs moment-timezone it cuts cold start ~80x
+(24.8ms → 0.3ms) and memory ~3x (22MB → 6.5MB) at ~1.3% of the bundle size
+(773.5KB → 10.2KB), while passing all 62 edge-case fixtures and improving
+abbreviation coverage for 159 zones where modern tzdata dropped letter
+abbreviations (Santiago CLT/CLST, Kathmandu NPT, Chatham CHAST/CHADT,
+Kiritimati LINT, Lord Howe LHST/LHDT, Istanbul TRT, …).
 
 ## Implementations
 
@@ -95,9 +90,9 @@ falls outside it, so only same-bucket repeats hit — suited to clock-driven
 queries near "now". The underlying compute always runs at the bucket start,
 so DST transitions (hour-aligned in UTC for nearly all zones) resolve
 deterministically at bucket boundaries. Cache hits return the same array
-reference — treat results as immutable. Hits cost ~0.2µs vs ~1-4ms for a
-miss; `tests/cache.test.ts` benches hit and miss loops separately for every
-impl.
+reference — treat results as immutable. Hits cost ~0.1-0.3µs vs a miss's
+~1-4ms (live impls) or ~0.05-0.1ms (baked impls); `tests/cache.test.ts`
+benches hit and miss loops separately for every impl.
 
 (Earlier attempts — raw `timeZoneName: 'short'`, uncorrected long-name
 initials, a two-formatters-per-zone variant, a standalone hour-cache
@@ -146,6 +141,48 @@ year boundaries until a country actually changes policy. Regeneration is
 needed on tzdata/CLDR changes (and yearly only for the irregular zones).
 `tests/schedule.test.ts` asserts output-equality with 04 including
 next-year instants; irregular zones clamp outside the generated year.
+
+## Layout
+
+- `shared/` — `TimeZoneInfo` type, zone list, Intl helpers, curated
+  metazone-name -> abbreviation map, test fixtures
+- `impls/NN-*/index.ts` — one directory per implementation attempt;
+  `impls/lib-*/index.ts` — wrappers around the third-party comparison
+  libraries (registered in `impls/lib-registry.ts`)
+- `tools/gen-core.ts` — pure, browser-safe generator core: probes Intl and
+  produces the class groupings (impl 08's hints) + the rule schedule (07/10),
+  plus an in-runtime verification pass against live Intl
+- `tools/gen-classes.ts` — bun CLI: runs the core against bun's own ICU and
+  writes the `shared/tables/bun/` variant
+- `tools/gen-chrome.ts` — Chrome CLI: bundles the core, evaluates it inside
+  chrome-headless-shell (stable), verifies in the same browser session, and
+  writes the `shared/tables/chrome/` variant
+- `tools/use-tables.ts` (`bun run tables <bun|chrome>`) — instantly switches
+  which variant the impls use: `shared/classes.ts` + `shared/schedule.ts`
+  are one-line selector re-exports, and both variants coexist on disk
+- `tools/emitters.ts` — shared file emitters so both paths produce
+  byte-comparable output, stamped with `genMeta` provenance (host + ICU).
+  Tables are emitted PACKED (zone-name prefix dictionary, delimited-string
+  columns, offsets as signed minutes) and decoded once at module load by
+  `shared/decode.ts` — packing cut minified bundles 22-53% since minifiers
+  can't compress string contents or object keys
+- `tools/audit-abbrs.ts` — audits the curated maps in `shared/abbrs.ts`
+  against current CLDR data (drift detection; abbrs themselves are curated
+  by hand)
+- `comparison.md` — third-party library comparison: 13 candidates
+  validated for built-in DST-aware abbreviations, plus correctness/benchmark
+  results for the 5 that qualified (see `tools/validate-libs.ts` and the
+  informational section of `bun run test`)
+- `.cursor/skills/maintain-curated-tz-data/` — agent skill documenting the
+  review workflow for the hand-curated files (`shared/abbrs.ts`,
+  `shared/zoneLinks.ts`, `shared/fixtures.ts`), watermarked with
+  `curation-reviewed:` headers so reviews only scan upstream changes since
+  the last pass
+- `impls/registry.ts` — list of all impls consumed by tests and the benchmark
+  (`impls/lib-registry.ts` holds the comparison-library wrappers)
+- `tests/dst.test.ts` — DST boundary tests (`bun test`)
+- `bench/bench.ts` — bun performance pass (cold/hit/miss, formatters, rss)
+  across all impls + libraries; correctness lives in the test suites
 
 ## Running
 
@@ -205,7 +242,7 @@ pages aren't returned to the OS — so treat them comparatively.
 Generated tables carry `genMeta` provenance (generating host + ICU version).
 The live-Intl equivalence tests skip with a warning when the executing
 runtime doesn't match the tables' provenance — Chrome-generated tables are
-instead verified inside the browser during `gen` itself (~90k checks per
+instead verified inside the browser during `gen` itself (~195k checks per
 run). Notable: bun 1.4 (ICU 75) and Chrome 150 (newer ICU) genuinely
 disagree — different zone lists (445 vs 418; Chrome enumerates legacy names
 like `Asia/Calcutta`/`Europe/Kiev` and omits `Etc/GMT±n`), different tzdata

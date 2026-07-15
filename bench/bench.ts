@@ -1,4 +1,6 @@
-// Validation + benchmark summary across all implementations.
+// Bun performance pass across all implementations + comparison libraries:
+// cold/hit/miss timings, Intl formatter constructions, subprocess RSS, and
+// minified bundle size. Correctness lives in the test suites, not here.
 // Run: bun bench/bench.ts
 
 import { impls } from '../impls/registry.ts';

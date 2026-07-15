@@ -1,10 +1,12 @@
 // Third-party-library comparison impls: libraries whose BUILT-IN data
 // produces real timezone abbreviations (validated by tools/validate-libs.ts)
 // with no help from this repo's strategies. Included in the benchmarks and
-// size/memory tools for comparison, but NOT in the correctness test suites —
-// their bundled tzdata is on the library's release cadence, not ours, and
-// their abbreviation conventions legitimately differ from our fixtures
-// (e.g. tzdata says "+03" for Europe/Istanbul where we curate TRT).
+// size/memory tools, and in the Chrome test stage's INFORMATIONAL
+// (non-gating) library-correctness pass — their fixture misses never fail
+// the suite, because their bundled tzdata is on the library's release
+// cadence, not ours, and their abbreviation conventions legitimately differ
+// from our fixtures (e.g. tzdata says "+03" for Europe/Istanbul where we
+// curate TRT). Findings live in comparison.md.
 
 import type { Impl } from '../shared/types.ts';
 
