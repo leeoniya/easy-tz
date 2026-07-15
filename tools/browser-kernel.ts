@@ -11,7 +11,7 @@
 import type { Impl } from '../shared/types.ts';
 import { fixtures } from '../shared/fixtures.ts';
 import { zones } from '../shared/zones.ts';
-import { formatterCount } from '../shared/fmt.ts';
+import { installIntlCounter, intlConstructCount } from '../shared/intl-count.ts';
 
 const MISS_ITERATIONS = 25;
 const HIT_CALLS = 50_000;
@@ -24,7 +24,10 @@ export interface BenchResult {
   coldMs: number;
   hitUs: number;
   missMedMs: number; // median over the miss loop
-  formatters: number; // Intl.DateTimeFormat instances constructed
+  // Intl.DateTimeFormat constructions, counted via a global constructor
+  // proxy so library-internal formatters are measured too. Each impl is
+  // benched in a fresh page, so the count attributes to that impl alone.
+  formatters: number;
 }
 
 export interface ValidateResult {
@@ -48,6 +51,10 @@ export function installKernel(
   baseline: Impl,
   initInfoFor: (id: string) => unknown = () => undefined
 ): void {
+  // must precede the first getTimeZonesAt() call; formatter construction is
+  // lazy in all impls/libs, so kernel-install time is early enough
+  installIntlCounter();
+
   const find = (id: string) => list.find((i) => i.id === id) ?? baseline;
 
   (globalThis as { __benchIds?: string[] }).__benchIds = list.map((i) => i.id);
@@ -99,7 +106,7 @@ export function installKernel(
       coldMs,
       hitUs,
       missMedMs: missTimes.toSorted((a, b) => a - b)[missTimes.length >> 1]!,
-      formatters: formatterCount(),
+      formatters: intlConstructCount(),
     };
   };
 

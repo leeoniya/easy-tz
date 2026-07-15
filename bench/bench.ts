@@ -67,9 +67,13 @@ for (const row of rows) {
     cmd: [
       process.execPath,
       '-e',
-      `const { impls } = await import(${JSON.stringify(new URL('../impls/registry.ts', import.meta.url).pathname)});
+      `// counting proxy over Intl.DateTimeFormat: catches library-internal
+       // formatter constructions too, not just this repo's fmtCache. Installed
+       // before the first getTimeZonesAt() call (construction is lazy).
+       const { installIntlCounter, intlConstructCount } = await import(${JSON.stringify(new URL('../shared/intl-count.ts', import.meta.url).pathname)});
+       installIntlCounter();
+       const { impls } = await import(${JSON.stringify(new URL('../impls/registry.ts', import.meta.url).pathname)});
        const { libImpls } = await import(${JSON.stringify(new URL('../impls/lib-registry.ts', import.meta.url).pathname)});
-       const { formatterCount } = await import(${JSON.stringify(new URL('../shared/fmt.ts', import.meta.url).pathname)});
        const impl = [...impls, ...libImpls].find((i) => i.id === ${JSON.stringify(row.id)});
        Bun.gc(true);
        const rss0 = process.memoryUsage().rss;
@@ -79,7 +83,7 @@ for (const row of rows) {
        for (let i = 1; i <= 25; i++) impl.getTimeZonesAt(${Date.UTC(2026, 6, 15)} + i * 3600000);
        Bun.gc(true);
        const rssMB = (process.memoryUsage().rss - rss0) / 1048576;
-       console.log(JSON.stringify({ cold: +cold.toFixed(1), formatters: formatterCount(), rssMB: +rssMB.toFixed(2) }));`,
+       console.log(JSON.stringify({ cold: +cold.toFixed(1), formatters: intlConstructCount(), rssMB: +rssMB.toFixed(2) }));`,
     ],
   });
 
