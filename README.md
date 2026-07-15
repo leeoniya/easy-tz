@@ -39,7 +39,7 @@ While swapping a codebase from 295KB `moment` to 68KB `luxon`, I also
 wanted to drop the 770KB `moment-timezone` dependency from a time zone picker
 component. A
 small, fast replacement did not exist for this purpose (see
-[comparison.md](comparison.md) for the full 16-library evaluation):
+[comparison.md](comparison.md) for the full 19-library evaluation):
 
 - `Intl` provides offsets, but not reliable abbreviations: `en` CLDR only
   defines short names for a handful of mostly North American metazones, so
@@ -186,7 +186,7 @@ next-year instants; irregular zones clamp outside the generated year.
 - `tools/audit-abbrs.ts` — audits the curated maps in `shared/abbrs.ts`
   against current CLDR data (drift detection; abbrs themselves are curated
   by hand)
-- `comparison.md` — third-party library comparison: 16 candidates
+- `comparison.md` — third-party library comparison: 19 candidates
   validated for built-in DST-aware abbreviations, plus correctness/benchmark
   results for the 5 that qualified (see `tools/validate-libs.ts` and the
   informational section of `bun run test`)

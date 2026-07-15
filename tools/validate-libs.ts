@@ -2,7 +2,14 @@
 // abbreviation support: winter/summer output for an EET/EEST zone
 // (Europe/Kyiv, 2026), with no help from this repo's strategies.
 //
-// The full 16-candidate evaluation (including the disqualified libraries:
+// The full 19-candidate evaluation (including the disqualified libraries:
+// react-timezone-select — passes the gate via timezone-soft's curated abbr
+// data, but its default list covers only 78 zones (no Europe/Kyiv, no
+// America/Denver), with stale curated data (Cairo has no EEST entry) and
+// spacetime offset bugs (Volgograd +4, Lord Howe DST +11:30);
+// vue-timezone-select — same stack as react-timezone-select on older pins;
+// moment-timezone-picker (Angular) — abbrs come wholesale from bundled
+// moment-timezone, duplicating that row's verdict;
 // luxon / date-fns / dayjs / @internationalized/date /
 // @js-temporal/polyfill / temporal-polyfill — Intl 'short' passthroughs
 // emitting "GMT+2" (Temporal has no abbreviation concept by spec);
