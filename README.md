@@ -14,43 +14,6 @@ interface TimeZoneInfo {
 }
 ```
 
-## Install
-
-```sh
-npm install @leeoniya/easy-tz
-```
-
-## Usage
-
-```ts
-import { getTimeZonesAt } from '@leeoniya/easy-tz';
-
-const zones = getTimeZonesAt(Date.now());
-// [
-//   { name: 'Africa/Abidjan',     abbr: 'GMT', offset: '+00:00' },
-//   ...
-//   { name: 'America/New_York',   abbr: 'EDT', offset: '-04:00' },
-//   ...
-// ] — every IANA zone the runtime knows, sorted by name
-```
-
-The root import is `07-baked-rules` — fastest and smallest, pure baked data
-(see [Implementations](#implementations)). The other impls are available as
-subpath imports with the same API, in increasing order of runtime
-verification (and cost):
-
-```ts
-import { getTimeZonesAt } from '@leeoniya/easy-tz/10-audited-rules';    // baked, Temporal-audited at first call
-import { getTimeZonesAt } from '@leeoniya/easy-tz/08-verified-sharing'; // live values, verified sharing
-import { getTimeZonesAt } from '@leeoniya/easy-tz/04-live-intl';        // fully live baseline
-```
-
-Results are memoized per UTC hour bucket and returned by reference — treat
-them as immutable. Every entry also exports `clearCache()`, which drops
-that memo so the next call recomputes (first-call init/verification work is
-not redone); it exists for test/bench harnesses and for recovering from
-accidental mutation of a returned array.
-
 ## Why this exists
 
 <pre>
@@ -204,3 +167,40 @@ reference — treat results as immutable. Hits cost ~0.1-0.3µs vs a miss's
 benches hit and miss loops separately for every impl.
 
 </details>
+
+## Install
+
+```sh
+npm install @leeoniya/easy-tz
+```
+
+## Usage
+
+```ts
+import { getTimeZonesAt } from '@leeoniya/easy-tz';
+
+const zones = getTimeZonesAt(Date.now());
+// [
+//   { name: 'Africa/Abidjan',     abbr: 'GMT', offset: '+00:00' },
+//   ...
+//   { name: 'America/New_York',   abbr: 'EDT', offset: '-04:00' },
+//   ...
+// ] — every IANA zone the runtime knows, sorted by name
+```
+
+The root import is `07-baked-rules` — fastest and smallest, pure baked data
+(see [Implementations](#implementations)). The other impls are available as
+subpath imports with the same API, in increasing order of runtime
+verification (and cost):
+
+```ts
+import { getTimeZonesAt } from '@leeoniya/easy-tz/10-audited-rules';    // baked, Temporal-audited at first call
+import { getTimeZonesAt } from '@leeoniya/easy-tz/08-verified-sharing'; // live values, verified sharing
+import { getTimeZonesAt } from '@leeoniya/easy-tz/04-live-intl';        // fully live baseline
+```
+
+Results are memoized per UTC hour bucket and returned by reference — treat
+them as immutable. Every entry also exports `clearCache()`, which drops
+that memo so the next call recomputes (first-call init/verification work is
+not redone); it exists for test/bench harnesses and for recovering from
+accidental mutation of a returned array.
