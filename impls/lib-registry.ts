@@ -9,6 +9,7 @@
 import type { Impl } from '../shared/types.ts';
 
 import { getTimeZonesAt as momentTz } from './lib-moment-timezone/index.ts';
+import { getTimeZonesAt as leeoniyaTz } from './lib-leeoniya-timezones/index.ts';
 import { getTimeZonesAt as bigeasyTz } from './lib-bigeasy-timezone/index.ts';
 import { getTimeZonesAt as tzSupport } from './lib-timezone-support/index.ts';
 import { getTimeZonesAt as tzComplete } from './lib-timezonecomplete/index.ts';
@@ -26,6 +27,22 @@ const libFeatures = (via: string): Impl['features'] => ({
 });
 
 export const libImpls: Impl[] = [
+  {
+    id: 'lib-leeoniya-timezones',
+    label: 'leeoniya-timezones@2cd74a8 (generated lookup from pinned tzdb 2026c + Intl offsets)',
+    features: {
+      'staleness risk': 'pinned tzdb snapshot',
+      'abbr source': 'generated lookup (tzdb 2026c via zic)',
+      'offset source': 'live Intl shortOffset',
+      'Intl formatters': 'one per multi-offset group',
+      'generated data': 'offset->abbr lookup + aliases',
+      'runtime guard': 'none',
+      'staleness healing': 'first-abbr fallback on offset mismatch',
+      'year rollover': 'immune for offsets (live Intl)',
+      'Temporal use': 'none',
+    },
+    getTimeZonesAt: leeoniyaTz,
+  },
   {
     id: 'lib-moment-timezone',
     label: 'moment-timezone@0.6.2 (bundled tzdata)',

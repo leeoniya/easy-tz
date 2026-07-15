@@ -12,7 +12,8 @@ Qualified libraries (✅) first; disqualified (❌) below.
 
 | library | why considered | winter / summer | verdict |
 |---|---|---|---|
-| `moment-timezone@0.6.2` | the historical default for timezone work; bundles full tzdata | EET / EEST | ✅ **Qualified.** Real tzdata abbreviations built-in. Best fixture score of the libraries. |
+| `leeoniya-timezones@2cd74a8` | purpose-built for exactly this API: generates a compact offset→abbr lookup from pinned tzdb source at build time, resolves offsets via live Intl at runtime | EET / EEST | ✅ **Qualified.** Same hybrid shape as this repo's generated-table impls but with tzdata-style abbreviations; by far the smallest and fastest of the qualified libraries (20.6 KB vs 328-1781 KB). |
+| `moment-timezone@0.6.2` | the historical default for timezone work; bundles full tzdata | EET / EEST | ✅ **Qualified.** Real tzdata abbreviations built-in. Tied-best fixture score of the libraries. |
 | `timezone-support@3.1.0` | lightweight tzdata lookup library, purpose-built for zone conversion | EET / EEST | ✅ **Qualified**, with stale data: bundled tzdata is 2022-vintage — Cairo reports EET +02:00 in July 2026 (predates Egypt's 2023 DST reintroduction) and `America/Ciudad_Juarez` is unknown. |
 | `timezonecomplete@5.15.1` | TS-first datetime library with tzdata-backed zone math | EET / EEST | ✅ **Qualified**, with bugs: browser use requires explicitly importing the separate `tzdata` package (+213 KB; errors otherwise); abbreviation lags the offset at transition boundaries ("EST −04:00" one minute after spring-forward); Cairo wrong despite current data. |
 | `timezone@1.0.23` (bigeasy) | venerable pure-function strftime-style formatter; per-region data loading | EET / EEST | ✅ **Qualified**, with 2019-vintage data: modern zone names (`Europe/Kyiv`) are unknown and silently return "UTC"; every rule change since 2019 is missing. Full data set is the largest bundle tested (1.8 MB), though regional subsetting is supported. |
@@ -27,13 +28,14 @@ Qualified libraries (✅) first; disqualified (❌) below.
 
 ## Table 2 — correctness & benchmarks (qualified libraries vs this repo's impls)
 
-> Correctness: fixtures = 55 expectations — DST boundaries across
+> Correctness: fixtures = 62 expectations — DST boundaries across
 > Europe/America/Africa/Asia/Australia plus tricky edge cases: the world's only 30-min DST delta
-> (Lord Howe), 45-min offsets (Kathmandu, Chatham), negative DST (Dublin), the Ramadan-based rule
-> (Casablanca), Saturday-local (Nuuk) and 24:00-local (Santiago) transitions, exact transition
-> instants, and the ±offset extremes (Kiritimati +14, Pago Pago −11).
+> (Lord Howe) and only 2-hour delta (Troll), 45-min offsets (Kathmandu, Chatham), negative DST
+> (Dublin), the Ramadan-based rule (Casablanca), Saturday-local (Nuuk) and 24:00-local (Santiago)
+> transitions, exact transition instants, the ±offset extremes (Kiritimati +14, Pago Pago −11),
+> and no-CLDR-metazone zones curated via aliases (Famagusta→EET/EEST, Kirov→MSK).
 > vs 04 = deep output-equality against live-Intl impl `04-live-intl` at 20 instants × 418 zones.
-> Benchmarks: chrome-headless-shell 150 on an idle machine inside the dev sandbox (slight uniform
+> Benchmarks: chrome-headless-shell 150 inside the dev sandbox under light ambient load (uniform
 > penalty vs bare metal; compare rows relatively); cold is the median over 5 fresh page contexts;
 > this repo's impls and the libraries are bundled separately so the libraries' ~4MB of tzdata
 > never inflates our impls' pages. Bundle = `Bun.build` minified, no gzip. Reproducible via
@@ -43,26 +45,35 @@ This repo's implementations (🔷) vs qualified libraries (📦).
 
 | impl | fixtures | vs 04 | notable failures | cold ms | miss ms | rss MB | bundle KB |
 |---|--:|--:|---|--:|--:|--:|--:|
-| 🔷 `04-live-intl` | **55/55** | baseline | — | 38.4 | 1.5 | 25.9 | 6.2 |
-| 🔷 `08-verified-sharing` | **55/55** | **8360/8360** | — | 22.1 | 0.6 | 18.7 | 10.5 |
-| 🔷 `10-audited-rules` | **55/55** | **8360/8360** | — | 2.3 | 0.1 | 7.5 | 11.7 |
-| 🔷 `07-baked-rules` | **55/55** | **8360/8360** | — | 0.3 | 0.1 | 5.5 | 10.2 |
-| 📦 `lib-moment-timezone` | 36/55 | 4956/8360 | all 19 misses are abbr *convention*, zero wrong offsets — even Lord Howe, Ramadan, Nuuk, and exact instants are right; tzdata numerics ("+1030", "−03") where CLDR has names | 23.9 | 0.8 | 22.6 | 773.5 |
-| 📦 `lib-timezone-support` | 35/55 | 4878/8360 | as moment, plus stale 2022 data now caught twice: Cairo **EET +02:00 in July** and Nuuk **−03/−02** (true −02/−01; predates Greenland's base-offset move) — both wrong offsets; Ciudad_Juarez unknown | 20.9 | 0.2 | 16.6 | 753.5 |
-| 📦 `lib-timezonecomplete` | 28/55 | 4777/8360 | label/offset incoherence at 8 boundary fixtures incl. the *exact* transition instant ("EST −04:00"), and the label can also *lead* the offset (Lord Howe pre-transition: "UTC+1100" beside +10:30); Cairo wrong despite current data; "UTC+0300"-style numerics | 161.4 | 67.5 | 28.6 | 327.6 |
-| 📦 `lib-bigeasy-timezone` | 35/55 | 4723/8360 | 2019 data: zones named after 2019 silently return "UTC +00:00" — now caught twice (Europe/Kyiv, America/Nuuk, renamed 2020); Cairo pre-2023 rules | 22.0 | 14.9 | 10.9 | 1781.4 |
+| 🔷 `04-live-intl` | **62/62** | baseline | — | 80.1 | 2.8 | 26.1 | 6.3 |
+| 🔷 `08-verified-sharing` | **62/62** | **8360/8360** | — | 50.0 | 1.1 | 19.5 | 10.6 |
+| 🔷 `10-audited-rules` | **62/62** | **8360/8360** | — | 4.3 | 0.1 | 7.8 | 11.7 |
+| 🔷 `07-baked-rules` | **62/62** | **8360/8360** | — | 0.6 | 0.1 | 7.8 | 10.2 |
+| 📦 `lib-leeoniya-timezones` | 39/62 | 4958/8360 | best library score, tied with moment at a fraction of the size; 22 of 23 misses are abbr *convention* (tzdata numerics "+03"/"+1030" where CLDR/our curation has TRT/LHST), zero wrong offsets; the one genuine quirk: inside the Casablanca Ramadan window the label falls back to "+01" beside the (correct) +00:00 offset — the generated lookup lacks that zone's Ramadan entry | 15.0 | 0.4 | 10.3 | 20.6 |
+| 📦 `lib-moment-timezone` | 39/62 | 4956/8360 | all 23 misses are abbr *convention*, zero wrong offsets — even Lord Howe, Troll, Ramadan, Nuuk, and exact instants are right; tzdata numerics ("+1030", "−03") where CLDR has names | 45.1 | 1.3 | 22.8 | 773.5 |
+| 📦 `lib-timezone-support` | 37/62 | 4878/8360 | as moment, plus stale 2022 data now caught twice: Cairo **EET +02:00 in July** and Nuuk **−03/−02** (true −02/−01; predates Greenland's base-offset move) — both wrong offsets; Ciudad_Juarez unknown | 33.5 | 0.4 | 16.3 | 753.5 |
+| 📦 `lib-timezonecomplete` | 31/62 | 4777/8360 | label/offset incoherence at 8 boundary fixtures incl. the *exact* transition instant ("EST −04:00"), and the label can also *lead* the offset (Lord Howe pre-transition: "UTC+1100" beside +10:30); Cairo wrong despite current data; "UTC+0300"-style numerics | 265.1 | 94.8 | 28.3 | 327.6 |
+| 📦 `lib-bigeasy-timezone` | 37/62 | 4723/8360 | 2019 data: zones named after 2019 silently return "UTC +00:00" — now caught twice (Europe/Kyiv, America/Nuuk, renamed 2020); Cairo pre-2023 rules | 32.9 | 21.8 | 11.0 | 1781.4 |
 
 > Reading notes: the libraries' vs-04 scores (~56-59%) and most fixture misses are a legitimate
 > convention split, not bugs — modern tzdata removed most invented abbreviations in 2017 (numeric
 > "+05", "+1030"), while this repo's output follows CLDR/user-facing names ("PKT", "LHST");
-> Istanbul TRT is a curated choice on our side. Notably, all four libraries compute the tricky
-> *mechanics* correctly (30-min DST delta, 45-min offsets, negative DST, the Ramadan rule,
-> 24:00-local and exact-instant transitions) wherever their data vintage covers the zone. The
-> genuine defects the edge cases surfaced or confirmed: stale bundled data producing wrong
-> *offsets* (timezone-support: Cairo + Nuuk), silent "UTC" for zones newer than the bundled data
-> (bigeasy: Kyiv + Nuuk), and transition-boundary label/offset incoherence in both directions
-> (timezonecomplete, incl. at the exact transition instant). moment-timezone emerged cleanest on
-> data quality: every miss is abbreviation convention, never a wrong offset. Chrome timer
-> quantization (~100µs) makes the baked impls' sub-0.1ms misses read as 0.1. Generated: 2026-07-14
-> (fixtures expanded 26 → 55 and library findings updated same day; benchmarks re-run post-merge
-> on an idle machine).
+> Istanbul TRT and the Famagusta/Kirov aliases are curated choices on our side. Notably, all five
+> libraries compute the tricky *mechanics* correctly (30-min and 2-hour DST deltas, 45-min
+> offsets, negative DST, the Ramadan rule, 24:00-local and exact-instant transitions) wherever
+> their data vintage covers the zone. The genuine defects the edge cases surfaced or confirmed:
+> stale bundled data producing wrong *offsets* (timezone-support: Cairo + Nuuk), silent "UTC" for
+> zones newer than the bundled data (bigeasy: Kyiv + Nuuk), transition-boundary label/offset
+> incoherence in both directions (timezonecomplete, incl. at the exact transition instant), and a
+> stale label beside a correct offset when a generated lookup lacks an offset entry
+> (`leeoniya-timezones`: Casablanca inside Ramadan). On data quality, moment-timezone and
+> `leeoniya-timezones` emerged cleanest: misses are abbreviation convention, never a
+> wrong offset (modulo the single Casablanca label above). `leeoniya-timezones` is also the
+> performance standout among the libraries — its generated-lookup-plus-live-Intl-offsets design
+> is the same hybrid shape as this repo's `08`/`10` impls, and it lands between them on cold
+> start and bundle size while using tzdata (not CLDR) abbreviation conventions. Chrome timer
+> quantization (~100µs) makes the baked impls' sub-0.1ms misses read as 0.1. Generated:
+> 2026-07-14 (fixtures expanded 26 → 55 and library findings updated same day); updated
+> 2026-07-15: fixtures 55 → 62 (Troll, Famagusta, Kirov), added `leeoniya-timezones` and
+> re-ran all benchmarks in one session — ambient load differed from the 07-14 run, so numbers
+> shifted uniformly; compare within the table only.

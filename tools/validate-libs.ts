@@ -2,7 +2,7 @@
 // abbreviation support: winter/summer output for an EET/EEST zone
 // (Europe/Kyiv, 2026), with no help from this repo's strategies.
 //
-// The full 12-candidate evaluation (including the disqualified libraries:
+// The full 13-candidate evaluation (including the disqualified libraries:
 // luxon / date-fns / dayjs / @js-temporal/polyfill — Intl 'short'
 // passthroughs emitting "GMT+2"; @tubular/time — GMT±n outside North
 // America; @vvo/tzdb — static standard-time abbrs, no timestamp API;
@@ -51,6 +51,14 @@ await probe('timezonecomplete@5.15.1', async () => {
     new tc.DateTime(WINTER, tc.utc()).toZone(zone).format('zzz'),
     new tc.DateTime(SUMMER, tc.utc()).toZone(zone).format('zzz'),
   ];
+});
+
+await probe('leeoniya-timezones@2cd74a8', async () => {
+  // getTimeZonesAt returns the full list; the gate probes the same single
+  // zone as the others
+  const { getTimeZonesAt } = await import('leeoniya-timezones');
+  const find = (ts: number) => getTimeZonesAt(ts).find((z) => z.name === ZONE)!;
+  return () => [find(WINTER).abbr, find(SUMMER).abbr];
 });
 
 await probe('timezone@1.0.23 (bigeasy)', async () => {
