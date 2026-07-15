@@ -2,12 +2,15 @@
 // abbreviation support: winter/summer output for an EET/EEST zone
 // (Europe/Kyiv, 2026), with no help from this repo's strategies.
 //
-// The full 13-candidate evaluation (including the disqualified libraries:
-// luxon / date-fns / dayjs / @js-temporal/polyfill — Intl 'short'
-// passthroughs emitting "GMT+2"; @tubular/time — GMT±n outside North
-// America; @vvo/tzdb — static standard-time abbrs, no timestamp API;
-// spacetime — no abbreviation API; @js-joda — errors without the locale
-// plugin, generic non-DST names with it) is recorded in comparison.md.
+// The full 16-candidate evaluation (including the disqualified libraries:
+// luxon / date-fns / dayjs / @internationalized/date /
+// @js-temporal/polyfill / temporal-polyfill — Intl 'short' passthroughs
+// emitting "GMT+2" (Temporal has no abbreviation concept by spec);
+// @tubular/time — GMT±n outside North America; @vvo/tzdb — static
+// standard-time abbrs, no timestamp API; countries-and-timezones — static
+// offset pairs, no abbrs and no timestamp API; spacetime — no abbreviation
+// API; @js-joda — errors without the locale plugin, generic non-DST names
+// with it) is recorded in comparison.md.
 // Those packages were uninstalled after evaluation; this script keeps the
 // qualifying probes reproducible.
 //
