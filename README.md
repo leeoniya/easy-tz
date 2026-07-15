@@ -69,6 +69,16 @@ Ordered fastest to slowest — which is also most-baked to most-live: each
 step down trusts the generated data less (adding runtime rigor and cost),
 until `04-live-intl` ships no generated data at all.
 
+| impl | trust model | cold ms | miss ms | rss MB | bundle KB |
+|---|---|--:|--:|--:|--:|
+| `07-baked-rules` | trusts baked tables completely | 0.3 | <0.1 | 6.5 | 10.2 |
+| `10-audited-rules` | baked tables, Temporal-audited at first call; failing zones recovered live | 2.3 | <0.1 | 7.4 | 11.7 |
+| `08-verified-sharing` | live Intl values; baked data only hints formatter sharing, Temporal-verified at first call | 22.2 | 0.6 | 18.4 | 10.6 |
+| `04-live-intl` | fully live — no generated data to trust | 38.9 | 1.4 | 25.6 | 6.3 |
+
+<details>
+<summary><b>Implementation details</b> — strategies and per-impl notes</summary>
+
 | impl | abbr strategy | offset strategy |
 |---|---|---|
 | `07-baked-rules` | baked into generated year schedule | baked into generated year schedule (zero Intl at runtime) |
@@ -88,6 +98,31 @@ wrong answers until regeneration (needed on tzdata/CLDR changes, and yearly
 only for the irregular zones). `tests/schedule.test.ts` asserts
 output-equality with 04 including next-year instants; irregular zones clamp
 outside the generated year.
+
+How exposed is that in practice — measured against 04, not against perfect
+data? The events are real but rare: weighting the last decade of tzdb
+releases (2016-2026) by who's affected, a future-effective rule change hit
+a 2M+ metro zone in 7 of 11 years — Cairo twice (2016 DST cancel on 3 days'
+notice, 2023 reintroduction), Istanbul (2016), Casablanca and Pyongyang
+(2018), Brazil's DST-observing zones incl. São Paulo and Rio (2019), the
+2022 cluster (Mexico City, Tehran, Amman, Damascus, Santiago), Almaty and
+Asunción (2024), Calgary/Edmonton (2026) — ~1.5-2 major zones/year, heavily
+clustered; 2021 and 2025 touched only small-population zones (Samoa, South
+Sudan, Chilean Aysén). But 04 is not current at the effective date either:
+its data rides announcement -> tzdb release (days-weeks, sometimes negative
+— Alberta 2026 shipped 3 weeks after taking effect; Egypt 2016 gave 3 days)
+-> ICU/Chrome pickup (a stable cycle or two on a 4-week cadence) -> each
+user's browser actually updating. That shared upstream pipeline is
+weeks-to-months; 07's *additional* exposure is only how long
+regen+redeploy lags the generating Chrome's update, which for any app that
+deploys monthly-or-better rounds to zero. It can even invert: baked output
+doesn't depend on the user's runtime, so a freshly regenerated table serves
+correct post-change data to browsers whose own ICU is still stale — where
+04 is wrong. The one structural exception is predictable, not
+event-driven: the Ramadan-rule zones (Casablanca/El Aaiun and Gaza/Hebron —
+all of Morocco and Palestine, ~40M people) clamp outside their generated
+year, so skipping the January regen gets them wrong for the ~month-long
+Ramadan window every single year, no policy change required.
 
 `10-audited-rules` builds on 07, adding a first-call audit for rigor: once
 per process (sound — browsers never hot-swap tzdata) every zone's
@@ -119,6 +154,8 @@ with offsets derived arithmetically from zone-local wall-clock fields.
 Slowest cold start and heaviest memory (one formatter per zone forces the
 full ICU cost), but nothing can go stale except the small curated abbr map;
 it's the reference the other three are tested against.
+
+</details>
 
 All impls memoize the full response per UTC hour bucket
 (`shared/hourCache.ts`): a single global

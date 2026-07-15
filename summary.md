@@ -94,6 +94,22 @@ Syria, Mexico, Iran, Chile, Fiji). Notice can be negative: Alberta's change
 took effect Jun 18 but tzdata 2026c landed Jul 8 — even live-Intl impls were
 wrong ~3 weeks because upstream lagged.
 
+Population-weighted (which zones a missed 07 regen would leave with an
+inaccurate offset or abbreviation — output stays well-formed, nothing
+crashes): a 2M+
+metro zone was hit in 7 of the last 11 years (~1.5-2 major zones/year,
+clustered — 2022 alone: Mexico City, Tehran, Amman, Damascus, Santiago;
+2021/2025 touched only small-population zones). Typical error: 1 hour for
+the DST window (abolition/reintroduction) or year-round (permanent move).
+Weighed against 04 the practical divergence is smaller than it looks: 04's
+own data rides tzdb release -> ICU/Chrome pickup -> per-user browser
+updates (weeks-to-months end to end), so 07's marginal exposure is just
+regen+redeploy lag beyond that — near zero on a monthly-or-better deploy
+cadence, and a fresh table can even lead a stale user browser's live Intl.
+The guaranteed annual case is the Ramadan-rule zones (Casablanca/El Aaiun,
+Gaza/Hebron — all of Morocco and Palestine, ~40M people): without the
+January regen they're wrong for the ~month-long Ramadan window every year.
+
 Exposure once the runtime's ICU picks up a change: 04 self-heals; 08
 self-heals (verification splits diverged groups); 10's init audit catches
 divergence per session and recovers those zones via Temporal; 07 is wrong

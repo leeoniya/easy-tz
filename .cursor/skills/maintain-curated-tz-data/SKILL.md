@@ -19,7 +19,7 @@ reviewed when upstream data changes:
 |---|---|
 | `shared/abbrs.ts` | `abbrOverrides` (CLDR long name → common abbr where the initials heuristic is wrong, e.g. "Eastern European Standard Time" → EET); `zoneAliases` (no-metazone zones borrowing a behavior-identical reference zone, e.g. Channel Islands → Europe/London); `zoneAbbrOverrides` (zone-level abbrs with no CLDR metazone at all, e.g. Europe/Istanbul → TRT) |
 | `shared/zoneLinks.ts` | `zoneLinkPairs` as `[canonical, alias]` — tzdata backward-link spelling variants (Asia/Kolkata ↔ Asia/Calcutta). Direction matters: `aliasOf` metadata and picker dedupe rely on element 0 being the modern canonical id |
-| `shared/fixtures.ts` | expected abbr/offset values at specific 2026 instants; breaks legitimately when countries change rules mid-year |
+| `shared/fixtures.ts` | expected abbr/offset values at specific 2026 instants; expectations legitimately go stale (tests fail) when countries change rules mid-year |
 
 All three files carry a `curation-reviewed:` header watermark (date + data
 versions reviewed through). Update it as the last step of every review.
