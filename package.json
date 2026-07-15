@@ -1,7 +1,51 @@
 {
-  "name": "timezones-play",
-  "private": true,
+  "name": "@leeoniya/easy-tz",
+  "version": "0.1.0",
+  "description": "Fast, tiny getTimeZonesAt(): DST-aware abbreviations and UTC offsets for every IANA zone at a timestamp",
+  "license": "MIT",
+  "repository": "github:leeoniya/easy-tz",
+  "keywords": [
+    "tz",
+    "timezone",
+    "time zone",
+    "timezone picker",
+    "IANA",
+    "tzdata",
+    "DST",
+    "abbreviation",
+    "UTC offset",
+    "Intl"
+  ],
   "type": "module",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/07-baked-rules/index.d.ts",
+      "default": "./dist/07-baked-rules/index.mjs"
+    },
+    "./10-audited-rules": {
+      "types": "./dist/10-audited-rules/index.d.ts",
+      "default": "./dist/10-audited-rules/index.mjs"
+    },
+    "./07-baked-rules": {
+      "types": "./dist/07-baked-rules/index.d.ts",
+      "default": "./dist/07-baked-rules/index.mjs"
+    },
+    "./08-verified-sharing": {
+      "types": "./dist/08-verified-sharing/index.d.ts",
+      "default": "./dist/08-verified-sharing/index.mjs"
+    },
+    "./04-live-intl": {
+      "types": "./dist/04-live-intl/index.d.ts",
+      "default": "./dist/04-live-intl/index.mjs"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "check": "tsc -p tsconfig.json",
     "build": "bun tools/build-dist.ts",
@@ -13,7 +57,8 @@
     "gen": "bun tools/gen-all.ts",
     "tables": "bun tools/use-tables.ts",
     "browsers:install": "bunx browsers install chrome-headless-shell@stable --path .browsers",
-    "audit": "bun tools/audit-abbrs.ts"
+    "audit": "bun tools/audit-abbrs.ts",
+    "prepublishOnly": "bun run check && bun run build"
   },
   "devDependencies": {
     "@puppeteer/browsers": "3.0.6",

@@ -1,8 +1,7 @@
 // Builds shippable bundles of getTimeZonesAt() for every impl into
-// dist/<impl-id>/:
+// dist/<impl-id>/ (the npm package's `files`/`exports` surface):
 //   index.mjs      — ESM:  export { getTimeZonesAt, clearCache }
-//   index.iife.js  — IIFE: installs globalThis.getTimeZonesAt (clearCache is
-//                    attached as a property: getTimeZonesAt.clearCache())
+//   index.d.ts     — types (same tiny surface every impl)
 // Bundled with Bun.build (target browser) UNMINIFIED so the output stays
 // human-readable (minified sizes are reported by `bun run size`), against
 // the CHROME table variant — the primary shipping target — with the active
@@ -23,33 +22,51 @@ const distUrl = new URL('../dist/', import.meta.url);
 // build can't leave scratch files behind for git to pick up
 const entriesDir = mkdtempSync(join(tmpdir(), 'tz-dist-'));
 
-// bundle entries are generated files: re-export for ESM, global install for
-// IIFE (Bun.build has no globalName option, so the entry does the assignment)
-function entrySource(implId: string, format: 'esm' | 'iife'): string {
+// bundle entries are generated re-export files
+async function buildEsm(implId: string): Promise<number> {
   const implPath = new URL(`../impls/${implId}/index.ts`, import.meta.url).pathname;
+  const entry = join(entriesDir, `${implId}.ts`);
 
-  return format === 'esm'
-    ? `export { getTimeZonesAt, clearCache } from '${implPath}';\n`
-    : `import { getTimeZonesAt, clearCache } from '${implPath}';\n` +
-      `getTimeZonesAt.clearCache = clearCache;\n` +
-      `globalThis.getTimeZonesAt = getTimeZonesAt;\n`;
-}
-
-async function buildVariant(implId: string, format: 'esm' | 'iife', outFile: string): Promise<number> {
-  const entry = join(entriesDir, `${implId}.${format}.ts`);
-  writeFileSync(entry, entrySource(implId, format));
+  writeFileSync(entry, `export { getTimeZonesAt, clearCache } from '${implPath}';\n`);
 
   const result = await Bun.build({
     entrypoints: [entry],
     target: 'browser',
-    format,
+    format: 'esm',
   });
 
   const code = await result.outputs[0]!.text();
-  await Bun.write(new URL(outFile, distUrl).pathname, code);
+  await Bun.write(new URL(`${implId}/index.mjs`, distUrl).pathname, code);
 
   return Buffer.byteLength(code);
 }
+
+const dtsSource = `export interface TimeZoneInfo {
+  /** IANA zone id, e.g. "America/New_York" */
+  name: string;
+  /** DST-aware abbreviation, e.g. "EST" / "EDT" (not "GMT-5" where avoidable) */
+  abbr: string;
+  /** UTC offset at the requested instant, e.g. "-05:00" */
+  offset: string;
+  /** canonical id when \`name\` is a legacy spelling ("Asia/Kolkata") */
+  aliasOf?: string;
+}
+
+/**
+ * All IANA zones known to the runtime (sorted by name) with their
+ * DST-correct abbreviation and UTC offset at \`timestamp\` (epoch ms).
+ * Results are memoized per UTC hour bucket and returned by reference —
+ * treat them as immutable.
+ */
+export declare function getTimeZonesAt(timestamp: number): TimeZoneInfo[];
+
+/**
+ * Drops the hour-bucket memo so the next call recomputes (first-call
+ * init/verification work is NOT redone). Only needed when the result
+ * arrays were mutated or in test/bench harnesses.
+ */
+export declare function clearCache(): void;
+`;
 
 const previousVariant = activeVariant() ?? 'bun';
 
@@ -61,14 +78,15 @@ try {
   const rows: string[][] = [];
 
   for (const impl of impls) {
-    const esmBytes = await buildVariant(impl.id, 'esm', `${impl.id}/index.mjs`);
-    const iifeBytes = await buildVariant(impl.id, 'iife', `${impl.id}/index.iife.js`);
+    const esmBytes = await buildEsm(impl.id);
 
-    rows.push([impl.id, (esmBytes / 1024).toFixed(1), (iifeBytes / 1024).toFixed(1)]);
+    await Bun.write(new URL(`${impl.id}/index.d.ts`, distUrl).pathname, dtsSource);
+
+    rows.push([impl.id, (esmBytes / 1024).toFixed(1)]);
   }
 
-  console.log('dist/<impl>/{index.mjs,index.iife.js} — unminified (readable), chrome tables\n');
-  printTable(['impl', 'esm KB', 'iife KB'], rows);
+  console.log('dist/<impl>/{index.mjs,index.d.ts} — unminified (readable), chrome tables\n');
+  printTable(['impl', 'esm KB'], rows);
 } finally {
   rmSync(entriesDir, { recursive: true, force: true });
   selectTables(previousVariant);

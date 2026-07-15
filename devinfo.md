@@ -76,10 +76,9 @@ bun run mem      # memory: fresh subprocess per impl, median of 5 runs,
                  # JS-heap vs native (~ICU) split via bun:jsc heapStats
 bun run audit    # check shared/abbrs.ts curated maps against current CLDR
 bun run build    # shippable bundles per impl into dist/<impl>/: index.mjs
-                 # (ESM) + index.iife.js (IIFE installing a global
-                 # getTimeZonesAt, with clearCache attached as a property);
-                 # unminified for readability, built against the chrome
-                 # table variant (minified sizes: `bun run size`)
+                 # (ESM) + index.d.ts; unminified for readability, built
+                 # against the chrome table variant (minified sizes:
+                 # `bun run size`)
 
 bun run tables <bun|chrome>  # (plumbing) switch the active table variant;
                              # gen leaves it on bun for local dev, and the
