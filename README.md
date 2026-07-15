@@ -1,4 +1,4 @@
-# timezones-play
+# easy-tz
 
 Experiments in implementing a fast, dependency-free `getTimeZonesAt(timestamp)`. Scope: current-year accuracy in modern runtimes; results are independent of
 the host timezone (`TZ`). Historical tzdata accuracy is a non-goal.
