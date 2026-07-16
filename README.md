@@ -16,7 +16,7 @@ interface TimeZoneInfo {
 
 ## Why this exists
 
-<pre>
+```
 ┌──────────────────────────────────────────────────────────────┐
 │ Type to search (name, city, abbreviation)                 🔍 │
 ├──────────────────────────────────────────────────────────────┤
@@ -31,12 +31,11 @@ interface TimeZoneInfo {
 │    Algiers  CET                                [UTC+01:00]  ░│
 │    Asmara  EAT                                 [UTC+03:00]  ▼│
 └──────────────────────────────────────────────────────────────┘
-</pre>
+```
 
 While swapping a codebase from 295KB `moment` to 68KB `luxon`, I also
 wanted to drop the 770KB `moment-timezone` dependency from a time zone picker
-component. A
-small, fast replacement did not exist for this purpose (see
+component. A small, fast replacement did not exist for this purpose (see
 [comparison.md](comparison.md) for the full 19-library evaluation):
 
 - `Intl` provides offsets, but not reliable abbreviations: `en` CLDR only
@@ -50,8 +49,6 @@ small, fast replacement did not exist for this purpose (see
   timezone-support, timezonecomplete, bigeasy/timezone) bundle full tzdata —
   0.3-1.8 MB minified — carrying deep historical transition data this use
   case doesn't need.
-- Bundled data also goes stale silently: wrong offsets after a rule change,
-  or "UTC" for zones renamed after the data vintage.
 
 My [first attempt](https://github.com/leeoniya/timezones) split the
 difference with a generated offset→abbreviation lookup plus live Intl
