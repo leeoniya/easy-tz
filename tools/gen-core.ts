@@ -18,7 +18,11 @@
 // Lord Howe). Assumes at most one transition per 24h window, which holds for
 // all real zones.
 
-import { zones } from '../shared/zones.ts';
+// probe the raw runtime enumeration, NOT the augmented public list: tables
+// must reflect exactly what this runtime's ICU enumerates, and the canonical
+// spellings added by shared/zones.ts are bridged at lookup time via
+// zoneLinks (buildScheduleIndex) instead of being baked into every table
+import { runtimeZones as zones } from '../shared/zones.ts';
 import { abbrOverrides, zoneAliases, zoneAbbrOverrides } from '../shared/abbrs.ts';
 import { fmtCache, formatOffsetMinutes, initialsAbbr, compactGmt } from '../shared/fmt.ts';
 import { ruleInstant, resolveClass, type ScheduleClass, type ZoneState, type Rule } from '../shared/rules.ts';

@@ -1,5 +1,46 @@
+// shared/zoneLinks.ts
+var zoneLinkPairs = [
+  ["Africa/Asmara", "Africa/Asmera"],
+  ["America/Argentina/Buenos_Aires", "America/Buenos_Aires"],
+  ["America/Argentina/Catamarca", "America/Catamarca"],
+  ["America/Argentina/Cordoba", "America/Cordoba"],
+  ["America/Argentina/Jujuy", "America/Jujuy"],
+  ["America/Argentina/Mendoza", "America/Mendoza"],
+  ["America/Atikokan", "America/Coral_Harbour"],
+  ["America/Indiana/Indianapolis", "America/Indianapolis"],
+  ["America/Kentucky/Louisville", "America/Louisville"],
+  ["America/Nuuk", "America/Godthab"],
+  ["Asia/Ho_Chi_Minh", "Asia/Saigon"],
+  ["Asia/Kathmandu", "Asia/Katmandu"],
+  ["Asia/Kolkata", "Asia/Calcutta"],
+  ["Asia/Ulaanbaatar", "Asia/Choibalsan"],
+  ["Asia/Yangon", "Asia/Rangoon"],
+  ["Atlantic/Faroe", "Atlantic/Faeroe"],
+  ["Europe/Kyiv", "Europe/Kiev"],
+  ["Pacific/Chuuk", "Pacific/Truk"],
+  ["Pacific/Kanton", "Pacific/Enderbury"],
+  ["Pacific/Pohnpei", "Pacific/Ponape"]
+];
+var zoneLinks = new Map;
+var aliasOfZone = new Map;
+for (const [canonical, alias] of zoneLinkPairs) {
+  zoneLinks.set(canonical, alias);
+  zoneLinks.set(alias, canonical);
+  aliasOfZone.set(alias, canonical);
+}
+function makeInfo(name, abbr, offset) {
+  const aliasOf = aliasOfZone.get(name);
+  return aliasOf === undefined ? { name, abbr, offset } : { name, abbr, offset, aliasOf };
+}
+
 // shared/zones.ts
-var zones = Intl.supportedValuesOf("timeZone");
+var runtimeZones = Intl.supportedValuesOf("timeZone");
+var zones = (() => {
+  const set = new Set(runtimeZones);
+  for (const [canonical] of zoneLinkPairs)
+    set.add(canonical);
+  return set.size === runtimeZones.length ? runtimeZones : [...set].sort();
+})();
 
 // shared/hourCache.ts
 var HOUR_MS = 3600000;
@@ -157,41 +198,6 @@ var abbrOverrides = {
   "Dumont-d’Urville Time": "DDUT",
   "Coordinated Universal Time": "UTC"
 };
-
-// shared/zoneLinks.ts
-var zoneLinkPairs = [
-  ["Africa/Asmara", "Africa/Asmera"],
-  ["America/Argentina/Buenos_Aires", "America/Buenos_Aires"],
-  ["America/Argentina/Catamarca", "America/Catamarca"],
-  ["America/Argentina/Cordoba", "America/Cordoba"],
-  ["America/Argentina/Jujuy", "America/Jujuy"],
-  ["America/Argentina/Mendoza", "America/Mendoza"],
-  ["America/Atikokan", "America/Coral_Harbour"],
-  ["America/Indiana/Indianapolis", "America/Indianapolis"],
-  ["America/Kentucky/Louisville", "America/Louisville"],
-  ["America/Nuuk", "America/Godthab"],
-  ["Asia/Ho_Chi_Minh", "Asia/Saigon"],
-  ["Asia/Kathmandu", "Asia/Katmandu"],
-  ["Asia/Kolkata", "Asia/Calcutta"],
-  ["Asia/Ulaanbaatar", "Asia/Choibalsan"],
-  ["Asia/Yangon", "Asia/Rangoon"],
-  ["Atlantic/Faroe", "Atlantic/Faeroe"],
-  ["Europe/Kyiv", "Europe/Kiev"],
-  ["Pacific/Chuuk", "Pacific/Truk"],
-  ["Pacific/Kanton", "Pacific/Enderbury"],
-  ["Pacific/Pohnpei", "Pacific/Ponape"]
-];
-var zoneLinks = new Map;
-var aliasOfZone = new Map;
-for (const [canonical, alias] of zoneLinkPairs) {
-  zoneLinks.set(canonical, alias);
-  zoneLinks.set(alias, canonical);
-  aliasOfZone.set(alias, canonical);
-}
-function makeInfo(name, abbr, offset) {
-  const aliasOf = aliasOfZone.get(name);
-  return aliasOf === undefined ? { name, abbr, offset } : { name, abbr, offset, aliasOf };
-}
 
 // shared/fmt.ts
 function fmtCache(options) {

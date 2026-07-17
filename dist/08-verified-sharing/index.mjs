@@ -1,5 +1,46 @@
+// shared/zoneLinks.ts
+var zoneLinkPairs = [
+  ["Africa/Asmara", "Africa/Asmera"],
+  ["America/Argentina/Buenos_Aires", "America/Buenos_Aires"],
+  ["America/Argentina/Catamarca", "America/Catamarca"],
+  ["America/Argentina/Cordoba", "America/Cordoba"],
+  ["America/Argentina/Jujuy", "America/Jujuy"],
+  ["America/Argentina/Mendoza", "America/Mendoza"],
+  ["America/Atikokan", "America/Coral_Harbour"],
+  ["America/Indiana/Indianapolis", "America/Indianapolis"],
+  ["America/Kentucky/Louisville", "America/Louisville"],
+  ["America/Nuuk", "America/Godthab"],
+  ["Asia/Ho_Chi_Minh", "Asia/Saigon"],
+  ["Asia/Kathmandu", "Asia/Katmandu"],
+  ["Asia/Kolkata", "Asia/Calcutta"],
+  ["Asia/Ulaanbaatar", "Asia/Choibalsan"],
+  ["Asia/Yangon", "Asia/Rangoon"],
+  ["Atlantic/Faroe", "Atlantic/Faeroe"],
+  ["Europe/Kyiv", "Europe/Kiev"],
+  ["Pacific/Chuuk", "Pacific/Truk"],
+  ["Pacific/Kanton", "Pacific/Enderbury"],
+  ["Pacific/Pohnpei", "Pacific/Ponape"]
+];
+var zoneLinks = new Map;
+var aliasOfZone = new Map;
+for (const [canonical, alias] of zoneLinkPairs) {
+  zoneLinks.set(canonical, alias);
+  zoneLinks.set(alias, canonical);
+  aliasOfZone.set(alias, canonical);
+}
+function makeInfo(name, abbr, offset) {
+  const aliasOf = aliasOfZone.get(name);
+  return aliasOf === undefined ? { name, abbr, offset } : { name, abbr, offset, aliasOf };
+}
+
 // shared/zones.ts
-var zones = Intl.supportedValuesOf("timeZone");
+var runtimeZones = Intl.supportedValuesOf("timeZone");
+var zones = (() => {
+  const set = new Set(runtimeZones);
+  for (const [canonical] of zoneLinkPairs)
+    set.add(canonical);
+  return set.size === runtimeZones.length ? runtimeZones : [...set].sort();
+})();
 
 // shared/abbrs.ts
 var zoneAliases = {
@@ -173,41 +214,6 @@ function hourBucketMemo(compute) {
   };
 }
 
-// shared/zoneLinks.ts
-var zoneLinkPairs = [
-  ["Africa/Asmara", "Africa/Asmera"],
-  ["America/Argentina/Buenos_Aires", "America/Buenos_Aires"],
-  ["America/Argentina/Catamarca", "America/Catamarca"],
-  ["America/Argentina/Cordoba", "America/Cordoba"],
-  ["America/Argentina/Jujuy", "America/Jujuy"],
-  ["America/Argentina/Mendoza", "America/Mendoza"],
-  ["America/Atikokan", "America/Coral_Harbour"],
-  ["America/Indiana/Indianapolis", "America/Indianapolis"],
-  ["America/Kentucky/Louisville", "America/Louisville"],
-  ["America/Nuuk", "America/Godthab"],
-  ["Asia/Ho_Chi_Minh", "Asia/Saigon"],
-  ["Asia/Kathmandu", "Asia/Katmandu"],
-  ["Asia/Kolkata", "Asia/Calcutta"],
-  ["Asia/Ulaanbaatar", "Asia/Choibalsan"],
-  ["Asia/Yangon", "Asia/Rangoon"],
-  ["Atlantic/Faroe", "Atlantic/Faeroe"],
-  ["Europe/Kyiv", "Europe/Kiev"],
-  ["Pacific/Chuuk", "Pacific/Truk"],
-  ["Pacific/Kanton", "Pacific/Enderbury"],
-  ["Pacific/Pohnpei", "Pacific/Ponape"]
-];
-var zoneLinks = new Map;
-var aliasOfZone = new Map;
-for (const [canonical, alias] of zoneLinkPairs) {
-  zoneLinks.set(canonical, alias);
-  zoneLinks.set(alias, canonical);
-  aliasOfZone.set(alias, canonical);
-}
-function makeInfo(name, abbr, offset) {
-  const aliasOf = aliasOfZone.get(name);
-  return aliasOf === undefined ? { name, abbr, offset } : { name, abbr, offset, aliasOf };
-}
-
 // shared/fmt.ts
 function fmtCache(options) {
   const cache = new Map;
@@ -331,9 +337,9 @@ function init() {
     const year = new Date().getUTCFullYear();
     const start = Date.UTC(year, 0, 1);
     const end = Date.UTC(year + 1, 0, 1);
-    const runtimeZones = new Set(zones);
+    const runtimeZones2 = new Set(zones);
     for (const group of classGroups) {
-      const present = group.filter((z) => runtimeZones.has(z));
+      const present = group.filter((z) => runtimeZones2.has(z));
       if (present.length < 2)
         continue;
       const rep = present[0];
@@ -348,7 +354,7 @@ function init() {
       }
     }
     for (const [alias, target] of Object.entries(zoneAliases)) {
-      if (!runtimeZones.has(alias) || !runtimeZones.has(target))
+      if (!runtimeZones2.has(alias) || !runtimeZones2.has(target))
         continue;
       if (yearSignature(alias, start, end) !== yearSignature(target, start, end)) {
         droppedAliases.add(alias);
