@@ -11,6 +11,7 @@
 import type { Impl } from '../shared/types.ts';
 import { fixtures } from '../shared/fixtures.ts';
 import { zones } from '../shared/zones.ts';
+import { zoneLinkPairs } from '../shared/zoneLinks.ts';
 import { installIntlCounter, intlConstructCount } from '../shared/intl-count.ts';
 
 const MISS_ITERATIONS = 25;
@@ -142,6 +143,40 @@ export function installKernel(
       letterAbbrs,
       init: initInfoFor(implId),
     };
+  };
+
+  // every tzdata link pair spelling must resolve to identical values: both
+  // names are the same underlying zone, whether served directly from the
+  // table or back-referenced through the zoneLinks bridge. Winter + summer
+  // instants so rule-scheduled pairs are checked in both DST states.
+  (globalThis as { __verifyAliasPairs?: unknown }).__verifyAliasPairs = (implId: string): Vs04 => {
+    const impl = find(implId);
+
+    let checked = 0;
+    let mismatchCount = 0;
+    const mismatches: string[] = [];
+
+    for (const ts of [Date.UTC(2026, 0, 15, 12), Date.UTC(2026, 6, 15, 12)]) {
+      const byName = new Map(impl.getTimeZonesAt(ts).map((z) => [z.name, z]));
+
+      for (const [canonical, alias] of zoneLinkPairs) {
+        checked++;
+
+        const c = byName.get(canonical);
+        const a = byName.get(alias);
+
+        if (c === undefined || a === undefined || a.abbr !== c.abbr || a.offset !== c.offset) {
+          mismatchCount++;
+
+          if (mismatches.length < 10) {
+            const show = (z: typeof c) => (z === undefined ? 'missing' : `${z.abbr} ${z.offset}`);
+            mismatches.push(`${alias} @ ${new Date(ts).toISOString()}: ${show(a)} vs ${canonical}=${show(c)}`);
+          }
+        }
+      }
+    }
+
+    return { checked, mismatchCount, mismatches };
   };
 
   // deep output-equality against the live-Intl baseline at monthly +

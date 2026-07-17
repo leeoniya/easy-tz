@@ -57,6 +57,25 @@ describe('zone list augmentation (link pair spellings)', () => {
           expect(set.has(alias)).toBe(true);
         }
       });
+
+      // both spellings of a link pair are the same underlying zone, so they
+      // must produce identical values however they were resolved (directly
+      // from the table, via the zoneLinks bridge, or live). Only some pairs
+      // are in the transition-rule schedule, so checking a winter AND a
+      // summer instant proves the back-reference lands in the right class,
+      // not just a coincidentally-matching static offset.
+      test('every alias matches its canonical at winter and summer instants', () => {
+        for (const when of [Date.UTC(2026, 0, 15, 12), Date.UTC(2026, 6, 15, 12)]) {
+          const byName = new Map(impl.getTimeZonesAt(when).map((z) => [z.name, z]));
+
+          for (const [canonical, alias] of zoneLinkPairs) {
+            const c = byName.get(canonical)!;
+            const a = byName.get(alias)!;
+
+            expect(`${alias} ${a.abbr} ${a.offset}`).toBe(`${alias} ${c.abbr} ${c.offset}`);
+          }
+        }
+      });
     });
   }
 });

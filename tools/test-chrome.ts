@@ -35,10 +35,13 @@ try {
   const implIds = (await page.evaluate('__implIds')) as string[];
   const rows: (ValidateResult & { label: string })[] = [];
   const vs04 = new Map<string, Vs04>();
+  const aliasPairs = new Map<string, Vs04>();
 
   for (const id of implIds) {
     const r = (await page.evaluate(`__validate(${JSON.stringify(id)})`)) as ValidateResult;
     rows.push({ ...r, label: id });
+
+    aliasPairs.set(id, (await page.evaluate(`__verifyAliasPairs(${JSON.stringify(id)})`)) as Vs04);
   }
 
   for (const id of VS04_IDS) {
@@ -71,6 +74,7 @@ try {
     if (id === '08-verified-sharing') init08NoT = r.init as InitInfo | null | undefined;
 
     vs04.set(`${id} (no-T)`, (await noTempPage.evaluate(`__verifyVs04(${JSON.stringify(id)})`)) as Vs04);
+    aliasPairs.set(`${id} (no-T)`, (await noTempPage.evaluate(`__verifyAliasPairs(${JSON.stringify(id)})`)) as Vs04);
   }
 
   await noTempPage.close();
@@ -78,13 +82,15 @@ try {
   console.log(`chrome correctness: ${rows[0]!.zones} zones, runtime: chrome-headless-shell ${version}\n`);
 
   printTable(
-    ['impl', 'fixtures', 'letter abbrs', 'vs 04'],
+    ['impl', 'fixtures', 'letter abbrs', 'alias pairs', 'vs 04'],
     rows.map((r) => {
       const eq = vs04.get(r.label);
+      const ap = aliasPairs.get(r.label);
       return [
         r.label,
         `${r.fixturesPassed}/${r.fixturesTotal}`,
         `${r.letterAbbrs}/${r.zones}`,
+        ap === undefined ? '-' : `${ap.checked - ap.mismatchCount}/${ap.checked}`,
         eq === undefined ? '-' : `${eq.checked - eq.mismatchCount}/${eq.checked}`,
       ];
     })
@@ -137,6 +143,15 @@ try {
       console.error(`\nFAIL ${label} vs 04: ${eq.mismatchCount}/${eq.checked} mismatched (first ${eq.mismatches.length}):`);
 
       for (const m of eq.mismatches) console.error(`  ${m}`);
+    }
+  }
+
+  for (const [label, ap] of aliasPairs) {
+    if (ap.mismatchCount > 0) {
+      failed = true;
+      console.error(`\nFAIL ${label} alias pairs: ${ap.mismatchCount}/${ap.checked} mismatched (first ${ap.mismatches.length}):`);
+
+      for (const m of ap.mismatches) console.error(`  ${m}`);
     }
   }
 
