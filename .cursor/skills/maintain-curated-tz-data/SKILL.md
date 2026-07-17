@@ -44,6 +44,14 @@ watermark in the file headers.
    watermark (2 releases/year): new/renamed metazone long names change
    `abbrOverrides` keys. The audit (below) finds these empirically — no need
    to read CLDR changelogs first.
+5. Cross-check against moment-timezone: each tzdata release lands there as a
+   merged PR titled `data: Add <version>` —
+   [search closed PRs](https://github.com/moment/moment-timezone/pulls?q=is%3Apr+is%3Aclosed+%22data%3A+Add%22).
+   Read the PR notes and diff for releases newer than the watermark: their
+   packed-data and test-fixture changes show which zones, links, and
+   abbreviations another curated library actually had to touch for the same
+   release — a good sanity check that Step 1 didn't miss anything NEWS
+   worded vaguely.
 
 ## Step 2: Run the detectors (existing tooling)
 

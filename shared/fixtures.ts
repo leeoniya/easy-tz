@@ -1,5 +1,6 @@
-// curation-reviewed: 2026-07-14 | IANA NEWS through tzdata 2026c (no fixture
-// zones affected: Alberta/Morocco changes don't touch the zones below);
+// curation-reviewed: 2026-07-16 | IANA NEWS through tzdata 2026c (no fixture
+// zones affected: Alberta/Morocco changes don't touch the zones below;
+// 2026b/2026c not yet in node tzdata 2026a or chrome-headless-shell 151);
 // tzdata cross-check via moment-timezone added Famagusta/Kirov/Troll coverage
 // Maintained by hand — see .cursor/skills/maintain-curated-tz-data/SKILL.md
 //

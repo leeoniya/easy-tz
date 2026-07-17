@@ -1,7 +1,8 @@
 import type { TimeZoneInfo } from './types.ts';
 
-// curation-reviewed: 2026-07-14 | IANA NEWS through tzdata 2026c | zone-list
-// diff: bun 1.4 (ICU 75.1) vs chrome-headless-shell 150.0.7871.115
+// curation-reviewed: 2026-07-16 | IANA NEWS through tzdata 2026c | zone-list
+// diff: bun 1.4 (ICU 75.1) vs chrome-headless-shell 151.0.7922.34 (418
+// zones, unchanged from 150 — no new spelling divergences)
 // Maintained by hand — see .cursor/skills/maintain-curated-tz-data/SKILL.md
 //
 // Canonicalization bridge for IANA zone spelling variants (tzdata backward

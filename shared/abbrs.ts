@@ -1,6 +1,10 @@
-// curation-reviewed: 2026-07-15 | IANA NEWS through tzdata 2026c | CLDR 48
-// (node 26.4) / ICU 75.1 (bun 1.4) | chrome-headless-shell 150.0.7871.115
-// | letter abbrs cross-checked against tzdata via moment-timezone (audit)
+// curation-reviewed: 2026-07-16 | IANA NEWS through tzdata 2026c | CLDR 48
+// (node 26.4) / ICU 75.1 (bun 1.4) | chrome-headless-shell 151.0.7922.34
+// | letter abbrs cross-checked against tzdata via moment-timezone (audit);
+// moment-timezone data PRs reviewed through 2026c (#1148) — no new links
+// NOTE: 'American Samoa Standard Time' shows as stale in the bun audit (ICU
+// 75 says 'Samoa Standard Time') but is live on CLDR 48 (node ICU 78,
+// Chrome 150+) — keep it
 // Maintained by hand — see .cursor/skills/maintain-curated-tz-data/SKILL.md
 //
 // Curated map of CLDR "long" metazone names (en locale) -> common tzdata-style
