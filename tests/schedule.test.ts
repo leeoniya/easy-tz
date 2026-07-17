@@ -2,7 +2,7 @@ import { describe, test, expect } from 'bun:test';
 import { getTimeZonesAt as precomputed, clearCache as clear07 } from '../impls/07-baked-rules/index.ts';
 import { getTimeZonesAt as baseline, clearCache as clear04 } from '../impls/04-live-intl/index.ts';
 import { scheduleClasses, genMeta } from '../shared/schedule.ts';
-import { zones } from '../shared/zones.ts';
+import { zones, runtimeZones } from '../shared/zones.ts';
 import { fixtures } from '../shared/fixtures.ts';
 
 const YEAR = 2026;
@@ -26,9 +26,12 @@ function both(ts: number) {
 }
 
 describe('07-baked-rules equivalence with 04 baseline', () => {
+  // tables are generated from the raw runtime enumeration (runtimeZones);
+  // the augmented spellings in `zones` reach a class via the zoneLinks
+  // bridge instead of appearing in the table themselves
   testIfAligned('schedule table covers exactly the runtime zone list, well-formed classes', () => {
     const seen = new Set<string>();
-    const known = new Set(zones);
+    const known = new Set(runtimeZones);
 
     for (const c of scheduleClasses) {
       if (c.kind === 0) {
@@ -62,7 +65,7 @@ describe('07-baked-rules equivalence with 04 baseline', () => {
       }
     }
 
-    expect(seen.size).toBe(zones.length);
+    expect(seen.size).toBe(runtimeZones.length);
   });
 
   testIfAligned('identical output to 04 at semi-monthly instants across the year', () => {

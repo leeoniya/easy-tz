@@ -7,16 +7,21 @@ import { zoneLinkPairs } from './zoneLinks.ts';
 export const runtimeZones: readonly string[] = Intl.supportedValuesOf('timeZone');
 
 // the list impls iterate (and getTimeZonesAt returns): the runtime list
-// plus every modern canonical id from the tzdata backward links that the
-// runtime enumerates only under a legacy spelling (e.g. Chrome lists
-// Asia/Calcutta but not Asia/Kolkata). All of these are valid Intl
-// timeZone inputs, and impls 07/10 bridge them to their table class via
-// zoneLinks. Sorted, no duplicates; identical to runtimeZones (by
-// reference) on runtimes that already enumerate every canonical id.
+// plus BOTH spellings of every tzdata backward link the runtime enumerates
+// only one side of — the modern canonical (Chrome lists Asia/Calcutta but
+// not Asia/Kolkata) and the legacy alias (bun lists Asia/Kolkata but not
+// Asia/Calcutta). All of these are valid Intl timeZone inputs; impls 07/10
+// bridge them to their table class via zoneLinks (buildScheduleIndex), and
+// legacy entries carry aliasOf metadata (makeInfo). Sorted, no duplicates;
+// identical to runtimeZones (by reference) on runtimes that already
+// enumerate both spellings.
 export const zones: readonly string[] = (() => {
   const set = new Set(runtimeZones);
 
-  for (const [canonical] of zoneLinkPairs) set.add(canonical);
+  for (const [canonical, alias] of zoneLinkPairs) {
+    set.add(canonical);
+    set.add(alias);
+  }
 
   return set.size === runtimeZones.length ? runtimeZones : [...set].sort();
 })();

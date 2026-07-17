@@ -37,8 +37,10 @@ function makeInfo(name, abbr, offset) {
 var runtimeZones = Intl.supportedValuesOf("timeZone");
 var zones = (() => {
   const set = new Set(runtimeZones);
-  for (const [canonical] of zoneLinkPairs)
+  for (const [canonical, alias] of zoneLinkPairs) {
     set.add(canonical);
+    set.add(alias);
+  }
   return set.size === runtimeZones.length ? runtimeZones : [...set].sort();
 })();
 

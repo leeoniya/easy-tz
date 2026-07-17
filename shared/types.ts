@@ -8,10 +8,11 @@ export interface TimeZoneInfo {
   offset: string;
   // set when `name` is a legacy/renamed spelling (tzdata backward link):
   // the modern canonical zone id, e.g. { name: "Asia/Calcutta", aliasOf:
-  // "Asia/Kolkata" } in runtimes that enumerate the legacy name. Both names
-  // are valid Intl timeZone inputs. Pickers: match search text against both,
-  // display `aliasOf ?? name`, and drop the item only if its aliasOf target
-  // is itself in the list (rare: runtime enumerates both spellings).
+  // "Asia/Kolkata" }. Both names are valid Intl timeZone inputs, and the
+  // list always contains both spellings (shared/zones.ts augments whichever
+  // side the runtime doesn't enumerate). Pickers: match search text against
+  // both, and either display legacy entries as-is or dedupe them — the
+  // aliasOf target is guaranteed to be in the list.
   aliasOf?: string;
 }
 
