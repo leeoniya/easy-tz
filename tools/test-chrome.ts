@@ -33,6 +33,7 @@ try {
   await page.evaluate(code);
 
   const implIds = (await page.evaluate('__implIds')) as string[];
+  const intlNames = (await page.evaluate('__verifyIntlZoneNames()')) as { checked: number; failures: string[] };
   const rows: (ValidateResult & { label: string })[] = [];
   const vs04 = new Map<string, Vs04>();
   const aliasPairs = new Map<string, Vs04>();
@@ -97,6 +98,7 @@ try {
   );
 
   console.log('\n(no-T) = Temporal global removed before load: Safari fallback paths under V8/Chrome ICU');
+  console.log(`intl zone names: ${intlNames.checked - intlNames.failures.length}/${intlNames.checked} link pair spellings constructible`);
 
   if (init08) {
     console.log(
@@ -118,6 +120,11 @@ try {
 
   // --- assertions ---
   let failed = false;
+
+  if (intlNames.failures.length > 0) {
+    failed = true;
+    console.error(`FAIL intl zone names: not constructible: ${intlNames.failures.join(', ')}`);
+  }
 
   for (const r of rows) {
     if (r.fixturesPassed !== r.fixturesTotal) {

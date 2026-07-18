@@ -145,6 +145,27 @@ export function installKernel(
     };
   };
 
+  // runtime-level (impl-independent): both spellings of every link pair
+  // must be constructible Intl time zones in this runtime, regardless of
+  // which side its ICU enumerates — the list augmentation in
+  // shared/zones.ts depends on this (invalid ids throw RangeError)
+  (globalThis as { __verifyIntlZoneNames?: unknown }).__verifyIntlZoneNames = (): { checked: number; failures: string[] } => {
+    const failures: string[] = [];
+    let checked = 0;
+
+    for (const name of zoneLinkPairs.flat()) {
+      checked++;
+
+      try {
+        new Intl.DateTimeFormat('en', { timeZone: name });
+      } catch {
+        failures.push(name);
+      }
+    }
+
+    return { checked, failures };
+  };
+
   // every tzdata link pair spelling must resolve to identical values: both
   // names are the same underlying zone, whether served directly from the
   // table or back-referenced through the zoneLinks bridge. Winter + summer

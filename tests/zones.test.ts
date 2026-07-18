@@ -25,6 +25,15 @@ describe('zone list augmentation (link pair spellings)', () => {
     expect([...new Set(zones)].sort()).toEqual([...zones]);
   });
 
+  // augmentation assumes every link pair spelling is a valid Intl timeZone
+  // input even when the runtime doesn't enumerate it (ICU resolves backward
+  // links internally); an invalid id throws RangeError at construction
+  test('both spellings of every link pair are accepted by Intl constructors', () => {
+    for (const name of zoneLinkPairs.flat()) {
+      expect(() => new Intl.DateTimeFormat('en', { timeZone: name })).not.toThrow();
+    }
+  });
+
   test('zones only adds link pair spellings on top of the runtime list', () => {
     const runtime = new Set(runtimeZones);
     const linked = new Set(zoneLinkPairs.flat());
