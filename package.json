@@ -1,6 +1,6 @@
 {
   "name": "@leeoniya/easy-tz",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Fast, tiny getTimeZonesAt(): DST-aware abbreviations and UTC offsets for every IANA zone at a timestamp",
   "license": "MIT",
   "repository": "github:leeoniya/easy-tz",
