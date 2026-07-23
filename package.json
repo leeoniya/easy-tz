@@ -58,6 +58,7 @@
     "tables": "bun tools/use-tables.ts",
     "browsers:install": "bunx browsers install chrome-headless-shell@stable --path .browsers",
     "audit": "bun tools/audit-abbrs.ts",
+    "sweep": "bun tools/sweep-validity.ts",
     "prepublishOnly": "bun run check && bun run build"
   },
   "devDependencies": {

@@ -18,13 +18,20 @@ const MISS_ITERATIONS = 25;
 const HIT_CALLS = 50_000;
 const HOUR_MS = 3_600_000;
 const BASE_TS = Date.UTC(2026, 5, 1, 12, 0);
+// historical anchor (pre-2007 US / EU-stable / single-year DST): a miss here
+// routes the rule-baking impls (07, 10) through the historical era resolver
+// (shared/history.ts) rather than the year-independent schedule, so the baked
+// history's runtime cost is measured. On a Temporal runtime impl 10 resolves
+// the past live via Temporal, so its hist column reflects that path.
+const HIST_TS = Date.UTC(2000, 5, 1, 12, 0);
 
 export interface BenchResult {
   id: string;
   zones: number;
   coldMs: number;
   hitUs: number;
-  missMedMs: number; // median over the miss loop
+  missMedMs: number; // median over the miss loop (current year)
+  histMedMs: number; // median over the miss loop anchored in a historical year
   // Intl.DateTimeFormat constructions, counted via a global constructor
   // proxy so library-internal formatters are measured too. Each impl is
   // benched in a fresh page, so the count attributes to that impl alone.
@@ -78,8 +85,10 @@ export function installKernel(
     impl.getTimeZonesAt(Date.UTC(2026, 6, 15));
     const coldMs = performance.now() - t0;
 
-    // brief untimed warm-up (JIT + memo paths)
+    // brief untimed warm-up (JIT + memo paths) for both the current-year
+    // schedule path and the historical era path
     for (let i = 0; i < 5; i++) impl.getTimeZonesAt(BASE_TS - (i + 1) * HOUR_MS);
+    for (let i = 0; i < 5; i++) impl.getTimeZonesAt(HIST_TS - (i + 1) * HOUR_MS);
 
     // hits: aggregate loop within one hour bucket
     impl.getTimeZonesAt(BASE_TS);
@@ -101,12 +110,25 @@ export function installKernel(
       missTimes.push(performance.now() - m0);
     }
 
+    // historical misses: same loop anchored in a pre-bake-year year, so the
+    // rule-baking impls run the era resolver instead of the schedule
+    const histTimes: number[] = [];
+
+    for (let i = 0; i < MISS_ITERATIONS; i++) {
+      const m0 = performance.now();
+      impl.getTimeZonesAt(HIST_TS + (i + 1) * HOUR_MS);
+      histTimes.push(performance.now() - m0);
+    }
+
+    const med = (xs: number[]) => xs.toSorted((a, b) => a - b)[xs.length >> 1]!;
+
     return {
       id: implId,
       zones: zones.length,
       coldMs,
       hitUs,
-      missMedMs: missTimes.toSorted((a, b) => a - b)[missTimes.length >> 1]!,
+      missMedMs: med(missTimes),
+      histMedMs: med(histTimes),
       formatters: intlConstructCount(),
     };
   };

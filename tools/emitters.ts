@@ -11,7 +11,8 @@
 //   two-state nth-weekday rules (year-independent), and current-year
 //   irregular segments; offsets as signed minutes throughout
 
-import type { GeneratedTables } from './gen-core.ts';
+import type { GeneratedTables, GeneratedHistory } from './gen-core.ts';
+import type { HistoryEra, Rule } from '../shared/rules.ts';
 
 // provenance of the Intl data the tables were probed from; the equivalence
 // tests skip when the executing runtime doesn't match
@@ -125,5 +126,132 @@ const R = '${rules.join('|')}';
 const I = '${irregulars.join('|')}';
 
 export const scheduleClasses = decodeSchedule(P, S, R, I);
+`;
+}
+
+export function emitHistoryTs(h: GeneratedHistory, t: GeneratedTables, meta: GenMeta): string {
+  const b36 = (n: number, width: number) => n.toString(36).padStart(width, '0');
+
+  // ORDERING CONTRACT: zones are indexed into the schedule table's DECODED
+  // enumeration — decodeSchedule returns statics, then rules, then
+  // irregulars (each preserving generator order), so flatten in that order,
+  // exactly what `scheduleClasses.flatMap((c) => c.zones)` yields at runtime
+  const orderedZones = [0, 1, 2].flatMap((k) => t.scheduleClasses.filter((c) => c.kind === k)).flatMap((c) => c.zones);
+  const zoneIdx = new Map(orderedZones.map((z, i) => [z, i]));
+
+  if (orderedZones.length > 1296) throw new Error(`zone index overflow: ${orderedZones.length} > 1296`);
+
+  const dict: string[] = [];
+  const dictIdx = new Map<string, number>();
+  const pairs: string[] = [];
+  const pairIdx = new Map<string, number>();
+  const tuples: string[] = [];
+  const tupleIdx = new Map<string, number>();
+
+  // offsets and wall minutes ship in quarter-hour units (all real values
+  // 1995+ are multiples of 15 min; the resolver works in minutes)
+  const q = (min: number): number => {
+    if (min % 15 !== 0) throw new Error(`sub-quarter-hour value in history: ${min}`);
+    return min / 15;
+  };
+
+  // rule-span offset pairs get their own dictionary: only ~38 distinct pairs
+  // back hundreds of rule spans, so a 2-char index beats inlining 'qA,qB'
+  const pairRef = (offA: number, offB: number): string => {
+    const key = `${q(offA)},${q(offB)}`;
+    let i = pairIdx.get(key);
+
+    if (i === undefined) {
+      i = pairs.length;
+      pairs.push(key);
+      pairIdx.set(key, i);
+    }
+
+    return b36(i, 2);
+  };
+
+  // rule (month, nth, dow, at) tuples get their own dictionary too, as fixed
+  // 5-char records (no delimiters): the same tuple recurs across many offset
+  // pairs (the US and EU shapes especially). at (quarter-hours, 0..96) is the
+  // only 2-char field.
+  const tupleRef = (r: Rule): string => {
+    const key = `${r.month},${r.nth},${r.dow},${q(r.atMin)}`;
+    let i = tupleIdx.get(key);
+
+    if (i === undefined) {
+      i = tuples.length;
+      tuples.push(`${b36(r.month, 1)}${b36(r.nth, 1)}${b36(r.dow, 1)}${b36(q(r.atMin), 2)}`);
+      tupleIdx.set(key, i);
+    }
+
+    return b36(i, 2);
+  };
+
+  const eraPayload = (e: HistoryEra): string => {
+    if (e.kind === 3) return 'd'; // defer to the schedule class
+
+    if (e.kind === 0) return `s${q(e.offs[0]!)}`;
+
+    if (e.kind === 1) {
+      // to flags implicit: rule 1 -> offs[1], rule 2 -> offs[0]
+      return `r${pairRef(e.offs[0]!, e.offs[1]!)}${tupleRef(e.rules![0])}${tupleRef(e.rules![1])}`;
+    }
+
+    return `w${e.steps!.map((s, i) => `${b36(s, 3)}${q(e.offs[i]!)}`).join(',')}`;
+  };
+
+  const classes = h.classes.map((c) => {
+    const zs = c.zones.map((z) => b36(zoneIdx.get(z)!, 2)).join('');
+
+    const eras = c.eras
+      .map((e) => {
+        const p = eraPayload(e);
+        let i = dictIdx.get(p);
+
+        if (i === undefined) {
+          i = dict.length;
+          dict.push(p);
+          dictIdx.set(p, i);
+        }
+
+        return `${(e.fromYear - h.fromYear).toString(36)}${b36(i, 2)}`;
+      })
+      .join('');
+
+    return `${zs}~${eras}`;
+  });
+
+  if (dict.length > 1296) throw new Error(`era dictionary overflow: ${dict.length} > 1296`);
+  if (pairs.length > 1296) throw new Error(`offset-pair dictionary overflow: ${pairs.length} > 1296`);
+  if (tuples.length > 1296) throw new Error(`rule tuple dictionary overflow: ${tuples.length} > 1296`);
+  // fixed 5-char tuple records assume single-char month/nth/dow and 2-char at
+  if (tuples.some((t) => t.length !== 5)) throw new Error('rule tuple field out of single-char range');
+
+  const s = h.stats;
+  const what = `Historical offset eras (${h.fromYear}-${h.toYear - 1}; the main schedule covers ${h.toYear}+):
+// static spans, two-rule DST spans, raw single years, and defer spans
+// (schedule class already exact — nothing stored). Offsets only — no
+// abbreviations. Irregular-class zones are excluded; fully schedule-covered
+// zones (${s.coveredZones}) have no entry at all. Zones reference the schedule
+// table's zone enumeration by index; era payloads are dictionary-shared.
+// ${s.zones} zones -> ${s.classes} classes (${s.staticEras} static, ${s.ruleEras} rule, ${s.rawYears} raw, ${s.deferEras} defer eras; ${dict.length} distinct payloads, ${pairs.length} offset pairs, ${tuples.length} rule tuples)
+// Consumed via shared/rules.ts resolveHistory (tools/sweep-validity.ts validates).`;
+
+  return `${genHeader(meta, what)}
+import { decodeHistory } from '../../decode.ts';
+import { scheduleClasses } from './schedule.ts';
+
+${metaExport(meta)}
+export const HISTORY_FROM = ${h.fromYear};
+export const HISTORY_TO = ${h.toYear}; // exclusive; the bake year
+
+// see emitHistoryTs: this flatten order is the zone-index space
+const Z = scheduleClasses.flatMap((c) => c.zones);
+const P = '${pairs.join('|')}';
+const T = '${tuples.join('')}';
+const E = '${dict.join('|')}';
+const H = '${classes.join('|')}';
+
+export const historyClasses = decodeHistory(Z, P, T, E, H, HISTORY_FROM);
 `;
 }

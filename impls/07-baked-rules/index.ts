@@ -10,66 +10,21 @@
 // a country changes policy; only irregular zones (non-Gregorian rules) clamp
 // to their current-year segments outside the generated year.
 //
+// Historical years (before the bake year) resolve through the baked offset
+// eras in shared/history.ts — still zero-Intl, just more baked data — so the
+// pre-2007 US/EU rule regimes, decree-driven years, etc. get exact offsets
+// instead of the current rules projected backwards. All of this lives in the
+// shared resolver (shared/bakedHistory.ts), which impl 10 also uses.
+//
 // CAVEAT: values are baked at generation time — regenerate with `bun run gen`
 // on tzdata/CLDR changes. tests/schedule.test.ts asserts output-equality
-// with impl 04, including next-year instants.
+// with impl 04, including next-year instants; tools/sweep-validity.ts
+// validates the historical offsets.
 
-import type { TimeZoneInfo } from '../../shared/types.ts';
-import { zones } from '../../shared/zones.ts';
-import { scheduleClasses, YEAR_START, STEP_MS } from '../../shared/schedule.ts';
-import { resolveClass, buildScheduleIndex } from '../../shared/rules.ts';
-import { formatOffsetMinutes } from '../../shared/fmt.ts';
+import { computeBaked } from '../../shared/bakedHistory.ts';
 import { hourBucketMemo } from '../../shared/hourCache.ts';
-import { makeInfo } from '../../shared/zoneLinks.ts';
 
-// zones-list order -> schedule class index, resolved once at module load,
-// bridging spelling variants (Asia/Kolkata <-> Asia/Calcutta) so tables from
-// a different runtime's zone list still serve this one. -1 marks zones the
-// table doesn't cover even after bridging (genuinely new zones on a stale
-// table); with no Intl available here they fall back to UTC rather than throw.
-const classIdx = buildScheduleIndex(zones, scheduleClasses);
-
-const offsetStrCache = new Map<number, string>();
-
-function offsetStr(offMin: number): string {
-  let s = offsetStrCache.get(offMin);
-
-  if (s === undefined) {
-    s = formatOffsetMinutes(offMin);
-    offsetStrCache.set(offMin, s);
-  }
-
-  return s;
-}
-
-function compute(timestamp: number): TimeZoneInfo[] {
-  const nClasses = scheduleClasses.length;
-  const abbrNow = new Array<string>(nClasses);
-  const offsetNow = new Array<string>(nClasses);
-
-  for (let c = 0; c < nClasses; c++) {
-    const st = resolveClass(scheduleClasses[c]!, timestamp, YEAR_START, STEP_MS);
-
-    abbrNow[c] = st.abbr;
-    offsetNow[c] = offsetStr(st.offMin);
-  }
-
-  const out: TimeZoneInfo[] = [];
-
-  for (let z = 0; z < zones.length; z++) {
-    const c = classIdx[z]!;
-
-    out.push(
-      c < 0
-        ? makeInfo(zones[z]!, 'UTC', '+00:00')
-        : makeInfo(zones[z]!, abbrNow[c]!, offsetNow[c]!)
-    );
-  }
-
-  return out;
-}
-
-const memo = hourBucketMemo(compute);
+const memo = hourBucketMemo(computeBaked);
 
 export const getTimeZonesAt = memo.get;
 export const clearCache = memo.clear;

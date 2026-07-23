@@ -12,7 +12,15 @@
 // Guarantees on Temporal runtimes: never a wrong offset (audited or live),
 // at worst a generic label for the few recovered zones until regeneration.
 // Without Temporal (Safari, bun, Node built without the Temporal component): the audit is skipped and this is
-// exactly 07 (pure baked, unknown zones get a UTC sentinel).
+// exactly 07 (pure baked schedule + baked history, unknown zones get a UTC
+// sentinel).
+//
+// History: for timestamps before the bake year, a Temporal runtime resolves
+// every zone live (Temporal is authoritative for the past; the baked history
+// eras are only gen-time-validated, so live keeps the never-wrong-offset
+// guarantee) with the same schedule-abbr-reuse labels as impl 07. Without
+// Temporal, historical years come from the shared baked resolver's eras,
+// identical to 07.
 //
 // vs 09-guarded-hybrid: same staleness protection on Temporal runtimes, but
 // verification is amortized to init instead of per-call (misses ~0.05ms vs
@@ -22,44 +30,19 @@
 import type { TimeZoneInfo } from '../../shared/types.ts';
 import { zones } from '../../shared/zones.ts';
 import { scheduleClasses, YEAR_START, STEP_MS } from '../../shared/schedule.ts';
-import { resolveClass, buildScheduleIndex, ruleInstant, type ScheduleClass } from '../../shared/rules.ts';
-import { formatOffsetMinutes } from '../../shared/fmt.ts';
+import { HISTORY_TO } from '../../shared/history.ts';
+import { resolveClass, ruleInstant, type ScheduleClass } from '../../shared/rules.ts';
+import { gmtLabel } from '../../shared/fmt.ts';
 import { hourBucketMemo } from '../../shared/hourCache.ts';
 import { makeInfo } from '../../shared/zoneLinks.ts';
+import { computeBaked, classIdx, historyAbbr } from '../../shared/bakedHistory.ts';
 
 const hasTemporal = typeof Temporal !== 'undefined';
-
-const classIdx = buildScheduleIndex(zones, scheduleClasses);
-
-const offsetStrCache = new Map<number, string>();
-
-function offsetStr(offMin: number): string {
-  let s = offsetStrCache.get(offMin);
-
-  if (s === undefined) {
-    s = formatOffsetMinutes(offMin);
-    offsetStrCache.set(offMin, s);
-  }
-
-  return s;
-}
 
 // "+05:30" -> 330
 function parseOffset(offset: string): number {
   const sign = offset[0] === '-' ? -1 : 1;
   return sign * (+offset.slice(1, 3) * 60 + +offset.slice(4, 6));
-}
-
-// generic label for recovered zones: "GMT", "GMT+2", "GMT+5:30"
-function gmtLabel(offMin: number): string {
-  if (offMin === 0) return 'GMT';
-
-  const sign = offMin < 0 ? '-' : '+';
-  const abs = Math.abs(offMin);
-  const h = Math.trunc(abs / 60);
-  const m = abs % 60;
-
-  return `GMT${sign}${h}${m > 0 ? `:${String(m).padStart(2, '0')}` : ''}`;
 }
 
 export interface AuditInfo {
@@ -169,40 +152,40 @@ function init(): void {
 function compute(timestamp: number): TimeZoneInfo[] {
   if (recovered === null) init();
 
-  const instant = hasTemporal && recovered!.size > 0 ? Temporal!.Instant.fromEpochMilliseconds(timestamp) : null;
+  // Temporal runtime + timestamp before the bake year: resolve every zone
+  // live. Temporal is exact for the past, so this keeps the never-wrong
+  // guarantee without auditing history; the label reuses the schedule abbr
+  // when the offset matches (matching 07's baked-history labels), else GMT.
+  if (hasTemporal && new Date(timestamp).getUTCFullYear() < HISTORY_TO) {
+    const instant = Temporal!.Instant.fromEpochMilliseconds(timestamp);
+    const out: TimeZoneInfo[] = [];
 
-  const nClasses = scheduleClasses.length;
-  const abbrNow = new Array<string>(nClasses);
-  const offsetNow = new Array<string>(nClasses);
+    for (let z = 0; z < zones.length; z++) {
+      const name = zones[z]!;
+      const offset = instant.toZonedDateTimeISO(name).offset;
+      const ci = classIdx[z]!;
+      const abbr = ci < 0 ? gmtLabel(parseOffset(offset)) : historyAbbr(scheduleClasses[ci]!, parseOffset(offset));
 
-  for (let c = 0; c < nClasses; c++) {
-    const st = resolveClass(scheduleClasses[c]!, timestamp, YEAR_START, STEP_MS);
-
-    abbrNow[c] = st.abbr;
-    offsetNow[c] = offsetStr(st.offMin);
-  }
-
-  const out: TimeZoneInfo[] = [];
-
-  for (let z = 0; z < zones.length; z++) {
-    const name = zones[z]!;
-
-    if (recovered!.has(z)) {
-      if (instant !== null) {
-        // session-recovered: live Temporal offset, generic label
-        const offset = instant.toZonedDateTimeISO(name).offset;
-        out.push(makeInfo(name, gmtLabel(parseOffset(offset)), offset));
-      } else {
-        // no Temporal (only possible for unknown zones here): UTC sentinel
-        out.push(makeInfo(name, 'UTC', '+00:00'));
-      }
-
-      continue;
+      out.push(makeInfo(name, abbr, offset));
     }
 
-    const c = classIdx[z]!;
+    return out;
+  }
 
-    out.push(makeInfo(name, abbrNow[c]!, offsetNow[c]!));
+  // bake year and later, or a no-Temporal runtime: shared baked resolver
+  // (schedule + baked history eras) — identical to impl 07
+  const out = computeBaked(timestamp);
+
+  // current/future on a Temporal runtime: overwrite the session-recovered
+  // zones (failed the current-year audit, or unknown) with their live offset
+  if (recovered!.size > 0) {
+    const instant = Temporal!.Instant.fromEpochMilliseconds(timestamp);
+
+    for (const z of recovered!) {
+      const name = zones[z]!;
+      const offset = instant.toZonedDateTimeISO(name).offset;
+      out[z] = makeInfo(name, gmtLabel(parseOffset(offset)), offset);
+    }
   }
 
   return out;

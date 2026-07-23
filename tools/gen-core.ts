@@ -25,7 +25,15 @@
 import { runtimeZones as zones } from '../shared/zones.ts';
 import { abbrOverrides, zoneAliases, zoneAbbrOverrides } from '../shared/abbrs.ts';
 import { fmtCache, formatOffsetMinutes, initialsAbbr, compactGmt } from '../shared/fmt.ts';
-import { ruleInstant, resolveClass, type ScheduleClass, type ZoneState, type Rule } from '../shared/rules.ts';
+import {
+  ruleInstant,
+  resolveClass,
+  type ScheduleClass,
+  type ZoneState,
+  type Rule,
+  type HistoryClass,
+  type HistoryEra,
+} from '../shared/rules.ts';
 
 const YEAR = new Date().getUTCFullYear();
 const YEARS = [YEAR, YEAR + 1, YEAR + 2];
@@ -114,15 +122,21 @@ function signature(zone: string, start: number, end: number): Seg[] {
   const totalSteps = (end - start) / STEP_MS;
   const segs: Seg[] = [];
   let prev = probe(zone, start);
+  let prevStep = 0; // last sampled step; probe(prevStep) === prev
 
   segs.push(toSeg(0, prev));
 
-  for (let step = STEPS_PER_DAY; step < totalSteps; step += STEPS_PER_DAY) {
-    const cur = probe(zone, start + step * STEP_MS);
+  // daily samples, plus the year's final step — a transition in the last
+  // hours of Dec 31 (e.g. Kosrae's +12 -> +11 at local midnight 1999-01-01,
+  // mid-day Dec 31 UTC) would otherwise fall between the last daily sample
+  // and the year boundary
+  for (let step = STEPS_PER_DAY; ; step += STEPS_PER_DAY) {
+    const s = Math.min(step, totalSteps - 1);
+    const cur = probe(zone, start + s * STEP_MS);
 
     if (cur !== prev) {
-      let lo = step - STEPS_PER_DAY; // probe(lo) === prev
-      let hi = step; // probe(hi) === cur
+      let lo = prevStep; // probe(lo) === prev
+      let hi = s; // probe(hi) === cur
 
       while (hi - lo > 1) {
         const mid = (lo + hi) >> 1;
@@ -133,6 +147,10 @@ function signature(zone: string, start: number, end: number): Seg[] {
       segs.push(toSeg(hi, cur));
       prev = cur;
     }
+
+    prevStep = s;
+
+    if (s === totalSteps - 1) break;
   }
 
   return segs;
@@ -334,6 +352,310 @@ export function generateTables(): GeneratedTables {
       ruleClasses,
       irregularClasses,
       irregularZones,
+      probeMs: Date.now() - t0,
+    },
+  };
+}
+
+// ---- historical eras (sidecar history tables; see shared/rules.ts) ----
+//
+// Probes each non-irregular zone year by year from HISTORY_FROM up to the
+// bake year and compresses the observed offset behavior into eras: static
+// spans, two-rule DST spans (merged across consecutive years while the
+// fitted rules agree, with nth-encoding ambiguity resolved by candidate-set
+// intersection like fitRule), and raw single years (explicit segments) for
+// anything else — mid-year regime changes, rule-less offset moves, and
+// years that fit no Gregorian rule. Rule years reproduce their observed
+// transition instants exactly by construction (month/dow/atMin come from
+// the probed instant; the nth candidate set maps back to the same day), so
+// the result matches this runtime's ICU at 15-min resolution everywhere.
+// The end-to-end check is tools/sweep-validity.ts.
+
+export const HISTORY_FROM = 1995; // matches the sweep's default range
+
+export interface GeneratedHistory {
+  fromYear: number;
+  toYear: number; // exclusive: the bake year, where the main schedule takes over
+  classes: HistoryClass[];
+  stats: {
+    zones: number;
+    coveredZones: number; // schedule reproduces their whole history; no class stored
+    classes: number;
+    staticEras: number;
+    ruleEras: number;
+    rawYears: number;
+    deferEras: number;
+    probeMs: number;
+  };
+}
+
+interface TransFit {
+  month: number;
+  dow: number;
+  atMin: number;
+  nths: number[]; // candidate nth encodings, primary first
+}
+
+interface YearFit {
+  year: number;
+  kind: 0 | 1 | 2;
+  offs: number[];
+  trans: [TransFit, TransFit] | null; // kind 1
+  steps: number[] | null; // kind 2
+}
+
+interface OffSeg {
+  step: number;
+  off: number;
+}
+
+// offset-only segments of one zone-year (name-only changes merged away)
+function probeOffSegs(zone: string, year: number): OffSeg[] {
+  const segs: OffSeg[] = [];
+
+  for (const s of signature(zone, Date.UTC(year, 0, 1), Date.UTC(year + 1, 0, 1))) {
+    if (segs.length === 0 || segs[segs.length - 1]!.off !== s.offsetMin) {
+      segs.push({ step: s.step, off: s.offsetMin });
+    }
+  }
+
+  return segs;
+}
+
+// does the zone's SCHEDULE class reproduce this observed year exactly
+// (same offsets, transitions at the same 15-min instants)? Such years need
+// no history storage — a defer era points the resolver at the schedule.
+function matchesSchedule(cls: ScheduleClass, year: number, segs: OffSeg[]): boolean {
+  if (cls.kind === 0) return segs.length === 1 && segs[0]!.off === cls.states[0].offMin;
+
+  if (cls.kind !== 1) return false; // irregular zones are excluded anyway
+
+  if (segs.length !== 3) return false;
+
+  const [r1, r2] = cls.rules;
+  const before = cls.states[r2.to]!.offMin; // state outside the two transitions
+  const mid = cls.states[r1.to]!.offMin;
+  const y0 = Date.UTC(year, 0, 1);
+
+  return (
+    segs[0]!.off === before &&
+    segs[1]!.off === mid &&
+    segs[2]!.off === before &&
+    ruleInstant(year, r1, cls.states[1 - r1.to]!.offMin) === y0 + segs[1]!.step * STEP_MS &&
+    ruleInstant(year, r2, cls.states[1 - r2.to]!.offMin) === y0 + segs[2]!.step * STEP_MS
+  );
+}
+
+function fitYearOffsets(year: number, segs: OffSeg[]): YearFit {
+  const start = Date.UTC(year, 0, 1);
+
+  if (segs.length === 1) return { year, kind: 0, offs: [segs[0]!.off], trans: null, steps: null };
+
+  if (segs.length === 3 && segs[0]!.off === segs[2]!.off) {
+    const fit = (si: 1 | 2): TransFit => {
+      const instant = start + segs[si]!.step * STEP_MS;
+      const wall = new Date(instant + segs[si - 1]!.off * 60_000);
+      const month = wall.getUTCMonth() + 1;
+
+      return {
+        month,
+        dow: wall.getUTCDay(),
+        atMin: wall.getUTCHours() * 60 + wall.getUTCMinutes(),
+        nths: nthCandidates(year, month, wall.getUTCDate()),
+      };
+    };
+
+    const t1 = fit(1);
+    const t2 = fit(2);
+
+    // transitions are time-ordered, so a rule-expressible year needs
+    // strictly increasing wall months: equality is a same-month double
+    // transition (religious-calendar shapes), and inversion means a wall
+    // time that wrapped across a year boundary (e.g. Dhaka's 2009 DST end
+    // at Dec 31 24:00 local, which is Jan 1 of the NEXT year in wall terms
+    // and thus not expressible as a rule of THIS year)
+    if (t1.month < t2.month) {
+      return { year, kind: 1, offs: [segs[0]!.off, segs[1]!.off], trans: [t1, t2], steps: null };
+    }
+  }
+
+  return { year, kind: 2, offs: segs.map((s) => s.off), trans: null, steps: segs.map((s) => s.step) };
+}
+
+const sameOffs = (a: number[], b: number[]) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+// merge f into the open rule run if every fitted transition still agrees on
+// (month, dow, atMin) and the nth candidate sets keep a nonempty intersection
+function mergeTrans(run: [TransFit, TransFit], f: [TransFit, TransFit]): boolean {
+  const merged: TransFit[] = [];
+
+  for (let i = 0; i < 2; i++) {
+    const a = run[i]!;
+    const b = f[i]!;
+
+    if (a.month !== b.month || a.dow !== b.dow || a.atMin !== b.atMin) return false;
+
+    const nths = a.nths.filter((n) => b.nths.includes(n));
+
+    if (nths.length === 0) return false;
+
+    merged.push({ ...a, nths });
+  }
+
+  run[0] = merged[0]!;
+  run[1] = merged[1]!;
+
+  return true;
+}
+
+// eras for one zone, or null when the schedule class reproduces EVERY year
+// (the zone then needs no history class at all). Years the schedule gets
+// right become defer eras (kind 3) instead of stored data.
+function buildEras(zone: string, cls: ScheduleClass, fromYear: number, toYear: number): HistoryEra[] | null {
+  const eras: HistoryEra[] = [];
+  let run: YearFit | null = null; // open static/rule span
+  let deferFrom = -1; // open defer span
+  let stored = false; // any non-defer era emitted?
+
+  const finalize = (): void => {
+    if (run === null) return;
+
+    if (run.kind === 0) {
+      eras.push({ fromYear: run.year, kind: 0, offs: run.offs, rules: null, steps: null });
+    } else {
+      // 'last dow' is the more common convention when both encodings fit
+      const rule = (t: TransFit, to: 0 | 1): Rule => ({
+        month: t.month,
+        nth: t.nths.includes(5) ? 5 : t.nths[0]!,
+        dow: t.dow,
+        atMin: t.atMin,
+        to,
+      });
+
+      // transitions are time-ordered within the year, so month order matches
+      // the sorted-by-month order resolveHistory expects
+      eras.push({
+        fromYear: run.year,
+        kind: 1,
+        offs: run.offs,
+        rules: [rule(run.trans![0]!, 1), rule(run.trans![1]!, 0)],
+        steps: null,
+      });
+    }
+
+    run = null;
+  };
+
+  const closeDefer = (): void => {
+    if (deferFrom !== -1) {
+      eras.push({ fromYear: deferFrom, kind: 3, offs: [], rules: null, steps: null });
+      deferFrom = -1;
+    }
+  };
+
+  for (let year = fromYear; year < toYear; year++) {
+    const segs = probeOffSegs(zone, year);
+
+    if (matchesSchedule(cls, year, segs)) {
+      finalize();
+      if (deferFrom === -1) deferFrom = year;
+      continue;
+    }
+
+    closeDefer();
+    stored = true;
+
+    const f = fitYearOffsets(year, segs);
+
+    if (f.kind === 2) {
+      finalize();
+      eras.push({ fromYear: year, kind: 2, offs: f.offs, rules: null, steps: f.steps });
+      continue;
+    }
+
+    if (run !== null && run.kind === f.kind && sameOffs(run.offs, f.offs)) {
+      if (f.kind === 0) continue; // static span extends
+      if (mergeTrans(run.trans!, f.trans!)) continue; // rule span extends
+    }
+
+    finalize();
+    run = f;
+  }
+
+  finalize();
+  closeDefer(); // a trailing defer era is load-bearing: without it, clamping would extend the last stored era
+
+  return stored ? eras : null;
+}
+
+export function generateHistory(tables: GeneratedTables): GeneratedHistory {
+  const t0 = Date.now();
+  const fromYear = HISTORY_FROM;
+  const toYear = tables.year;
+
+  // the irregular-class zones are excluded: their behavior isn't
+  // rule-expressible in ANY year, so history would be 31 raw years each
+  const irregular = new Set<string>();
+  const classOf = new Map<string, ScheduleClass>();
+
+  for (const c of tables.scheduleClasses) {
+    for (const z of c.zones) {
+      if (c.kind === 2) irregular.add(z);
+      else classOf.set(z, c);
+    }
+  }
+
+  const byKey = new Map<string, HistoryClass>();
+  let zoneCount = 0;
+  let coveredZones = 0;
+
+  for (const zone of zones) {
+    if (irregular.has(zone)) continue;
+
+    zoneCount++;
+
+    const eras = buildEras(zone, classOf.get(zone)!, fromYear, toYear);
+
+    if (eras === null) {
+      coveredZones++;
+      continue;
+    }
+
+    const key = eras
+      .map((e) => `${e.fromYear}${e.kind}~${e.offs.join(',')}~${e.rules?.map((r) => `${r.month},${r.nth},${r.dow},${r.atMin},${r.to}`).join('~') ?? ''}~${e.steps?.join(',') ?? ''}`)
+      .join(';');
+
+    const existing = byKey.get(key);
+
+    if (existing !== undefined) existing.zones.push(zone);
+    else byKey.set(key, { zones: [zone], eras });
+  }
+
+  const classes = [...byKey.values()].sort((a, b) => (a.zones[0]! < b.zones[0]! ? -1 : 1));
+
+  let staticEras = 0, ruleEras = 0, rawYears = 0, deferEras = 0;
+
+  for (const c of classes) {
+    for (const e of c.eras) {
+      if (e.kind === 0) staticEras++;
+      else if (e.kind === 1) ruleEras++;
+      else if (e.kind === 2) rawYears++;
+      else deferEras++;
+    }
+  }
+
+  return {
+    fromYear,
+    toYear,
+    classes,
+    stats: {
+      zones: zoneCount,
+      coveredZones,
+      classes: classes.length,
+      staticEras,
+      ruleEras,
+      rawYears,
+      deferEras,
       probeMs: Date.now() - t0,
     },
   };

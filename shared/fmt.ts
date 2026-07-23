@@ -56,6 +56,21 @@ export function initialsAbbr(longName: string): string | null {
   return abbr.length >= 2 ? abbr : null;
 }
 
+// generic offset label from minutes: "GMT", "GMT+2", "GMT-3:30". Used for
+// historical offsets that don't match a zone's current abbreviations and for
+// session-recovered zones (impl 10) — an honest label when no curated abbr
+// applies. Distinct from compactGmt, which parses a CLDR "GMT+03:00" string.
+export function gmtLabel(offMin: number): string {
+  if (offMin === 0) return 'GMT';
+
+  const sign = offMin < 0 ? '-' : '+';
+  const abs = offMin < 0 ? -offMin : offMin;
+  const h = Math.trunc(abs / 60);
+  const m = abs % 60;
+
+  return `GMT${sign}${h}${m > 0 ? `:${String(m).padStart(2, '0')}` : ''}`;
+}
+
 // last-resort abbr for zones with no CLDR metazone: "GMT+03:00" -> "GMT+3",
 // "GMT+05:30" -> "GMT+5:30", "GMT" -> "GMT". these zones genuinely have no
 // common letter abbreviation in modern tzdata. A zero offset normalizes to

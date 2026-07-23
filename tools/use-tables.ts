@@ -8,7 +8,7 @@
 import { writeFileSync, existsSync } from 'node:fs';
 
 export function selectTables(variant: 'bun' | 'chrome'): void {
-  for (const file of ['classes', 'schedule']) {
+  for (const file of ['classes', 'schedule', 'history']) {
     const target = new URL(`../shared/tables/${variant}/${file}.ts`, import.meta.url);
 
     if (!existsSync(target)) {

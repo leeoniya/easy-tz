@@ -26,9 +26,9 @@ export async function bundleForBrowser(entryPath: string): Promise<string> {
   return result.outputs[0]!.text();
 }
 
-// bundles tools/bench-browser-entry.ts against the Chrome table variant,
-// temporarily flipping the selector and restoring it
-export async function bundleBrowserEntry(): Promise<string> {
+// bundles a browser entry (default: tools/bench-browser-entry.ts) against
+// the Chrome table variant, temporarily flipping the selector and restoring it
+export async function bundleBrowserEntry(entryPath?: string): Promise<string> {
   if (!existsSync(new URL('../shared/tables/chrome/schedule.ts', import.meta.url))) {
     console.error('no Chrome table set — run: bun run gen');
     process.exit(1);
@@ -39,7 +39,7 @@ export async function bundleBrowserEntry(): Promise<string> {
   selectTables('chrome');
 
   try {
-    return await bundleForBrowser(new URL('./bench-browser-entry.ts', import.meta.url).pathname);
+    return await bundleForBrowser(entryPath ?? new URL('./bench-browser-entry.ts', import.meta.url).pathname);
   } finally {
     selectTables(previousVariant);
   }
