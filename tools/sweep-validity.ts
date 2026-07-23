@@ -32,7 +32,7 @@
 // is stale vs that runtime's ICU — rerun bun run gen).
 
 import { type SweepResult, type Mismatch } from './sweep-core.ts';
-import { formatOffsetMinutes } from '../shared/fmt.ts';
+import { formatOffset } from '../shared/fmt.ts';
 
 // ---- CLI ----
 
@@ -108,7 +108,7 @@ console.log(
 console.log(`sweep:     ${fromYear}-${toYear}, weekly samples (Jan 1 12:00 UTC + n*7d)\n`);
 
 const fmtDate = (ts: number) => new Date(ts).toISOString().slice(0, 10);
-const fmtOff = (min: number) => (Number.isInteger(min) ? formatOffsetMinutes(min) : `${min.toFixed(2)}m`);
+const fmtOff = (min: number) => (Number.isInteger(min) ? formatOffset(min) : `${min.toFixed(2)}m`);
 
 // ---- by-zone pivot: zone -> the years it mismatches ----
 

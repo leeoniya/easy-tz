@@ -33,3 +33,4 @@ const memo = hourBucketMemo(computeBaked);
 export const getTimeZonesAt = memo.get;
 export const clearCache = memo.clear;
 export { getTimeZoneAt } from '../../shared/bakedHistory.ts';
+export { formatOffset } from '../../shared/offsetFormatBaked.ts';

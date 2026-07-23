@@ -11,7 +11,7 @@
 import type { TimeZoneInfo } from './types.ts';
 import { abbrOverrides, zoneAliases, zoneAbbrOverrides } from './abbrs.ts';
 import { makeInfo } from './zoneLinks.ts';
-import { fmtCache, formatOffsetMinutes, initialsAbbr, compactGmt } from './fmt.ts';
+import { fmtCache, initialsAbbr, compactGmt } from './fmt.ts';
 
 const partsFmt = fmtCache({
   year: 'numeric',
@@ -37,14 +37,10 @@ function resolveAbbr(longName: string): string {
   return abbr;
 }
 
-// offsets are memoized per offset-minutes value; the set of distinct offsets
-// per instant is small (<40), so formatting repeats are avoided
-const offsetStrCache = new Map<number, string>();
-
-// parses `fmtZone`'s live Intl output at an instant: resolved abbr + offset.
-// callers sharing one fmtZone across grouped zones (impl 08) memoize this
-// result per call and apply per-zone overrides themselves.
-export function liveParts(fmtZone: string, timestamp: number, date: Date): { abbr: string; offset: string } {
+// parses `fmtZone`'s live Intl output at an instant: resolved abbr + offset in
+// signed minutes. callers sharing one fmtZone across grouped zones (impl 08)
+// memoize this result per call and apply per-zone overrides themselves.
+export function liveParts(fmtZone: string, timestamp: number, date: Date): { abbr: string; offset: number } {
   const parts = partsFmt(fmtZone).formatToParts(date);
 
   let year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;
@@ -66,14 +62,7 @@ export function liveParts(fmtZone: string, timestamp: number, date: Date): { abb
   // round to whole minutes; sub-second remainder of `timestamp` cancels out
   const offsetMin = Math.round((asUTC - timestamp) / 60_000);
 
-  let offset = offsetStrCache.get(offsetMin);
-
-  if (offset == null) {
-    offset = formatOffsetMinutes(offsetMin);
-    offsetStrCache.set(offsetMin, offset);
-  }
-
-  return { abbr: resolveAbbr(longName), offset };
+  return { abbr: resolveAbbr(longName), offset: offsetMin };
 }
 
 // full live resolution for one zone, applying the curated metazone alias

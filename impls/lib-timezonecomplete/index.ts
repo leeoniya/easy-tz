@@ -11,7 +11,6 @@ import tzdata from 'tzdata';
 tc.TzDatabase.init(tzdata);
 import type { TimeZoneInfo } from '../../shared/types.ts';
 import { zones } from '../../shared/zones.ts';
-import { formatOffsetMinutes } from '../../shared/fmt.ts';
 import { hourBucketMemo } from '../../shared/hourCache.ts';
 
 const zoneCache = new Map<string, tc.TimeZone>();
@@ -33,7 +32,7 @@ function compute(timestamp: number): TimeZoneInfo[] {
   for (const name of zones) {
     const dt = new tc.DateTime(timestamp, tc.utc()).toZone(zone(name));
 
-    out.push({ name, abbr: dt.format('zzz'), offset: formatOffsetMinutes(dt.offset()) });
+    out.push({ name, abbr: dt.format('zzz'), offset: dt.offset() });
   }
 
   return out;

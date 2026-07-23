@@ -27,7 +27,7 @@ async function buildEsm(implId: string): Promise<number> {
   const implPath = new URL(`../impls/${implId}/index.ts`, import.meta.url).pathname;
   const entry = join(entriesDir, `${implId}.ts`);
 
-  writeFileSync(entry, `export { getTimeZonesAt, clearCache } from '${implPath}';\n`);
+  writeFileSync(entry, `export { getTimeZonesAt, clearCache, formatOffset } from '${implPath}';\n`);
 
   const result = await Bun.build({
     entrypoints: [entry],
@@ -46,8 +46,10 @@ const dtsSource = `export interface TimeZoneInfo {
   name: string;
   /** DST-aware abbreviation, e.g. "EST" / "EDT" (not "GMT-5" where avoidable) */
   abbr: string;
-  /** UTC offset at the requested instant, e.g. "-05:00" */
-  offset: string;
+  /** UTC offset at the requested instant, in signed minutes (east positive,
+   * west negative): -300 for New York EST, 330 for Kolkata, 0 for UTC.
+   * Use formatOffset(offset) for a "-05:00" style string. */
+  offset: number;
   /** canonical id when \`name\` is a legacy spelling ("Asia/Kolkata") */
   aliasOf?: string;
 }
@@ -66,6 +68,12 @@ export declare function getTimeZonesAt(timestamp: number): TimeZoneInfo[];
  * arrays were mutated or in test/bench harnesses.
  */
 export declare function clearCache(): void;
+
+/**
+ * Formats a signed-minutes UTC offset (a TimeZoneInfo.offset) as an
+ * ISO-style string: 0 -> "+00:00", -300 -> "-05:00", 330 -> "+05:30".
+ */
+export declare function formatOffset(minutes: number): string;
 `;
 
 const previousVariant = activeVariant() ?? 'bun';

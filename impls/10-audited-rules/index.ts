@@ -57,18 +57,18 @@ function parseOffset(offset: string): number {
 // baked-history labels), else a generic GMT label. Shared by the historical
 // all-zones loop and the single-zone getTimeZoneAt().
 function liveInfo(name: string, ci: number, instant: TZInstant): TimeZoneInfo {
-  const offset = instant.toZonedDateTimeISO(name).offset;
-  const abbr = ci < 0 ? gmtLabel(parseOffset(offset)) : historyAbbr(scheduleClasses[ci]!, parseOffset(offset));
+  const offMin = parseOffset(instant.toZonedDateTimeISO(name).offset);
+  const abbr = ci < 0 ? gmtLabel(offMin) : historyAbbr(scheduleClasses[ci]!, offMin);
 
-  return makeInfo(name, abbr, offset);
+  return makeInfo(name, abbr, offMin);
 }
 
 // exact live offset from Temporal for a session-recovered zone (failed the
 // current-year audit, or unknown): always a generic GMT-style label.
 function liveRecovered(name: string, instant: TZInstant): TimeZoneInfo {
-  const offset = instant.toZonedDateTimeISO(name).offset;
+  const offMin = parseOffset(instant.toZonedDateTimeISO(name).offset);
 
-  return makeInfo(name, gmtLabel(parseOffset(offset)), offset);
+  return makeInfo(name, gmtLabel(offMin), offMin);
 }
 
 export interface AuditInfo {
@@ -238,3 +238,4 @@ const memo = hourBucketMemo(compute);
 export const getTimeZonesAt = memo.get;
 export const clearCache = memo.clear;
 export const getTimeZoneAt = computeOne;
+export { formatOffset } from '../../shared/offsetFormatBaked.ts';

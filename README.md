@@ -5,11 +5,12 @@ the host timezone (`TZ`). Historical tzdata accuracy is a non-goal.
 
 ```ts
 function getTimeZonesAt(timestamp: number): TimeZoneInfo[];
+function formatOffset(minutes: number): string; // -300 -> "-05:00"
 
 interface TimeZoneInfo {
   name: string;     // "America/New_York"
   abbr: string;     // "EST" / "EDT" (not "GMT-5" where avoidable)
-  offset: string;   // "-05:00"
+  offset: number;   // signed minutes east of UTC, e.g. -300 (formatOffset() -> "-05:00")
   aliasOf?: string; // canonical id when `name` is a legacy spelling ("Asia/Kolkata")
 }
 ```
@@ -174,15 +175,17 @@ npm install @leeoniya/easy-tz
 ## Usage
 
 ```ts
-import { getTimeZonesAt } from '@leeoniya/easy-tz';
+import { getTimeZonesAt, formatOffset } from '@leeoniya/easy-tz';
 
 const zones = getTimeZonesAt(Date.now());
 // [
-//   { name: 'Africa/Abidjan',     abbr: 'GMT', offset: '+00:00' },
+//   { name: 'Africa/Abidjan',     abbr: 'GMT', offset: 0 },
 //   ...
-//   { name: 'America/New_York',   abbr: 'EDT', offset: '-04:00' },
+//   { name: 'America/New_York',   abbr: 'EDT', offset: -240 },
 //   ...
 // ] — every IANA zone the runtime knows, sorted by name
+
+formatOffset(-240); // "-04:00" — render offset minutes as an ISO-style string
 ```
 
 The root import is `07-baked-rules` — fastest and smallest, pure baked data

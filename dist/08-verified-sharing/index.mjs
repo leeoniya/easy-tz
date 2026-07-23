@@ -245,9 +245,9 @@ function fmtCache(options) {
     return fmt;
   };
 }
-function formatOffsetMinutes(min) {
-  const sign = min < 0 ? "-" : "+";
-  const abs = min < 0 ? -min : min;
+function formatOffset(minutes) {
+  const sign = minutes < 0 ? "-" : "+";
+  const abs = minutes < 0 ? -minutes : minutes;
   const hh = String(abs / 60 | 0).padStart(2, "0");
   const mm = String(abs % 60).padStart(2, "0");
   return `${sign}${hh}:${mm}`;
@@ -288,7 +288,6 @@ function resolveAbbr(longName) {
   }
   return abbr;
 }
-var offsetStrCache = new Map;
 function liveParts(fmtZone, timestamp, date) {
   const parts = partsFmt(fmtZone).formatToParts(date);
   let year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;
@@ -320,12 +319,60 @@ function liveParts(fmtZone, timestamp, date) {
   }
   const asUTC = Date.UTC(year, month - 1, day, hour, minute, second);
   const offsetMin = Math.round((asUTC - timestamp) / 60000);
-  let offset = offsetStrCache.get(offsetMin);
-  if (offset == null) {
-    offset = formatOffsetMinutes(offsetMin);
-    offsetStrCache.set(offsetMin, offset);
-  }
-  return { abbr: resolveAbbr(longName), offset };
+  return { abbr: resolveAbbr(longName), offset: offsetMin };
+}
+
+// shared/tables/chrome/offsets.ts
+var offsetStrings = new Map([
+  [-660, "-11:00"],
+  [-600, "-10:00"],
+  [-570, "-09:30"],
+  [-540, "-09:00"],
+  [-510, "-08:30"],
+  [-480, "-08:00"],
+  [-420, "-07:00"],
+  [-360, "-06:00"],
+  [-300, "-05:00"],
+  [-270, "-04:30"],
+  [-240, "-04:00"],
+  [-210, "-03:30"],
+  [-180, "-03:00"],
+  [-150, "-02:30"],
+  [-120, "-02:00"],
+  [-60, "-01:00"],
+  [0, "+00:00"],
+  [60, "+01:00"],
+  [120, "+02:00"],
+  [180, "+03:00"],
+  [210, "+03:30"],
+  [240, "+04:00"],
+  [270, "+04:30"],
+  [300, "+05:00"],
+  [330, "+05:30"],
+  [345, "+05:45"],
+  [360, "+06:00"],
+  [390, "+06:30"],
+  [420, "+07:00"],
+  [480, "+08:00"],
+  [510, "+08:30"],
+  [525, "+08:45"],
+  [540, "+09:00"],
+  [570, "+09:30"],
+  [585, "+09:45"],
+  [600, "+10:00"],
+  [630, "+10:30"],
+  [660, "+11:00"],
+  [690, "+11:30"],
+  [720, "+12:00"],
+  [765, "+12:45"],
+  [780, "+13:00"],
+  [825, "+13:45"],
+  [840, "+14:00"]
+]);
+
+// shared/offsetFormat.ts
+function formatOffset2(minutes) {
+  return offsetStrings.get(minutes) ?? formatOffset(minutes);
 }
 
 // impls/08-verified-sharing/index.ts
@@ -409,5 +456,6 @@ var getTimeZonesAt = memo.get;
 var clearCache = memo.clear;
 export {
   getTimeZonesAt,
+  formatOffset2 as formatOffset,
   clearCache
 };

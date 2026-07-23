@@ -4,8 +4,10 @@ export interface TimeZoneInfo {
   // common timezone abbreviation, e.g. EET or EEST depending on daylight or standard time
   // important: NOT a GMT or offset, like GMT+5
   abbr: string;
-  // UTC offset in the form "-04:00"
-  offset: string;
+  // UTC offset in signed minutes (east of UTC positive, west negative), e.g.
+  // -300 for New York EST, +330 for Kolkata, 0 for UTC. This is the raw
+  // numeric offset; pass it to formatOffset() for a "-05:00" style string.
+  offset: number;
   // set when `name` is a legacy/renamed spelling (tzdata backward link):
   // the modern canonical zone id, e.g. { name: "Asia/Calcutta", aliasOf:
   // "Asia/Kolkata" }. Both names are valid Intl timeZone inputs, and the

@@ -24,7 +24,7 @@
 // zoneLinks (buildScheduleIndex) instead of being baked into every table
 import { runtimeZones as zones } from '../shared/zones.ts';
 import { abbrOverrides, zoneAliases, zoneAbbrOverrides } from '../shared/abbrs.ts';
-import { fmtCache, formatOffsetMinutes, initialsAbbr, compactGmt } from '../shared/fmt.ts';
+import { fmtCache, formatOffset, initialsAbbr, compactGmt } from '../shared/fmt.ts';
 import {
   ruleInstant,
   resolveClass,
@@ -749,8 +749,8 @@ export function verifyTables(tables: GeneratedTables): Verification {
             kind: 'schedule',
             zone,
             ts,
-            expected: `${liveAbbr} ${formatOffsetMinutes(liveOffMin)}`,
-            got: `${st.abbr} ${formatOffsetMinutes(st.offMin)}`,
+            expected: `${liveAbbr} ${formatOffset(liveOffMin)}`,
+            got: `${st.abbr} ${formatOffset(st.offMin)}`,
           });
         }
       }

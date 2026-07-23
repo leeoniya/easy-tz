@@ -93,7 +93,7 @@ describe('getTimeZoneAt on the baked impls (07/10) handles unknown zones gracefu
     test(id, () => {
       const info = one('Not/AZone', Date.UTC(2026, 6, 15, 12));
 
-      expect(info).toEqual({ name: 'Not/AZone', abbr: 'UTC', offset: '+00:00' });
+      expect(info).toEqual({ name: 'Not/AZone', abbr: 'UTC', offset: 0 });
     });
   }
 });

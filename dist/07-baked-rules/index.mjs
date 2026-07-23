@@ -255,13 +255,6 @@ function resolveHistory(eras, ts, stepMs) {
 }
 
 // shared/fmt.ts
-function formatOffsetMinutes(min) {
-  const sign = min < 0 ? "-" : "+";
-  const abs = min < 0 ? -min : min;
-  const hh = String(abs / 60 | 0).padStart(2, "0");
-  const mm = String(abs % 60).padStart(2, "0");
-  return `${sign}${hh}:${mm}`;
-}
 function gmtLabel(offMin) {
   if (offMin === 0)
     return "GMT";
@@ -279,15 +272,6 @@ var HISTORY_TO_MS = Date.UTC(HISTORY_TO, 0, 1);
 var nameIdx = new Map;
 for (let z = 0;z < zones.length; z++)
   nameIdx.set(zones[z], z);
-var offsetStrCache = new Map;
-function offsetStr(offMin) {
-  let s = offsetStrCache.get(offMin);
-  if (s == null) {
-    s = formatOffsetMinutes(offMin);
-    offsetStrCache.set(offMin, s);
-  }
-  return s;
-}
 function historyAbbr(cls, offMin) {
   if (cls.kind === 0) {
     if (cls.states[0].offMin === offMin)
@@ -313,18 +297,18 @@ function bakedZoneInfo(name, ci, hi, timestamp, historical, schedCache, histCach
     }
     if (off !== null) {
       const abbr = ci < 0 ? gmtLabel(off) : historyAbbr(scheduleClasses[ci], off);
-      return makeInfo(name, abbr, offsetStr(off));
+      return makeInfo(name, abbr, off);
     }
   }
   if (ci < 0)
-    return makeInfo(name, "UTC", "+00:00");
+    return makeInfo(name, "UTC", 0);
   let st = schedCache != null ? schedCache[ci] : undefined;
   if (st == null) {
     st = resolveClass(scheduleClasses[ci], timestamp, YEAR_START, STEP_MS);
     if (schedCache != null)
       schedCache[ci] = st;
   }
-  return makeInfo(name, st.abbr, offsetStr(st.offMin));
+  return makeInfo(name, st.abbr, st.offMin);
 }
 function computeBaked(timestamp) {
   const historical = timestamp < HISTORY_TO_MS;
@@ -358,11 +342,65 @@ function hourBucketMemo(compute) {
   };
 }
 
+// shared/tables/chrome/offsets.ts
+var offsetStrings = new Map([
+  [-660, "-11:00"],
+  [-600, "-10:00"],
+  [-570, "-09:30"],
+  [-540, "-09:00"],
+  [-510, "-08:30"],
+  [-480, "-08:00"],
+  [-420, "-07:00"],
+  [-360, "-06:00"],
+  [-300, "-05:00"],
+  [-270, "-04:30"],
+  [-240, "-04:00"],
+  [-210, "-03:30"],
+  [-180, "-03:00"],
+  [-150, "-02:30"],
+  [-120, "-02:00"],
+  [-60, "-01:00"],
+  [0, "+00:00"],
+  [60, "+01:00"],
+  [120, "+02:00"],
+  [180, "+03:00"],
+  [210, "+03:30"],
+  [240, "+04:00"],
+  [270, "+04:30"],
+  [300, "+05:00"],
+  [330, "+05:30"],
+  [345, "+05:45"],
+  [360, "+06:00"],
+  [390, "+06:30"],
+  [420, "+07:00"],
+  [480, "+08:00"],
+  [510, "+08:30"],
+  [525, "+08:45"],
+  [540, "+09:00"],
+  [570, "+09:30"],
+  [585, "+09:45"],
+  [600, "+10:00"],
+  [630, "+10:30"],
+  [660, "+11:00"],
+  [690, "+11:30"],
+  [720, "+12:00"],
+  [765, "+12:45"],
+  [780, "+13:00"],
+  [825, "+13:45"],
+  [840, "+14:00"]
+]);
+
+// shared/offsetFormatBaked.ts
+function formatOffset(minutes) {
+  return offsetStrings.get(minutes) ?? "";
+}
+
 // impls/07-baked-rules/index.ts
 var memo = hourBucketMemo(computeBaked);
 var getTimeZonesAt = memo.get;
 var clearCache = memo.clear;
 export {
   getTimeZonesAt,
+  formatOffset,
   clearCache
 };

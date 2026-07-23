@@ -12,7 +12,6 @@
 import { findTimeZone, getZonedTime } from 'timezone-support';
 import type { TimeZoneInfo } from '../../shared/types.ts';
 import { zones } from '../../shared/zones.ts';
-import { formatOffsetMinutes } from '../../shared/fmt.ts';
 import { hourBucketMemo } from '../../shared/hourCache.ts';
 
 const tzCache = new Map<string, ReturnType<typeof findTimeZone> | null>();
@@ -43,13 +42,14 @@ function compute(timestamp: number): TimeZoneInfo[] {
     const t = tz(name);
 
     if (t === null) {
-      out.push({ name, abbr: '?', offset: '+00:00' });
+      out.push({ name, abbr: '?', offset: 0 });
       continue;
     }
 
     const zone = getZonedTime(date, t).zone!;
 
-    out.push({ name, abbr: zone.abbreviation!, offset: formatOffsetMinutes(-zone.offset!) });
+    // zone.offset is minutes WEST of UTC (inverted JS convention), hence negated
+    out.push({ name, abbr: zone.abbreviation!, offset: -zone.offset! });
   }
 
   return out;

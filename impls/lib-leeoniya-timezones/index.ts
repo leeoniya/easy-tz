@@ -29,14 +29,26 @@ import type { TimeZoneInfo } from '../../shared/types.ts';
 import { zones } from '../../shared/zones.ts';
 import { hourBucketMemo } from '../../shared/hourCache.ts';
 
+// the library reports offsets as strings ("+03", "+05:30", "-04:00"); our
+// TimeZoneInfo.offset is signed minutes, so parse them (tolerant of the
+// colon-less "+03" form)
+function offMinFromStr(o: string): number {
+  const sign = o[0] === '-' ? -1 : 1;
+  const digits = o.slice(1).replace(':', '');
+  const hh = +digits.slice(0, 2);
+  const mm = digits.length > 2 ? +digits.slice(2, 4) : 0;
+
+  return sign * (hh * 60 + mm);
+}
+
 function compute(timestamp: number): TimeZoneInfo[] {
   const byName = new Map<string, TimeZoneInfo>();
 
   for (const z of libGetTimeZonesAt(timestamp)) {
-    byName.set(z.name, z);
+    byName.set(z.name, { ...z, offset: offMinFromStr(z.offset) });
   }
 
-  return zones.map((name) => byName.get(name) ?? { name, abbr: '?', offset: '+00:00' });
+  return zones.map((name) => byName.get(name) ?? { name, abbr: '?', offset: 0 });
 }
 
 const memo = hourBucketMemo(compute);

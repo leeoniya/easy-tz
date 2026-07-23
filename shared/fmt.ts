@@ -31,10 +31,11 @@ export function isoOffsetFromLongOffset(longOffset: string): string {
   return longOffset.length === 3 ? '+00:00' : longOffset.slice(3);
 }
 
-// offset in minutes -> "-04:00" / "+05:30" / "+00:00"
-export function formatOffsetMinutes(min: number): string {
-  const sign = min < 0 ? '-' : '+';
-  const abs = min < 0 ? -min : min;
+// signed offset minutes -> "-04:00" / "+05:30" / "+00:00". Public API (every
+// entry point re-exports it) for rendering the numeric TimeZoneInfo.offset.
+export function formatOffset(minutes: number): string {
+  const sign = minutes < 0 ? '-' : '+';
+  const abs = minutes < 0 ? -minutes : minutes;
   const hh = String((abs / 60) | 0).padStart(2, '0');
   const mm = String(abs % 60).padStart(2, '0');
   return `${sign}${hh}:${mm}`;

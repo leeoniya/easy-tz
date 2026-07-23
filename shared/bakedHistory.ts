@@ -23,7 +23,7 @@ import { zones } from './zones.ts';
 import { scheduleClasses, YEAR_START, STEP_MS } from './schedule.ts';
 import { historyClasses, HISTORY_TO } from './history.ts';
 import { resolveClass, resolveHistory, buildScheduleIndex, type ScheduleClass, type ZoneState } from './rules.ts';
-import { formatOffsetMinutes, gmtLabel } from './fmt.ts';
+import { gmtLabel } from './fmt.ts';
 import { makeInfo, zoneLinks } from './zoneLinks.ts';
 
 // zones-list order -> schedule / history class index (bridging spelling
@@ -51,19 +51,6 @@ export function zoneIndexOf(name: string): number {
   const bridged = zoneLinks.get(name);
 
   return bridged != null ? nameIdx.get(bridged) ?? -1 : -1;
-}
-
-const offsetStrCache = new Map<number, string>();
-
-export function offsetStr(offMin: number): string {
-  let s = offsetStrCache.get(offMin);
-
-  if (s == null) {
-    s = formatOffsetMinutes(offMin);
-    offsetStrCache.set(offMin, s);
-  }
-
-  return s;
 }
 
 // label for a historical offset: the schedule class's abbr for that offset
@@ -113,12 +100,12 @@ function bakedZoneInfo(
 
     if (off !== null) {
       const abbr = ci < 0 ? gmtLabel(off) : historyAbbr(scheduleClasses[ci]!, off);
-      return makeInfo(name, abbr, offsetStr(off));
+      return makeInfo(name, abbr, off);
     }
   }
 
   // uncovered zone -> UTC sentinel
-  if (ci < 0) return makeInfo(name, 'UTC', '+00:00');
+  if (ci < 0) return makeInfo(name, 'UTC', 0);
 
   // schedule: bake year onward, or an earlier year whose history defers/absent
   let st = schedCache != null ? schedCache[ci] : undefined;
@@ -128,7 +115,7 @@ function bakedZoneInfo(
     if (schedCache != null) schedCache[ci] = st;
   }
 
-  return makeInfo(name, st.abbr, offsetStr(st.offMin));
+  return makeInfo(name, st.abbr, st.offMin);
 }
 
 // Single-zone resolver for the single-zone / many-timestamps use case: resolves

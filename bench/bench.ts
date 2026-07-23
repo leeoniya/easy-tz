@@ -182,12 +182,12 @@ for (const impl of impls) {
        const Z = ${JSON.stringify(GETONE_ZONE)}, N = ${GETONE_CALLS}, STEP = ${GETONE_STEP_MS};
        const CUR = ${GETONE_CUR_BASE}, HIST = ${GETONE_HIST_BASE};
        let s = 0;
-       for (let i = 0; i < 500; i++) { s += one(Z, CUR + i * STEP).offset.length; s += one(Z, HIST + i * STEP).offset.length; }
+       for (let i = 0; i < 500; i++) { s += Math.abs(one(Z, CUR + i * STEP).offset); s += Math.abs(one(Z, HIST + i * STEP).offset); }
        let t0 = Bun.nanoseconds();
-       for (let i = 0; i < N; i++) s += one(Z, CUR + i * STEP).offset.length;
+       for (let i = 0; i < N; i++) s += Math.abs(one(Z, CUR + i * STEP).offset);
        const curMs = (Bun.nanoseconds() - t0) / 1e6;
        t0 = Bun.nanoseconds();
-       for (let i = 0; i < N; i++) s += one(Z, HIST + i * STEP).offset.length;
+       for (let i = 0; i < N; i++) s += Math.abs(one(Z, HIST + i * STEP).offset);
        const histMs = (Bun.nanoseconds() - t0) / 1e6;
        if (s < 0) throw new Error('unreachable');
        console.log(JSON.stringify({ curMs, histMs, formatters: intlConstructCount() }));`,

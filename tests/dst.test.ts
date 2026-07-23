@@ -2,7 +2,7 @@ import { describe, test, expect } from 'bun:test';
 import { impls } from '../impls/registry.ts';
 import { fixtures } from '../shared/fixtures.ts';
 import { zones } from '../shared/zones.ts';
-import { fmtCache, tzNameFromFormat, isoOffsetFromLongOffset } from '../shared/fmt.ts';
+import { fmtCache, tzNameFromFormat, isoOffsetFromLongOffset, formatOffset } from '../shared/fmt.ts';
 import { genMeta } from '../shared/schedule.ts';
 import { aliasOfZone } from '../shared/zoneLinks.ts';
 
@@ -29,14 +29,14 @@ for (const impl of liveCheckedImpls) {
 
         expect(info).toBeDefined();
         expect(info!.abbr).toBe(f.abbr);
-        expect(info!.offset).toBe(f.offset);
+        expect(formatOffset(info!.offset)).toBe(f.offset);
       });
     }
 
     test('no abbr is a raw GMT±HH:MM offset and all offsets are well-formed', () => {
       for (const info of impl.getTimeZonesAt(Date.UTC(2026, 6, 15))) {
         expect(info.abbr).not.toMatch(/^GMT[+-]\d{2}:\d{2}$/);
-        expect(info.offset).toMatch(/^[+-]\d{2}:\d{2}$/);
+        expect(formatOffset(info.offset)).toMatch(/^[+-]\d{2}:\d{2}$/);
       }
     });
   });
@@ -84,7 +84,7 @@ describe('consistency', () => {
 
         for (const z of result) {
           const expected = isoOffsetFromLongOffset(tzNameFromFormat(offsetFmt(z.name).format(date)));
-          expect(`${z.name} ${z.offset}`).toBe(`${z.name} ${expected}`);
+          expect(`${z.name} ${formatOffset(z.offset)}`).toBe(`${z.name} ${expected}`);
         }
       }
     }
@@ -98,7 +98,7 @@ describe('consistency', () => {
     for (const impl of liveCheckedImpls) {
       const ny = impl.getTimeZonesAt(ts).find((z) => z.name === 'America/New_York')!;
       expect(ny.abbr).toBe('EDT');
-      expect(ny.offset).toBe('-04:00');
+      expect(formatOffset(ny.offset)).toBe('-04:00');
     }
   });
 });

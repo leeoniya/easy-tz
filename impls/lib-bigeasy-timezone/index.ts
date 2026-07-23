@@ -16,8 +16,8 @@ import { hourBucketMemo } from '../../shared/hourCache.ts';
 
 const tz = timezone(zonesData);
 
-// "+0530" -> "+05:30"
-const withColon = (o: string) => `${o.slice(0, 3)}:${o.slice(3)}`;
+// "+0530" / "-0400" -> signed minutes
+const offsetMins = (o: string) => (o[0] === '-' ? -1 : 1) * (+o.slice(1, 3) * 60 + +o.slice(3, 5));
 
 function compute(timestamp: number): TimeZoneInfo[] {
   const out: TimeZoneInfo[] = [];
@@ -26,7 +26,7 @@ function compute(timestamp: number): TimeZoneInfo[] {
     out.push({
       name,
       abbr: tz(timestamp, '%Z', name),
-      offset: withColon(tz(timestamp, '%z', name)),
+      offset: offsetMins(tz(timestamp, '%z', name)),
     });
   }
 

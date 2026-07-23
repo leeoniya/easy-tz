@@ -13,6 +13,7 @@
 
 import type { GeneratedTables, GeneratedHistory } from './gen-core.ts';
 import type { HistoryEra, Rule } from '../shared/rules.ts';
+import { formatOffset } from '../shared/fmt.ts';
 
 // provenance of the Intl data the tables were probed from; the equivalence
 // tests skip when the executing runtime doesn't match
@@ -253,5 +254,24 @@ const E = '${dict.join('|')}';
 const H = '${classes.join('|')}';
 
 export const historyClasses = decodeHistory(Z, P, T, E, H, HISTORY_FROM);
+`;
+}
+
+// Pre-baked signed-offset-minutes -> "±HH:MM" lookup. `offsets` is the sorted
+// set of distinct offsets observed across the schedule + history tables (see
+// tools/gen-offsets.ts); the public formatOffset() reads this and only formats
+// on the fly for offsets outside the baked set (arbitrary caller input, or a
+// live Intl/Temporal offset no baked table covers).
+export function emitOffsetsTs(offsets: number[], meta: GenMeta): string {
+  const entries = offsets.map((o) => `  [${o}, '${formatOffset(o)}'],`).join('\n');
+
+  const what = `Pre-baked signed-offset-minutes -> "±HH:MM" string lookup: the ${offsets.length}
+// distinct UTC offsets across the schedule + history tables. formatOffset()
+// resolves these with a Map.get and formats on the fly only outside this set.`;
+
+  return `${genHeader(meta, what)}
+export const offsetStrings: ReadonlyMap<number, string> = new Map([
+${entries}
+]);
 `;
 }

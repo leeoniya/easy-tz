@@ -15,7 +15,7 @@ function compute(timestamp: number): TimeZoneInfo[] {
   for (const name of zones) {
     const m = moment.tz(timestamp, name);
 
-    out.push({ name, abbr: m.zoneAbbr(), offset: m.format('Z') });
+    out.push({ name, abbr: m.zoneAbbr(), offset: m.utcOffset() });
   }
 
   return out;

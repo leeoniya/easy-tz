@@ -13,6 +13,7 @@ import { fixtures } from '../shared/fixtures.ts';
 import { zones } from '../shared/zones.ts';
 import { zoneLinkPairs } from '../shared/zoneLinks.ts';
 import { installIntlCounter, intlConstructCount } from '../shared/intl-count.ts';
+import { formatOffset } from '../shared/fmt.ts';
 import { GETONE_ZONE, GETONE_CALLS, GETONE_STEP_MS, GETONE_CUR_BASE, GETONE_HIST_BASE } from './bench-config.ts';
 
 const MISS_ITERATIONS = 25;
@@ -157,16 +158,16 @@ export function installKernel(
     let sink = 0;
 
     for (let i = 0; i < 500; i++) {
-      sink += one(GETONE_ZONE, GETONE_CUR_BASE + i * GETONE_STEP_MS).offset.length;
-      sink += one(GETONE_ZONE, GETONE_HIST_BASE + i * GETONE_STEP_MS).offset.length;
+      sink += Math.abs(one(GETONE_ZONE, GETONE_CUR_BASE + i * GETONE_STEP_MS).offset);
+      sink += Math.abs(one(GETONE_ZONE, GETONE_HIST_BASE + i * GETONE_STEP_MS).offset);
     }
 
     let t0 = performance.now();
-    for (let i = 0; i < GETONE_CALLS; i++) sink += one(GETONE_ZONE, GETONE_CUR_BASE + i * GETONE_STEP_MS).offset.length;
+    for (let i = 0; i < GETONE_CALLS; i++) sink += Math.abs(one(GETONE_ZONE, GETONE_CUR_BASE + i * GETONE_STEP_MS).offset);
     const curMs = performance.now() - t0;
 
     t0 = performance.now();
-    for (let i = 0; i < GETONE_CALLS; i++) sink += one(GETONE_ZONE, GETONE_HIST_BASE + i * GETONE_STEP_MS).offset.length;
+    for (let i = 0; i < GETONE_CALLS; i++) sink += Math.abs(one(GETONE_ZONE, GETONE_HIST_BASE + i * GETONE_STEP_MS).offset);
     const histMs = performance.now() - t0;
 
     if (sink < 0) throw new Error('unreachable'); // keep the loops from being optimized away
@@ -183,11 +184,11 @@ export function installKernel(
     for (const f of fixtures) {
       const info = impl.getTimeZonesAt(f.ts).find((z) => z.name === f.zone || z.name === f.altZone);
 
-      if (info != null && info.abbr === f.abbr && info.offset === f.offset) {
+      if (info != null && info.abbr === f.abbr && formatOffset(info.offset) === f.offset) {
         fixturesPassed++;
       } else if (fixtureFailures.length < 10) {
         fixtureFailures.push(
-          `${f.zone} (${f.desc}): expected ${f.abbr} ${f.offset}, got ${info == null ? 'missing' : `${info.abbr} ${info.offset}`}`
+          `${f.zone} (${f.desc}): expected ${f.abbr} ${f.offset}, got ${info == null ? 'missing' : `${info.abbr} ${formatOffset(info.offset)}`}`
         );
       }
     }

@@ -5,7 +5,6 @@ import { getTimeZonesAt as baseline04, clearCache as clear04 } from '../impls/04
 import { scheduleClasses, genMeta, YEAR_START, STEP_MS } from '../shared/schedule.ts';
 import { resolveClass, buildScheduleIndex } from '../shared/rules.ts';
 import { zones } from '../shared/zones.ts';
-import { formatOffsetMinutes } from '../shared/fmt.ts';
 
 // Coverage for the historical eras (shared/history.ts) integrated into the
 // rule-baking impls (07, 10). Each "tricky" instant is a case the 0.1.1
@@ -30,12 +29,13 @@ if (!aligned) {
 const classIdx = buildScheduleIndex(zones, scheduleClasses);
 const zoneIdx = new Map(zones.map((z, i) => [z, i]));
 
-function legacyOffset(zone: string, ts: number): string {
+// signed-minutes offset, matching TimeZoneInfo.offset
+function legacyOffset(zone: string, ts: number): number {
   const ci = classIdx[zoneIdx.get(zone)!]!;
-  return formatOffsetMinutes(resolveClass(scheduleClasses[ci]!, ts, YEAR_START, STEP_MS).offMin);
+  return resolveClass(scheduleClasses[ci]!, ts, YEAR_START, STEP_MS).offMin;
 }
 
-function rec(get: (t: number) => { name: string; offset: string; abbr: string }[], clear: () => void, zone: string, ts: number) {
+function rec(get: (t: number) => { name: string; offset: number; abbr: string }[], clear: () => void, zone: string, ts: number) {
   clear();
   return get(ts).find((z) => z.name === zone)!;
 }

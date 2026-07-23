@@ -62,10 +62,11 @@ for (const [canonical, alias] of zoneLinkPairs) {
 // produces no garbage. Freezing guarantees a caller can't mutate a shared
 // instance and corrupt another call's result.
 //
-// Nested maps (name -> offset -> abbr) key the pool without building a
-// composite string on the hot path. The pool is process-lifetime and bounded
-// by the finite result space, so it never needs eviction.
-const internPool = new Map<string, Map<string, Map<string, Readonly<TimeZoneInfo>>>>();
+// Nested maps (name -> offset-minutes -> abbr) key the pool directly on the
+// numeric offset — no string built on the hot path. The pool is
+// process-lifetime and bounded by the finite result space, so it never needs
+// eviction.
+const internPool = new Map<string, Map<number, Map<string, Readonly<TimeZoneInfo>>>>();
 
 // getTimeZonesAt() only ever asks for the fixed zone list, but getTimeZoneAt()
 // takes a caller-supplied name and answers a UTC sentinel for unknown ones —
@@ -75,7 +76,7 @@ const internPool = new Map<string, Map<string, Map<string, Readonly<TimeZoneInfo
 // without bound. Real zones are always pooled.
 const POOL_NAME_CAP = 4096;
 
-function freezeInfo(name: string, abbr: string, offset: string): Readonly<TimeZoneInfo> {
+function freezeInfo(name: string, abbr: string, offset: number): Readonly<TimeZoneInfo> {
   const aliasOf = aliasOfZone.get(name);
 
   return Object.freeze(aliasOf == null ? { name, abbr, offset } : { name, abbr, offset, aliasOf });
@@ -83,8 +84,8 @@ function freezeInfo(name: string, abbr: string, offset: string): Readonly<TimeZo
 
 // single construction point for TimeZoneInfo so every impl attaches aliasOf
 // identically (the cross-impl equivalence tests depend on this) and shares the
-// interned, frozen pool above
-export function makeInfo(name: string, abbr: string, offset: string): TimeZoneInfo {
+// interned, frozen pool above. `offset` is signed minutes (see TimeZoneInfo).
+export function makeInfo(name: string, abbr: string, offset: number): TimeZoneInfo {
   let byOffset = internPool.get(name);
 
   if (byOffset == null) {

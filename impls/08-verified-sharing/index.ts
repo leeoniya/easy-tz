@@ -121,7 +121,7 @@ function compute(timestamp: number): TimeZoneInfo[] {
 
   const date = new Date(timestamp);
   const out: TimeZoneInfo[] = [];
-  const repResults = new Map<string, { abbr: string; offset: string }>();
+  const repResults = new Map<string, { abbr: string; offset: number }>();
 
   for (const name of zones) {
     const fmtZone = formatZoneOf(name);
@@ -143,6 +143,7 @@ const memo = hourBucketMemo(compute);
 
 export const getTimeZonesAt = memo.get;
 export const clearCache = memo.clear;
+export { formatOffset } from '../../shared/offsetFormat.ts';
 
 // single-zone resolver (single-zone / many-timestamps use case): resolves just
 // `name` via the same representative + override logic the all-zones loop uses.

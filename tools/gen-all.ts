@@ -28,6 +28,7 @@ function run(label: string, script: string): void {
 
 run('chrome tables (primary, verified in-browser)', './gen-chrome.ts');
 run('bun tables (supplementary, for local tests + Safari-fallback coverage)', './gen-classes.ts');
+run('offset lookup (derived from both variants\u2019 tables)', './gen-offsets.ts');
 
 selectTables('bun');
 console.log('--- active variant: bun (local dev/tests); shippable artifact: shared/tables/chrome/ ---');

@@ -31,6 +31,7 @@ const memo = hourBucketMemo(compute);
 
 export const getTimeZonesAt = memo.get;
 export const clearCache = memo.clear;
+export { formatOffset } from '../../shared/offsetFormat.ts';
 
 // single-zone resolver (single-zone / many-timestamps use case): the same
 // per-zone live-Intl leaf getTimeZonesAt() loops, resolved directly for `name`.
