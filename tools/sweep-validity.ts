@@ -127,19 +127,19 @@ if (byZone) {
     irregular ? 2 : zone.startsWith('America/') || zone.startsWith('Europe/') ? 0 : 1;
 
   const rows = [...yearsOf]
-    .map(([zone, { irregular, years }]) => ({ zone, irregular, years, rank: rank(zone, irregular) }))
+    .map(([zone, { irregular, years: yrs }]) => ({ zone, irregular, years: yrs, rank: rank(zone, irregular) }))
     .sort((a, b) => a.rank - b.rank || b.years.length - a.years.length || (a.zone < b.zone ? -1 : 1));
 
   // consecutive years -> ranges: [1995..2006, 2008, 2030] -> "1995-2006, 2008, 2030"
-  const fmtYears = (years: number[]) => {
+  const fmtYears = (yrs: number[]) => {
     const parts: string[] = [];
 
-    for (let i = 0; i < years.length; ) {
+    for (let i = 0; i < yrs.length; ) {
       let j = i;
 
-      while (j + 1 < years.length && years[j + 1]! === years[j]! + 1) j++;
+      while (j + 1 < yrs.length && (yrs[j + 1]!) === yrs[j]! + 1) j++;
 
-      parts.push(j > i ? `${years[i]}-${years[j]}` : `${years[i]}`);
+      parts.push(j > i ? `${yrs[i]}-${yrs[j]}` : `${yrs[i]}`);
       i = j + 1;
     }
 

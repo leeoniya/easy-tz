@@ -226,7 +226,7 @@ export function emitHistoryTs(h: GeneratedHistory, t: GeneratedTables, meta: Gen
   if (pairs.length > 1296) throw new Error(`offset-pair dictionary overflow: ${pairs.length} > 1296`);
   if (tuples.length > 1296) throw new Error(`rule tuple dictionary overflow: ${tuples.length} > 1296`);
   // fixed 5-char tuple records assume single-char month/nth/dow and 2-char at
-  if (tuples.some((t) => t.length !== 5)) throw new Error('rule tuple field out of single-char range');
+  if (tuples.some((rec) => rec.length !== 5)) throw new Error('rule tuple field out of single-char range');
 
   const s = h.stats;
   const what = `Historical offset eras (${h.fromYear}-${h.toYear - 1}; the main schedule covers ${h.toYear}+):

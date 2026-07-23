@@ -221,7 +221,8 @@ export function installKernel(
       checked++;
 
       try {
-        new Intl.DateTimeFormat('en', { timeZone: name });
+        // constructing (even without `new`) validates the zone id — throws RangeError if unknown
+        Intl.DateTimeFormat('en', { timeZone: name });
       } catch {
         failures.push(name);
       }

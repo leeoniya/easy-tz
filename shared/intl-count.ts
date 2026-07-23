@@ -30,7 +30,7 @@ export function installIntlCounter(): void {
       constructions++;
       return Reflect.apply(target, thisArg, args as unknown[]);
     },
-  }) as typeof Intl.DateTimeFormat;
+  });
 }
 
 export const intlConstructCount = (): number => constructions;

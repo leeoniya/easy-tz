@@ -43,7 +43,7 @@ export const getInitInfo = (): InitInfo | null => initInfo;
 // exact offset signature for the current year: initial offset + every
 // (transition instant, offset) pair, enumerated by Temporal
 function yearSignature(zone: string, start: number, end: number): string {
-  let zdt = Temporal!.Instant.fromEpochMilliseconds(start).toZonedDateTimeISO(zone);
+  let zdt = Temporal.Instant.fromEpochMilliseconds(start).toZonedDateTimeISO(zone);
   let sig = zdt.offset;
 
   for (;;) {
@@ -111,7 +111,7 @@ function init(): void {
 // (unless it offset-diverged at init) resolved to its verified group
 // representative. Shared by the all-zones loop and the single-zone resolver.
 function formatZoneOf(name: string): string {
-  const aliased = zoneAliases[name] != null && !droppedAliases!.has(name) ? zoneAliases[name]! : name;
+  const aliased = zoneAliases[name] != null && !droppedAliases!.has(name) ? zoneAliases[name] : name;
 
   return repOf!.get(aliased) ?? aliased;
 }

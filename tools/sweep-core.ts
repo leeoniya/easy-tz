@@ -76,7 +76,7 @@ function parseIsoOffsetMin(iso: string): number {
 
 function baselineOffMin(zone: string, ts: number): number {
   const iso = hasTemporal
-    ? Temporal!.Instant.fromEpochMilliseconds(ts).toZonedDateTimeISO(zone).offset
+    ? Temporal.Instant.fromEpochMilliseconds(ts).toZonedDateTimeISO(zone).offset
     : isoOffsetFromLongOffset(tzNameFromFormat(offsetFmt(zone).format(ts)));
 
   return parseIsoOffsetMin(iso);

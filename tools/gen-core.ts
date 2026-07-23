@@ -299,7 +299,7 @@ export function generateTables(): GeneratedTables {
           { abbr: a.abbr, offMin: a.offMin },
           { abbr: b!.abbr, offMin: b!.offMin },
         ];
-        const rules = (r1.month < r2.month ? [r1, r2] : [r2, r1]) as [Rule, Rule];
+        const rules: [Rule, Rule] = r1.month < r2.month ? [r1, r2] : [r2, r1];
 
         make = () => ({ zones: [zone], kind: 1, states, rules });
         key = `R~${stateKey(states[0])}~${stateKey(states[1])}~${rules.map((r) => `${r.month},${r.nth},${r.dow},${r.atMin},${r.to}`).join('~')}`;
@@ -433,8 +433,8 @@ function matchesSchedule(cls: ScheduleClass, year: number, segs: OffSeg[]): bool
   if (segs.length !== 3) return false;
 
   const [r1, r2] = cls.rules;
-  const before = cls.states[r2.to]!.offMin; // state outside the two transitions
-  const mid = cls.states[r1.to]!.offMin;
+  const before = cls.states[r2.to].offMin; // state outside the two transitions
+  const mid = cls.states[r1.to].offMin;
   const y0 = Date.UTC(year, 0, 1);
 
   return (
@@ -538,7 +538,7 @@ function buildEras(zone: string, cls: ScheduleClass, fromYear: number, toYear: n
         fromYear: run.year,
         kind: 1,
         offs: run.offs,
-        rules: [rule(run.trans![0]!, 1), rule(run.trans![1]!, 0)],
+        rules: [rule(run.trans![0], 1), rule(run.trans![1], 0)],
         steps: null,
       });
     }

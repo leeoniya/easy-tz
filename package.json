@@ -59,6 +59,8 @@
     "browsers:install": "bunx browsers install chrome-headless-shell@stable --path .browsers",
     "audit": "bun tools/audit-abbrs.ts",
     "sweep": "bun tools/sweep-validity.ts",
+    "lint": "oxlint --type-aware",
+    "lint:fix": "oxlint --type-aware --fix",
     "prepublishOnly": "bun run check && bun run build"
   },
   "devDependencies": {
@@ -67,6 +69,8 @@
     "@types/node": "26.1.1",
     "leeoniya-timezones": "github:leeoniya/timezones#2cd74a8",
     "moment-timezone": "0.6.3",
+    "oxlint": "1.75.0",
+    "oxlint-tsgolint": "^7.0.2001",
     "puppeteer-core": "25.3.0",
     "timezone": "1.0.23",
     "timezone-support": "3.1.0",

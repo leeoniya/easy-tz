@@ -93,8 +93,8 @@ function predictedTransitions(cls: ScheduleClass, year: number): { t: number; of
     const [r1, r2] = cls.rules;
 
     return [
-      { t: ruleInstant(year, r1, cls.states[1 - r1.to]!.offMin), offMin: cls.states[r1.to]!.offMin },
-      { t: ruleInstant(year, r2, cls.states[1 - r2.to]!.offMin), offMin: cls.states[r2.to]!.offMin },
+      { t: ruleInstant(year, r1, cls.states[1 - r1.to]!.offMin), offMin: cls.states[r1.to].offMin },
+      { t: ruleInstant(year, r2, cls.states[1 - r2.to]!.offMin), offMin: cls.states[r2.to].offMin },
     ];
   }
 
@@ -111,7 +111,7 @@ function predictedTransitions(cls: ScheduleClass, year: number): { t: number; of
 
 // exact audit of one zone's current-year behavior vs its baked class
 function auditZone(zone: string, cls: ScheduleClass, yearStart: number, yearEnd: number, year: number): boolean {
-  let zdt = Temporal!.Instant.fromEpochMilliseconds(yearStart).toZonedDateTimeISO(zone);
+  let zdt = Temporal.Instant.fromEpochMilliseconds(yearStart).toZonedDateTimeISO(zone);
 
   if (parseOffset(zdt.offset) !== resolveClass(cls, yearStart, YEAR_START, STEP_MS).offMin) return false;
 
@@ -183,7 +183,7 @@ function compute(timestamp: number): TimeZoneInfo[] {
   // guarantee without auditing history; the label reuses the schedule abbr
   // when the offset matches (matching 07's baked-history labels), else GMT.
   if (hasTemporal && timestamp < HISTORY_TO_MS) {
-    const instant = Temporal!.Instant.fromEpochMilliseconds(timestamp);
+    const instant = Temporal.Instant.fromEpochMilliseconds(timestamp);
     const out: TimeZoneInfo[] = new Array(zones.length);
 
     for (let z = 0; z < zones.length; z++) out[z] = liveInfo(zones[z]!, classIdx[z]!, instant);
@@ -198,7 +198,7 @@ function compute(timestamp: number): TimeZoneInfo[] {
   // current/future on a Temporal runtime: overwrite the session-recovered
   // zones (failed the current-year audit, or unknown) with their live offset
   if (recovered!.size > 0) {
-    const instant = Temporal!.Instant.fromEpochMilliseconds(timestamp);
+    const instant = Temporal.Instant.fromEpochMilliseconds(timestamp);
 
     for (const z of recovered!) out[z] = liveRecovered(zones[z]!, instant);
   }
@@ -221,12 +221,12 @@ function computeOne(name: string, timestamp: number): TimeZoneInfo {
 
   // Temporal runtime + before the bake year: exact live past, schedule label
   if (hasTemporal && timestamp < HISTORY_TO_MS) {
-    return liveInfo(name, classIdx[z]!, Temporal!.Instant.fromEpochMilliseconds(timestamp));
+    return liveInfo(name, classIdx[z]!, Temporal.Instant.fromEpochMilliseconds(timestamp));
   }
 
   // current/future recovered zone on a Temporal runtime: live offset, GMT label
   if (recovered!.size > 0 && recovered!.has(z)) {
-    return liveRecovered(name, Temporal!.Instant.fromEpochMilliseconds(timestamp));
+    return liveRecovered(name, Temporal.Instant.fromEpochMilliseconds(timestamp));
   }
 
   // bake year and later, or a no-Temporal runtime: shared baked resolver
