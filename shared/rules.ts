@@ -62,28 +62,50 @@ export function ruleInstant(year: number, rule: Rule, offBeforeMin: number): num
   return Date.UTC(year, rule.month - 1, day) + (rule.atMin - offBeforeMin) * 60_000;
 }
 
+// ---- shared resolution primitives (used by both the schedule resolver and
+// the historical era resolver below, which are otherwise identical in their
+// rule/segment handling — only their return shape differs) ----
+
+// index (0|1) of the state/offset active at `ts` for a two-rule DST cycle
+// over the two offsets [off0, off1]. Rules are month-sorted; `r.to` indexes
+// the pair, and the offset in effect BEFORE a transition is the "from" side
+// (1 - r.to). Scalar offsets (not an array) keep this allocation-free on the
+// hot path. Before the year's first transition the active state is whatever
+// the LAST transition of the (identical) previous year switched to.
+function ruleCycleIndex(off0: number, off1: number, r1: Rule, r2: Rule, year: number, ts: number): 0 | 1 {
+  const t1 = ruleInstant(year, r1, r1.to === 0 ? off1 : off0);
+  const t2 = ruleInstant(year, r2, r2.to === 0 ? off1 : off0);
+
+  if (ts < t1) return r2.to;
+  if (ts < t2) return r1.to;
+  return r2.to;
+}
+
+// index of the ascending 15-min-step segment active at `ts`, measured from
+// `anchor` (Jan 1 of the relevant year). Shared by schedule irregular
+// segments and historical raw-year segments.
+function segmentIndex(starts: readonly number[], ts: number, anchor: number, stepMs: number): number {
+  const step = Math.max(0, Math.floor((ts - anchor) / stepMs));
+  let i = starts.length - 1;
+
+  while (i > 0 && starts[i]! > step) i--;
+
+  return i;
+}
+
 // state of a class at `ts`. yearStart/stepMs anchor the irregular segments
 // (which are only valid for the generated year and clamp outside it).
 export function resolveClass(cls: ScheduleClass, ts: number, yearStart: number, stepMs: number): ZoneState {
   if (cls.kind === 0) return cls.states[0];
 
   if (cls.kind === 1) {
-    const year = new Date(ts).getUTCFullYear();
     const [r1, r2] = cls.rules; // emitted sorted by month
-    const t1 = ruleInstant(year, r1, cls.states[1 - r1.to]!.offMin);
-    const t2 = ruleInstant(year, r2, cls.states[1 - r2.to]!.offMin);
+    const year = new Date(ts).getUTCFullYear();
 
-    // before the year's first transition, the state is whatever the LAST
-    // transition of the (identical) previous year switched to
-    if (ts < t1) return cls.states[r2.to];
-    if (ts < t2) return cls.states[r1.to];
-    return cls.states[r2.to];
+    return cls.states[ruleCycleIndex(cls.states[0].offMin, cls.states[1].offMin, r1, r2, year, ts)];
   }
 
-  const step = Math.max(0, Math.floor((ts - yearStart) / stepMs));
-  let i = cls.starts.length - 1;
-
-  while (i > 0 && cls.starts[i]! > step) i--;
+  const i = segmentIndex(cls.starts, ts, yearStart, stepMs);
 
   return { abbr: cls.abbrs[i]!, offMin: cls.offMins[i]! };
 }
@@ -138,19 +160,10 @@ export function resolveHistory(eras: HistoryEra[], ts: number, stepMs: number): 
 
   if (e.kind === 1) {
     const [r1, r2] = e.rules!;
-    const t1 = ruleInstant(year, r1, e.offs[1 - r1.to]!);
-    const t2 = ruleInstant(year, r2, e.offs[1 - r2.to]!);
 
-    if (ts < t1) return e.offs[r2.to]!;
-    if (ts < t2) return e.offs[r1.to]!;
-    return e.offs[r2.to]!;
+    return e.offs[ruleCycleIndex(e.offs[0]!, e.offs[1]!, r1, r2, year, ts)]!;
   }
 
   // raw single year, anchored at its own Jan 1
-  const step = Math.max(0, Math.floor((ts - Date.UTC(e.fromYear, 0, 1)) / stepMs));
-  let i = e.steps!.length - 1;
-
-  while (i > 0 && e.steps![i]! > step) i--;
-
-  return e.offs[i]!;
+  return e.offs[segmentIndex(e.steps!, ts, Date.UTC(e.fromYear, 0, 1), stepMs)]!;
 }
