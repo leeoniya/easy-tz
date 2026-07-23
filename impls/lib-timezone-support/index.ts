@@ -20,6 +20,8 @@ const tzCache = new Map<string, ReturnType<typeof findTimeZone> | null>();
 function tz(name: string) {
   let t = tzCache.get(name);
 
+  // strict `=== undefined` on purpose: null is a valid cached result (zone
+  // unknown to the bundled tzdata), distinct from undefined (not yet looked up)
   if (t === undefined) {
     try {
       t = findTimeZone(name);

@@ -52,10 +52,54 @@ for (const [canonical, alias] of zoneLinkPairs) {
   aliasOfZone.set(alias, canonical);
 }
 
-// single construction point for TimeZoneInfo so every impl attaches aliasOf
-// identically (the cross-impl equivalence tests depend on this)
-export function makeInfo(name: string, abbr: string, offset: string): TimeZoneInfo {
+// Interned, frozen TimeZoneInfo pool. The set of distinct (name, abbr, offset)
+// triples a zone can produce is small and finite — its standard/DST states, a
+// handful of irregular-year segments, and the historical offset labels — so
+// across the ~450 zones there are on the order of ~10^3 possible results in
+// total. We build each lazily on first sighting and return that same frozen
+// instance on every later call, turning the per-call allocation (hundreds per
+// getTimeZonesAt(), one per getTimeZoneAt()) into a pointer lookup that
+// produces no garbage. Freezing guarantees a caller can't mutate a shared
+// instance and corrupt another call's result.
+//
+// Nested maps (name -> offset -> abbr) key the pool without building a
+// composite string on the hot path. The pool is process-lifetime and bounded
+// by the finite result space, so it never needs eviction.
+const internPool = new Map<string, Map<string, Map<string, Readonly<TimeZoneInfo>>>>();
+
+// getTimeZonesAt() only ever asks for the fixed zone list, but getTimeZoneAt()
+// takes a caller-supplied name and answers a UTC sentinel for unknown ones —
+// so the pool's outer key is untrusted input. Cap the number of distinct names
+// well above every real IANA spelling (~900); past it, results are still built
+// and frozen, just not retained, so a flood of junk names can't grow the pool
+// without bound. Real zones are always pooled.
+const POOL_NAME_CAP = 4096;
+
+function freezeInfo(name: string, abbr: string, offset: string): Readonly<TimeZoneInfo> {
   const aliasOf = aliasOfZone.get(name);
 
-  return aliasOf === undefined ? { name, abbr, offset } : { name, abbr, offset, aliasOf };
+  return Object.freeze(aliasOf == null ? { name, abbr, offset } : { name, abbr, offset, aliasOf });
+}
+
+// single construction point for TimeZoneInfo so every impl attaches aliasOf
+// identically (the cross-impl equivalence tests depend on this) and shares the
+// interned, frozen pool above
+export function makeInfo(name: string, abbr: string, offset: string): TimeZoneInfo {
+  let byOffset = internPool.get(name);
+
+  if (byOffset == null) {
+    if (internPool.size >= POOL_NAME_CAP) return freezeInfo(name, abbr, offset);
+
+    internPool.set(name, (byOffset = new Map()));
+  }
+
+  let byAbbr = byOffset.get(offset);
+
+  if (byAbbr == null) byOffset.set(offset, (byAbbr = new Map()));
+
+  let info = byAbbr.get(abbr);
+
+  if (info == null) byAbbr.set(abbr, (info = freezeInfo(name, abbr, offset)));
+
+  return info;
 }

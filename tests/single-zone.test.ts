@@ -53,6 +53,35 @@ describe('getTimeZoneAt agrees with getTimeZonesAt for every zone', () => {
   }
 });
 
+describe('TimeZoneInfo objects are interned and frozen (no per-call allocation)', () => {
+  // every impl funnels construction through makeInfo, which returns a shared
+  // frozen instance per (name, abbr, offset). This pins that a zone's repeated
+  // resolutions reuse one object rather than allocating, that distinct states
+  // are distinct objects, and that the full-response and single-zone APIs hand
+  // back the very same instance.
+  test('same (zone, state) reuses one frozen instance; distinct states differ', () => {
+    const summer1 = one07('America/New_York', Date.UTC(2026, 6, 15, 12));
+    const summer2 = one07('America/New_York', Date.UTC(2026, 7, 20, 3, 45)); // different ts, still EDT
+    const winter = one07('America/New_York', Date.UTC(2026, 0, 15, 12)); // EST
+
+    expect(summer1).toBe(summer2); // identical object, not just equal
+    expect(Object.isFrozen(summer1)).toBe(true);
+    expect(summer1).not.toBe(winter);
+    expect(summer1.abbr).toBe('EDT');
+    expect(winter.abbr).toBe('EST');
+  });
+
+  test('getTimeZoneAt and getTimeZonesAt return the same interned instance', () => {
+    const ts = Date.UTC(2026, 6, 15, 12);
+
+    clear07();
+    const fromAll = all07(ts).find((z) => z.name === 'Europe/Paris')!;
+    const fromOne = one07('Europe/Paris', ts);
+
+    expect(fromOne).toBe(fromAll);
+  });
+});
+
 describe('getTimeZoneAt on the baked impls (07/10) handles unknown zones gracefully', () => {
   // the full response omits unknown zones; the single-zone baked resolvers
   // answer the UTC sentinel instead of throwing (07 always; 10 on this

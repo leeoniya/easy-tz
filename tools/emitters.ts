@@ -161,7 +161,7 @@ export function emitHistoryTs(h: GeneratedHistory, t: GeneratedTables, meta: Gen
     const key = `${q(offA)},${q(offB)}`;
     let i = pairIdx.get(key);
 
-    if (i === undefined) {
+    if (i == null) {
       i = pairs.length;
       pairs.push(key);
       pairIdx.set(key, i);
@@ -178,7 +178,7 @@ export function emitHistoryTs(h: GeneratedHistory, t: GeneratedTables, meta: Gen
     const key = `${r.month},${r.nth},${r.dow},${q(r.atMin)}`;
     let i = tupleIdx.get(key);
 
-    if (i === undefined) {
+    if (i == null) {
       i = tuples.length;
       tuples.push(`${b36(r.month, 1)}${b36(r.nth, 1)}${b36(r.dow, 1)}${b36(q(r.atMin), 2)}`);
       tupleIdx.set(key, i);
@@ -208,7 +208,7 @@ export function emitHistoryTs(h: GeneratedHistory, t: GeneratedTables, meta: Gen
         const p = eraPayload(e);
         let i = dictIdx.get(p);
 
-        if (i === undefined) {
+        if (i == null) {
           i = dict.length;
           dict.push(p);
           dictIdx.set(p, i);

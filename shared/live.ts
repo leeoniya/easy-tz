@@ -29,7 +29,7 @@ const abbrCache = new Map<string, string>();
 function resolveAbbr(longName: string): string {
   let abbr = abbrCache.get(longName);
 
-  if (abbr === undefined) {
+  if (abbr == null) {
     abbr = abbrOverrides[longName] ?? initialsAbbr(longName) ?? compactGmt(longName);
     abbrCache.set(longName, abbr);
   }
@@ -68,7 +68,7 @@ export function liveParts(fmtZone: string, timestamp: number, date: Date): { abb
 
   let offset = offsetStrCache.get(offsetMin);
 
-  if (offset === undefined) {
+  if (offset == null) {
     offset = formatOffsetMinutes(offsetMin);
     offsetStrCache.set(offsetMin, offset);
   }

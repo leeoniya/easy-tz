@@ -35,12 +35,11 @@
 import type { TimeZoneInfo } from '../../shared/types.ts';
 import { zones } from '../../shared/zones.ts';
 import { scheduleClasses, YEAR_START, STEP_MS } from '../../shared/schedule.ts';
-import { HISTORY_TO } from '../../shared/history.ts';
 import { resolveClass, ruleInstant, type ScheduleClass } from '../../shared/rules.ts';
 import { gmtLabel } from '../../shared/fmt.ts';
 import { hourBucketMemo } from '../../shared/hourCache.ts';
 import { makeInfo } from '../../shared/zoneLinks.ts';
-import { computeBaked, classIdx, historyAbbr, zoneIndexOf, getTimeZoneAt as bakedGetTimeZoneAt } from '../../shared/bakedHistory.ts';
+import { computeBaked, classIdx, historyAbbr, zoneIndexOf, getTimeZoneAt as bakedGetTimeZoneAt, HISTORY_TO_MS } from '../../shared/bakedHistory.ts';
 
 const hasTemporal = typeof Temporal !== 'undefined';
 
@@ -126,7 +125,7 @@ function auditZone(zone: string, cls: ScheduleClass, yearStart: number, yearEnd:
 
     const exp = predicted[i];
 
-    if (exp === undefined || next.epochMilliseconds !== exp.t || parseOffset(next.offset) !== exp.offMin) {
+    if (exp == null || next.epochMilliseconds !== exp.t || parseOffset(next.offset) !== exp.offMin) {
       return false;
     }
 
@@ -183,7 +182,7 @@ function compute(timestamp: number): TimeZoneInfo[] {
   // live. Temporal is exact for the past, so this keeps the never-wrong
   // guarantee without auditing history; the label reuses the schedule abbr
   // when the offset matches (matching 07's baked-history labels), else GMT.
-  if (hasTemporal && new Date(timestamp).getUTCFullYear() < HISTORY_TO) {
+  if (hasTemporal && timestamp < HISTORY_TO_MS) {
     const instant = Temporal!.Instant.fromEpochMilliseconds(timestamp);
     const out: TimeZoneInfo[] = new Array(zones.length);
 
@@ -221,7 +220,7 @@ function computeOne(name: string, timestamp: number): TimeZoneInfo {
   if (z === -1) return bakedGetTimeZoneAt(name, timestamp);
 
   // Temporal runtime + before the bake year: exact live past, schedule label
-  if (hasTemporal && new Date(timestamp).getUTCFullYear() < HISTORY_TO) {
+  if (hasTemporal && timestamp < HISTORY_TO_MS) {
     return liveInfo(name, classIdx[z]!, Temporal!.Instant.fromEpochMilliseconds(timestamp));
   }
 

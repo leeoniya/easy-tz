@@ -19,7 +19,7 @@ const zoneCache = new Map<string, tc.TimeZone>();
 function zone(name: string): tc.TimeZone {
   let z = zoneCache.get(name);
 
-  if (z === undefined) {
+  if (z == null) {
     z = tc.zone(name);
     zoneCache.set(name, z);
   }

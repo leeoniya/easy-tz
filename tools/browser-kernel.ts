@@ -142,11 +142,11 @@ export function installKernel(
     for (const f of fixtures) {
       const info = impl.getTimeZonesAt(f.ts).find((z) => z.name === f.zone || z.name === f.altZone);
 
-      if (info !== undefined && info.abbr === f.abbr && info.offset === f.offset) {
+      if (info != null && info.abbr === f.abbr && info.offset === f.offset) {
         fixturesPassed++;
       } else if (fixtureFailures.length < 10) {
         fixtureFailures.push(
-          `${f.zone} (${f.desc}): expected ${f.abbr} ${f.offset}, got ${info === undefined ? 'missing' : `${info.abbr} ${info.offset}`}`
+          `${f.zone} (${f.desc}): expected ${f.abbr} ${f.offset}, got ${info == null ? 'missing' : `${info.abbr} ${info.offset}`}`
         );
       }
     }
@@ -208,11 +208,11 @@ export function installKernel(
         const c = byName.get(canonical);
         const a = byName.get(alias);
 
-        if (c === undefined || a === undefined || a.abbr !== c.abbr || a.offset !== c.offset) {
+        if (c == null || a == null || a.abbr !== c.abbr || a.offset !== c.offset) {
           mismatchCount++;
 
           if (mismatches.length < 10) {
-            const show = (z: typeof c) => (z === undefined ? 'missing' : `${z.abbr} ${z.offset}`);
+            const show = (z: typeof c) => (z == null ? 'missing' : `${z.abbr} ${z.offset}`);
             mismatches.push(`${alias} @ ${new Date(ts).toISOString()}: ${show(a)} vs ${canonical}=${show(c)}`);
           }
         }

@@ -111,7 +111,7 @@ function init(): void {
 // (unless it offset-diverged at init) resolved to its verified group
 // representative. Shared by the all-zones loop and the single-zone resolver.
 function formatZoneOf(name: string): string {
-  const aliased = zoneAliases[name] !== undefined && !droppedAliases!.has(name) ? zoneAliases[name]! : name;
+  const aliased = zoneAliases[name] != null && !droppedAliases!.has(name) ? zoneAliases[name]! : name;
 
   return repOf!.get(aliased) ?? aliased;
 }
@@ -128,7 +128,7 @@ function compute(timestamp: number): TimeZoneInfo[] {
 
     let res = repResults.get(fmtZone);
 
-    if (res === undefined) {
+    if (res == null) {
       res = liveParts(fmtZone, timestamp, date);
       repResults.set(fmtZone, res);
     }

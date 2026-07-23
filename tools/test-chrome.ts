@@ -91,8 +91,8 @@ try {
         r.label,
         `${r.fixturesPassed}/${r.fixturesTotal}`,
         `${r.letterAbbrs}/${r.zones}`,
-        ap === undefined ? '-' : `${ap.checked - ap.mismatchCount}/${ap.checked}`,
-        eq === undefined ? '-' : `${eq.checked - eq.mismatchCount}/${eq.checked}`,
+        ap == null ? '-' : `${ap.checked - ap.mismatchCount}/${ap.checked}`,
+        eq == null ? '-' : `${eq.checked - eq.mismatchCount}/${eq.checked}`,
       ];
     })
   );

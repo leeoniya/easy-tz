@@ -11,7 +11,7 @@ export function fmtCache(
   return (zone) => {
     let fmt = cache.get(zone);
 
-    if (fmt === undefined) {
+    if (fmt == null) {
       fmt = new Intl.DateTimeFormat('en-US', { ...options, timeZone: zone });
       cache.set(zone, fmt);
     }

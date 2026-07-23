@@ -175,7 +175,7 @@ function effectiveSegs(rawByZone: Map<string, Seg[]>, zone: string): EffSeg[] {
     const abbr = zoneAbbrOverrides[zone] ?? resolveAbbr(s.longName);
     const last = out[out.length - 1];
 
-    if (last === undefined || last.abbr !== abbr || last.offMin !== s.offsetMin) {
+    if (last == null || last.abbr !== abbr || last.offMin !== s.offsetMin) {
       out.push({ step: s.step, abbr, offMin: s.offsetMin });
     }
   }
@@ -259,7 +259,7 @@ export function generateTables(): GeneratedTables {
     const sig = rawByYear[0]!.get(zone)!.map((s) => `${s.step}:${s.longName}|${s.offsetMin}`).join(';');
     const group = bySig.get(sig);
 
-    if (group === undefined) bySig.set(sig, [zone]);
+    if (group == null) bySig.set(sig, [zone]);
     else group.push(zone);
   }
 
@@ -286,7 +286,7 @@ export function generateTables(): GeneratedTables {
       const a = perYear[0]![0]!;
       const b = perYear[0]![1];
       const cyclic =
-        b !== undefined &&
+        b != null &&
         perYear.every(
           (s) => s.length === 3 && sameState(s[0]!, a) && sameState(s[1]!, b) && sameState(s[2]!, a)
         );
@@ -320,7 +320,7 @@ export function generateTables(): GeneratedTables {
 
     const existing = byKey.get(key);
 
-    if (existing !== undefined) existing.zones.push(zone);
+    if (existing != null) existing.zones.push(zone);
     else byKey.set(key, make());
   }
 
@@ -626,7 +626,7 @@ export function generateHistory(tables: GeneratedTables, fromYear: number = HIST
 
     const existing = byKey.get(key);
 
-    if (existing !== undefined) existing.zones.push(zone);
+    if (existing != null) existing.zones.push(zone);
     else byKey.set(key, { zones: [zone], eras });
   }
 

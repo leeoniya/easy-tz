@@ -31,6 +31,11 @@ import { makeInfo, zoneLinks } from './zoneLinks.ts';
 export const classIdx = buildScheduleIndex(zones, scheduleClasses);
 export const histIdx = buildScheduleIndex(zones, historyClasses);
 
+// UTC start of the bake year: `ts < HISTORY_TO_MS` is exactly `year < HISTORY_TO`
+// (the timestamp falls before Jan 1 of the bake year) but with no Date
+// allocation on the per-call hot path.
+export const HISTORY_TO_MS = Date.UTC(HISTORY_TO, 0, 1);
+
 // zone name -> its index in `zones`. Both canonical and legacy spellings are
 // enumerated in `zones`, so most lookups hit directly; the zoneLinks fallback
 // bridges any remaining alias exactly as buildScheduleIndex does. Built once.
@@ -41,11 +46,11 @@ for (let z = 0; z < zones.length; z++) nameIdx.set(zones[z]!, z);
 export function zoneIndexOf(name: string): number {
   const z = nameIdx.get(name);
 
-  if (z !== undefined) return z;
+  if (z != null) return z;
 
   const bridged = zoneLinks.get(name);
 
-  return bridged !== undefined ? nameIdx.get(bridged) ?? -1 : -1;
+  return bridged != null ? nameIdx.get(bridged) ?? -1 : -1;
 }
 
 const offsetStrCache = new Map<number, string>();
@@ -53,7 +58,7 @@ const offsetStrCache = new Map<number, string>();
 export function offsetStr(offMin: number): string {
   let s = offsetStrCache.get(offMin);
 
-  if (s === undefined) {
+  if (s == null) {
     s = formatOffsetMinutes(offMin);
     offsetStrCache.set(offMin, s);
   }
@@ -97,11 +102,13 @@ function bakedZoneInfo(
 ): TimeZoneInfo {
   // historical era wins when the zone has one live at this instant (non-null)
   if (historical && hi !== -1) {
-    let off = histCache !== undefined ? histCache[hi] : undefined;
+    let off = histCache != null ? histCache[hi] : undefined;
 
+    // strict `=== undefined` on purpose: null is a valid cached result (the
+    // era defers to the schedule), distinct from undefined (not yet resolved)
     if (off === undefined) {
       off = resolveHistory(historyClasses[hi]!.eras, timestamp, STEP_MS);
-      if (histCache !== undefined) histCache[hi] = off;
+      if (histCache != null) histCache[hi] = off;
     }
 
     if (off !== null) {
@@ -114,11 +121,11 @@ function bakedZoneInfo(
   if (ci < 0) return makeInfo(name, 'UTC', '+00:00');
 
   // schedule: bake year onward, or an earlier year whose history defers/absent
-  let st = schedCache !== undefined ? schedCache[ci] : undefined;
+  let st = schedCache != null ? schedCache[ci] : undefined;
 
-  if (st === undefined) {
+  if (st == null) {
     st = resolveClass(scheduleClasses[ci]!, timestamp, YEAR_START, STEP_MS);
-    if (schedCache !== undefined) schedCache[ci] = st;
+    if (schedCache != null) schedCache[ci] = st;
   }
 
   return makeInfo(name, st.abbr, offsetStr(st.offMin));
@@ -133,9 +140,8 @@ export function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo {
   const z = zoneIndexOf(name);
   const ci = z === -1 ? -1 : classIdx[z]!;
   const hi = z === -1 ? -1 : histIdx[z]!;
-  const historical = new Date(timestamp).getUTCFullYear() < HISTORY_TO;
 
-  return bakedZoneInfo(name, ci, hi, timestamp, historical);
+  return bakedZoneInfo(name, ci, hi, timestamp, timestamp < HISTORY_TO_MS);
 }
 
 // full baked response at `timestamp`: schedule for the bake year onward,
@@ -144,7 +150,7 @@ export function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo {
 // class is resolved once and shared across its zones (lazily — in a historical
 // year, schedule classes are only touched for zones whose history defers).
 export function computeBaked(timestamp: number): TimeZoneInfo[] {
-  const historical = new Date(timestamp).getUTCFullYear() < HISTORY_TO;
+  const historical = timestamp < HISTORY_TO_MS;
   const schedCache = new Array<ZoneState | undefined>(scheduleClasses.length);
   const histCache = historical ? new Array<number | null | undefined>(historyClasses.length) : undefined;
   const out: TimeZoneInfo[] = new Array(zones.length);
