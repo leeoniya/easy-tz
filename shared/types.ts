@@ -18,6 +18,11 @@ export interface TimeZoneInfo {
 
 export type GetTimeZonesAt = (timestamp: number) => TimeZoneInfo[];
 
+// single-zone / many-timestamps counterpart to GetTimeZonesAt: resolves one
+// zone at one instant without building the full response. Exported by the
+// first-party impls (04, 07, 08, 10).
+export type GetTimeZoneAt = (name: string, timestamp: number) => TimeZoneInfo;
+
 export interface Impl {
   id: string;
   label: string;

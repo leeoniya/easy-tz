@@ -20,6 +20,10 @@
 // on tzdata/CLDR changes. tests/schedule.test.ts asserts output-equality
 // with impl 04, including next-year instants; tools/sweep-validity.ts
 // validates the historical offsets.
+//
+// getTimeZoneAt(name, ts) resolves a SINGLE zone (the single-zone /
+// many-timestamps use case) via the same baked resolver, without building or
+// memoizing the full response. getTimeZonesAt() loops that same per-zone core.
 
 import { computeBaked } from '../../shared/bakedHistory.ts';
 import { hourBucketMemo } from '../../shared/hourCache.ts';
@@ -28,3 +32,4 @@ const memo = hourBucketMemo(computeBaked);
 
 export const getTimeZonesAt = memo.get;
 export const clearCache = memo.clear;
+export { getTimeZoneAt } from '../../shared/bakedHistory.ts';

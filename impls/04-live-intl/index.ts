@@ -31,3 +31,9 @@ const memo = hourBucketMemo(compute);
 
 export const getTimeZonesAt = memo.get;
 export const clearCache = memo.clear;
+
+// single-zone resolver (single-zone / many-timestamps use case): the same
+// per-zone live-Intl leaf getTimeZonesAt() loops, resolved directly for `name`.
+export function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo {
+  return liveZoneInfo(name, timestamp, new Date(timestamp));
+}

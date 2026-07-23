@@ -107,6 +107,15 @@ function init(): void {
   initInfo = { temporal, verifyMs: performance.now() - t0, sharedZones, healedZones, healedAliases };
 }
 
+// the zone whose live Intl output represents `name`: the curated metazone alias
+// (unless it offset-diverged at init) resolved to its verified group
+// representative. Shared by the all-zones loop and the single-zone resolver.
+function formatZoneOf(name: string): string {
+  const aliased = zoneAliases[name] !== undefined && !droppedAliases!.has(name) ? zoneAliases[name]! : name;
+
+  return repOf!.get(aliased) ?? aliased;
+}
+
 function compute(timestamp: number): TimeZoneInfo[] {
   if (repOf === null) init();
 
@@ -115,8 +124,7 @@ function compute(timestamp: number): TimeZoneInfo[] {
   const repResults = new Map<string, { abbr: string; offset: string }>();
 
   for (const name of zones) {
-    const aliased = zoneAliases[name] !== undefined && !droppedAliases!.has(name) ? zoneAliases[name]! : name;
-    const fmtZone = repOf!.get(aliased) ?? aliased;
+    const fmtZone = formatZoneOf(name);
 
     let res = repResults.get(fmtZone);
 
@@ -135,3 +143,15 @@ const memo = hourBucketMemo(compute);
 
 export const getTimeZonesAt = memo.get;
 export const clearCache = memo.clear;
+
+// single-zone resolver (single-zone / many-timestamps use case): resolves just
+// `name` via the same representative + override logic the all-zones loop uses.
+// The formatter-sharing cache is a per-call all-zones optimization, so it isn't
+// needed here — one zone formats once.
+export function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo {
+  if (repOf === null) init();
+
+  const res = liveParts(formatZoneOf(name), timestamp, new Date(timestamp));
+
+  return makeInfo(name, zoneAbbrOverrides[name] ?? res.abbr, res.offset);
+}

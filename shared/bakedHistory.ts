@@ -22,14 +22,31 @@ import type { TimeZoneInfo } from './types.ts';
 import { zones } from './zones.ts';
 import { scheduleClasses, YEAR_START, STEP_MS } from './schedule.ts';
 import { historyClasses, HISTORY_TO } from './history.ts';
-import { resolveClass, resolveHistory, buildScheduleIndex, type ScheduleClass } from './rules.ts';
+import { resolveClass, resolveHistory, buildScheduleIndex, type ScheduleClass, type ZoneState } from './rules.ts';
 import { formatOffsetMinutes, gmtLabel } from './fmt.ts';
-import { makeInfo } from './zoneLinks.ts';
+import { makeInfo, zoneLinks } from './zoneLinks.ts';
 
 // zones-list order -> schedule / history class index (bridging spelling
 // variants; -1 = not covered even after bridging). Both resolved once.
 export const classIdx = buildScheduleIndex(zones, scheduleClasses);
-const histIdx = buildScheduleIndex(zones, historyClasses);
+export const histIdx = buildScheduleIndex(zones, historyClasses);
+
+// zone name -> its index in `zones`. Both canonical and legacy spellings are
+// enumerated in `zones`, so most lookups hit directly; the zoneLinks fallback
+// bridges any remaining alias exactly as buildScheduleIndex does. Built once.
+const nameIdx = new Map<string, number>();
+for (let z = 0; z < zones.length; z++) nameIdx.set(zones[z]!, z);
+
+// index of `name` in the zones list (bridging alias spellings); -1 if unknown.
+export function zoneIndexOf(name: string): number {
+  const z = nameIdx.get(name);
+
+  if (z !== undefined) return z;
+
+  const bridged = zoneLinks.get(name);
+
+  return bridged !== undefined ? nameIdx.get(bridged) ?? -1 : -1;
+}
 
 const offsetStrCache = new Map<number, string>();
 
@@ -58,57 +75,82 @@ export function historyAbbr(cls: ScheduleClass, offMin: number): string {
   return gmtLabel(offMin);
 }
 
-// full baked response at `timestamp`: schedule for the bake year onward,
-// historical eras for earlier years, UTC sentinel for uncovered zones.
-export function computeBaked(timestamp: number): TimeZoneInfo[] {
-  const year = new Date(timestamp).getUTCFullYear();
-  const historical = year < HISTORY_TO;
+// Resolve ONE zone's TimeZoneInfo at `timestamp`. `ci`/`hi` are its schedule
+// and history class indices (from classIdx/histIdx; -1 = uncovered). This is
+// the single source of truth for the per-zone answer, shared by the single-zone
+// getTimeZoneAt() and the all-zones computeBaked() loop.
+//
+// The optional per-class caches let the all-zones path resolve each schedule /
+// history class at most once and reuse it across the (avg ~2.5) zones in that
+// class — the batching that keeps getTimeZonesAt() fast. undefined entry = not
+// yet computed (a resolved schedule state is an object and a resolved history
+// offset is number|null, so undefined is an unambiguous "miss"). getTimeZoneAt()
+// passes no caches and resolves directly.
+function bakedZoneInfo(
+  name: string,
+  ci: number,
+  hi: number,
+  timestamp: number,
+  historical: boolean,
+  schedCache?: (ZoneState | undefined)[],
+  histCache?: (number | null | undefined)[],
+): TimeZoneInfo {
+  // historical era wins when the zone has one live at this instant (non-null)
+  if (historical && hi !== -1) {
+    let off = histCache !== undefined ? histCache[hi] : undefined;
 
-  // schedule state per class (cheap; also the fallback for deferring eras)
-  const nClasses = scheduleClasses.length;
-  const schedAbbr = new Array<string>(nClasses);
-  const schedOff = new Array<string>(nClasses);
+    if (off === undefined) {
+      off = resolveHistory(historyClasses[hi]!.eras, timestamp, STEP_MS);
+      if (histCache !== undefined) histCache[hi] = off;
+    }
 
-  for (let c = 0; c < nClasses; c++) {
-    const st = resolveClass(scheduleClasses[c]!, timestamp, YEAR_START, STEP_MS);
-    schedAbbr[c] = st.abbr;
-    schedOff[c] = offsetStr(st.offMin);
-  }
-
-  // historical offset (minutes) per history class, or null when the era
-  // defers to the schedule; computed once per class, shared by its zones
-  let histOffMin: (number | null)[] | null = null;
-
-  if (historical) {
-    const nHist = historyClasses.length;
-    histOffMin = new Array<number | null>(nHist);
-
-    for (let h = 0; h < nHist; h++) {
-      histOffMin[h] = resolveHistory(historyClasses[h]!.eras, timestamp, STEP_MS);
+    if (off !== null) {
+      const abbr = ci < 0 ? gmtLabel(off) : historyAbbr(scheduleClasses[ci]!, off);
+      return makeInfo(name, abbr, offsetStr(off));
     }
   }
 
-  const out: TimeZoneInfo[] = [];
+  // uncovered zone -> UTC sentinel
+  if (ci < 0) return makeInfo(name, 'UTC', '+00:00');
+
+  // schedule: bake year onward, or an earlier year whose history defers/absent
+  let st = schedCache !== undefined ? schedCache[ci] : undefined;
+
+  if (st === undefined) {
+    st = resolveClass(scheduleClasses[ci]!, timestamp, YEAR_START, STEP_MS);
+    if (schedCache !== undefined) schedCache[ci] = st;
+  }
+
+  return makeInfo(name, st.abbr, offsetStr(st.offMin));
+}
+
+// Single-zone resolver for the single-zone / many-timestamps use case: resolves
+// just `name` with no all-zones allocation, using the exact per-zone logic of
+// computeBaked(). Unknown names resolve to the UTC sentinel (as they do in the
+// full response). Not memoized — callers sweeping many distinct timestamps get
+// a fresh, allocation-light answer each call.
+export function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo {
+  const z = zoneIndexOf(name);
+  const ci = z === -1 ? -1 : classIdx[z]!;
+  const hi = z === -1 ? -1 : histIdx[z]!;
+  const historical = new Date(timestamp).getUTCFullYear() < HISTORY_TO;
+
+  return bakedZoneInfo(name, ci, hi, timestamp, historical);
+}
+
+// full baked response at `timestamp`: schedule for the bake year onward,
+// historical eras for earlier years, UTC sentinel for uncovered zones. Loops
+// the same per-zone resolver as getTimeZoneAt(), with per-class caches so each
+// class is resolved once and shared across its zones (lazily — in a historical
+// year, schedule classes are only touched for zones whose history defers).
+export function computeBaked(timestamp: number): TimeZoneInfo[] {
+  const historical = new Date(timestamp).getUTCFullYear() < HISTORY_TO;
+  const schedCache = new Array<ZoneState | undefined>(scheduleClasses.length);
+  const histCache = historical ? new Array<number | null | undefined>(historyClasses.length) : undefined;
+  const out: TimeZoneInfo[] = new Array(zones.length);
 
   for (let z = 0; z < zones.length; z++) {
-    const name = zones[z]!;
-    const ci = classIdx[z]!;
-
-    if (historical) {
-      const hi = histIdx[z]!;
-
-      if (hi !== -1) {
-        const off = histOffMin![hi];
-
-        if (off != null) {
-          const abbr = ci < 0 ? gmtLabel(off) : historyAbbr(scheduleClasses[ci]!, off);
-          out.push(makeInfo(name, abbr, offsetStr(off)));
-          continue;
-        }
-      }
-    }
-
-    out.push(ci < 0 ? makeInfo(name, 'UTC', '+00:00') : makeInfo(name, schedAbbr[ci]!, schedOff[ci]!));
+    out[z] = bakedZoneInfo(zones[z]!, classIdx[z]!, histIdx[z]!, timestamp, historical, schedCache, histCache);
   }
 
   return out;
