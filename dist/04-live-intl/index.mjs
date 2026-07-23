@@ -28,9 +28,26 @@ for (const [canonical, alias] of zoneLinkPairs) {
   zoneLinks.set(alias, canonical);
   aliasOfZone.set(alias, canonical);
 }
-function makeInfo(name, abbr, offset) {
+var internPool = new Map;
+var POOL_NAME_CAP = 4096;
+function freezeInfo(name, abbr, offset) {
   const aliasOf = aliasOfZone.get(name);
-  return aliasOf === undefined ? { name, abbr, offset } : { name, abbr, offset, aliasOf };
+  return Object.freeze(aliasOf == null ? { name, abbr, offset } : { name, abbr, offset, aliasOf });
+}
+function makeInfo(name, abbr, offset) {
+  let byOffset = internPool.get(name);
+  if (byOffset == null) {
+    if (internPool.size >= POOL_NAME_CAP)
+      return freezeInfo(name, abbr, offset);
+    internPool.set(name, byOffset = new Map);
+  }
+  let byAbbr = byOffset.get(offset);
+  if (byAbbr == null)
+    byOffset.set(offset, byAbbr = new Map);
+  let info = byAbbr.get(abbr);
+  if (info == null)
+    byAbbr.set(abbr, info = freezeInfo(name, abbr, offset));
+  return info;
 }
 
 // shared/zones.ts
@@ -206,7 +223,7 @@ function fmtCache(options) {
   const cache = new Map;
   return (zone) => {
     let fmt = cache.get(zone);
-    if (fmt === undefined) {
+    if (fmt == null) {
       fmt = new Intl.DateTimeFormat("en-US", { ...options, timeZone: zone });
       cache.set(zone, fmt);
     }
@@ -250,7 +267,7 @@ var partsFmt = fmtCache({
 var abbrCache = new Map;
 function resolveAbbr(longName) {
   let abbr = abbrCache.get(longName);
-  if (abbr === undefined) {
+  if (abbr == null) {
     abbr = abbrOverrides[longName] ?? initialsAbbr(longName) ?? compactGmt(longName);
     abbrCache.set(longName, abbr);
   }
@@ -289,7 +306,7 @@ function liveParts(fmtZone, timestamp, date) {
   const asUTC = Date.UTC(year, month - 1, day, hour, minute, second);
   const offsetMin = Math.round((asUTC - timestamp) / 60000);
   let offset = offsetStrCache.get(offsetMin);
-  if (offset === undefined) {
+  if (offset == null) {
     offset = formatOffsetMinutes(offsetMin);
     offsetStrCache.set(offsetMin, offset);
   }
