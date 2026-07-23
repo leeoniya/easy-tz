@@ -588,9 +588,8 @@ function buildEras(zone: string, cls: ScheduleClass, fromYear: number, toYear: n
   return stored ? eras : null;
 }
 
-export function generateHistory(tables: GeneratedTables): GeneratedHistory {
+export function generateHistory(tables: GeneratedTables, fromYear: number = HISTORY_FROM): GeneratedHistory {
   const t0 = Date.now();
-  const fromYear = HISTORY_FROM;
   const toYear = tables.year;
 
   // the irregular-class zones are excluded: their behavior isn't
