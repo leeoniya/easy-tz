@@ -13,6 +13,7 @@ import { fixtures } from '../shared/fixtures.ts';
 import { zones } from '../shared/zones.ts';
 import { zoneLinkPairs } from '../shared/zoneLinks.ts';
 import { installIntlCounter, intlConstructCount } from '../shared/intl-count.ts';
+import { GETONE_ZONE, GETONE_CALLS, GETONE_STEP_MS, GETONE_CUR_BASE, GETONE_HIST_BASE } from './bench-config.ts';
 
 const MISS_ITERATIONS = 25;
 const HIT_CALLS = 50_000;
@@ -38,6 +39,15 @@ export interface BenchResult {
   formatters: number;
 }
 
+export interface BenchOneResult {
+  id: string;
+  supported: boolean; // false for impls without a getTimeZoneAt() (the libs)
+  calls: number;
+  curMs: number; // total ms to resolve `calls` present-era timestamps
+  histMs: number; // same, anchored in a historical year
+  formatters: number; // Intl.DateTimeFormat constructions during the sweeps
+}
+
 export interface ValidateResult {
   id: string;
   zones: number;
@@ -57,7 +67,7 @@ export interface Vs04 {
 export function installKernel(
   list: Impl[],
   baseline: Impl,
-  initInfoFor: (id: string) => unknown = () => undefined
+  initInfoFor: (id: string) => unknown = () => null
 ): void {
   // must precede the first getTimeZonesAt() call; formatter construction is
   // lazy in all impls/libs, so kernel-install time is early enough
@@ -131,6 +141,37 @@ export function installKernel(
       histMedMs: med(histTimes),
       formatters: intlConstructCount(),
     };
+  };
+
+  // single-zone getTimeZoneAt() sweep: one DST zone resolved at GETONE_CALLS
+  // timestamps in the present, then in a historical year. Run in its own fresh
+  // page (see bench-chrome.ts) so the formatter count reflects only this
+  // workload — one formatter for 04/08, none for the baked impls. Impls without
+  // a getTimeZoneAt() (the comparison libraries) report supported: false.
+  (globalThis as { __benchOne?: unknown }).__benchOne = (implId: string): BenchOneResult => {
+    const one = find(implId).getTimeZoneAt;
+
+    if (one == null) return { id: implId, supported: false, calls: 0, curMs: 0, histMs: 0, formatters: 0 };
+
+    // untimed warm-up (JIT + intern pool for both DST states, both eras)
+    let sink = 0;
+
+    for (let i = 0; i < 500; i++) {
+      sink += one(GETONE_ZONE, GETONE_CUR_BASE + i * GETONE_STEP_MS).offset.length;
+      sink += one(GETONE_ZONE, GETONE_HIST_BASE + i * GETONE_STEP_MS).offset.length;
+    }
+
+    let t0 = performance.now();
+    for (let i = 0; i < GETONE_CALLS; i++) sink += one(GETONE_ZONE, GETONE_CUR_BASE + i * GETONE_STEP_MS).offset.length;
+    const curMs = performance.now() - t0;
+
+    t0 = performance.now();
+    for (let i = 0; i < GETONE_CALLS; i++) sink += one(GETONE_ZONE, GETONE_HIST_BASE + i * GETONE_STEP_MS).offset.length;
+    const histMs = performance.now() - t0;
+
+    if (sink < 0) throw new Error('unreachable'); // keep the loops from being optimized away
+
+    return { id: implId, supported: true, calls: GETONE_CALLS, curMs, histMs, formatters: intlConstructCount() };
   };
 
   (globalThis as { __validate?: unknown }).__validate = (implId: string): ValidateResult => {

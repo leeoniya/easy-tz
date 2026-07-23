@@ -9,6 +9,14 @@ import { printTable } from '../tools/print-table.ts';
 import { zones } from '../shared/zones.ts';
 import { genMeta } from '../shared/schedule.ts';
 import { minifiedSizes } from './size.ts';
+import {
+  GETONE_ZONE,
+  GETONE_CALLS,
+  GETONE_STEP_MS,
+  GETONE_STEP_HOURS,
+  GETONE_CUR_BASE,
+  GETONE_HIST_BASE,
+} from '../tools/bench-config.ts';
 
 const ITERATIONS = 25;
 const HOUR_MS = 3_600_000;
@@ -137,6 +145,75 @@ printTable(
     r.rssMB,
     ((sizes.get(r.id) ?? 0) / 1024).toFixed(1),
   ])
+);
+
+// --- single-zone getTimeZoneAt() benchmark --------------------------------
+// The single-zone / many-timestamps use case: one DST zone resolved at
+// GETONE_CALLS timestamps stepping across DST transitions, timed once in the
+// projected present and once in a historical year. Only this repo's impls
+// expose getTimeZoneAt(); the comparison libraries have no equivalent API, so
+// they're absent here. Each impl runs in a FRESH subprocess so the formatter
+// count is clean (04/08 build one formatter for the zone, the baked impls
+// none) and unpolluted by the getTimeZonesAt warm-up above.
+interface OneRow {
+  id: string;
+  curNs: string;
+  histNs: string;
+  curMs: string;
+  histMs: string;
+  formatters: string;
+}
+
+const intlCountUrl = new URL('../shared/intl-count.ts', import.meta.url).pathname;
+const registryUrl = new URL('../impls/registry.ts', import.meta.url).pathname;
+const oneRows: OneRow[] = [];
+
+for (const impl of impls) {
+  if (impl.getTimeZoneAt == null) continue;
+
+  const proc = Bun.spawnSync({
+    cmd: [
+      process.execPath,
+      '-e',
+      `const { installIntlCounter, intlConstructCount } = await import(${JSON.stringify(intlCountUrl)});
+       installIntlCounter();
+       const { impls } = await import(${JSON.stringify(registryUrl)});
+       const one = impls.find((i) => i.id === ${JSON.stringify(impl.id)}).getTimeZoneAt;
+       const Z = ${JSON.stringify(GETONE_ZONE)}, N = ${GETONE_CALLS}, STEP = ${GETONE_STEP_MS};
+       const CUR = ${GETONE_CUR_BASE}, HIST = ${GETONE_HIST_BASE};
+       let s = 0;
+       for (let i = 0; i < 500; i++) { s += one(Z, CUR + i * STEP).offset.length; s += one(Z, HIST + i * STEP).offset.length; }
+       let t0 = Bun.nanoseconds();
+       for (let i = 0; i < N; i++) s += one(Z, CUR + i * STEP).offset.length;
+       const curMs = (Bun.nanoseconds() - t0) / 1e6;
+       t0 = Bun.nanoseconds();
+       for (let i = 0; i < N; i++) s += one(Z, HIST + i * STEP).offset.length;
+       const histMs = (Bun.nanoseconds() - t0) / 1e6;
+       if (s < 0) throw new Error('unreachable');
+       console.log(JSON.stringify({ curMs, histMs, formatters: intlConstructCount() }));`,
+    ],
+  });
+
+  const p = JSON.parse(proc.stdout.toString() || '{}') as { curMs?: number; histMs?: number; formatters?: number };
+
+  oneRows.push({
+    id: impl.id,
+    curNs: p.curMs != null ? ((p.curMs * 1e6) / GETONE_CALLS).toFixed(0) : 'err',
+    histNs: p.histMs != null ? ((p.histMs * 1e6) / GETONE_CALLS).toFixed(0) : 'err',
+    curMs: p.curMs != null ? p.curMs.toFixed(2) : 'err',
+    histMs: p.histMs != null ? p.histMs.toFixed(2) : 'err',
+    formatters: String(p.formatters ?? '-'),
+  });
+}
+
+console.log(`\nsingle-zone getTimeZoneAt(): ${GETONE_ZONE}, ${GETONE_CALLS} timestamps/sweep (${GETONE_STEP_HOURS}h step)\n`);
+
+// cur/hist ns are per-call; 10k ms are the totals for each sweep (hist routes
+// 07/10 through the baked era resolver — bun has no Temporal). formatters: one
+// per zone for the live-Intl impls, none for the baked ones.
+printTable(
+  ['impl', 'cur ns/call', 'hist ns/call', '10k cur ms', '10k hist ms', 'formatters'],
+  oneRows.map((r) => [r.id, r.curNs, r.histNs, r.curMs, r.histMs, r.formatters])
 );
 
 // strategy/feature comparison matrix: features as rows, impls as columns

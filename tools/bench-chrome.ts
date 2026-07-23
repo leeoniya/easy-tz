@@ -18,7 +18,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { minifiedSizes } from '../bench/size.ts';
 import { bundleBrowserEntry, bundleLibBrowserEntry, launchChrome } from './chrome-harness.ts';
 import { printTable } from './print-table.ts';
-import type { BenchResult } from './bench-browser-entry.ts';
+import { GETONE_ZONE, GETONE_CALLS, GETONE_STEP_HOURS } from './bench-config.ts';
+import type { BenchResult, BenchOneResult } from './bench-browser-entry.ts';
 
 // sum of VmRSS across this browser's renderer processes (Linux /proc scan)
 function rendererRssBytes(): number | null {
@@ -139,6 +140,41 @@ try {
       Number.isNaN(r.coldMs) ? '-' : String(r.formatters),
       r.rendererMB === null ? 'n/a' : r.rendererMB.toFixed(2),
       ((sizes.get(r.id) ?? 0) / 1024).toFixed(1),
+    ])
+  );
+
+  // single-zone getTimeZoneAt() sweep — this repo's impls only (the comparison
+  // libraries expose no equivalent single-zone API). Each runs in a fresh page
+  // so its formatter count reflects just this workload.
+  const oneResults: BenchOneResult[] = [];
+
+  for (const id of mainIds) {
+    try {
+      const page = await browser.newPage();
+      await page.evaluate(mainCode);
+      const r = (await page.evaluate(`__benchOne(${JSON.stringify(id)})`)) as BenchOneResult;
+      await page.close();
+
+      if (r.supported) oneResults.push(r);
+    } catch (e) {
+      console.error(`${id}: getTimeZoneAt bench failed in-browser (${(e as Error).message.split('\n')[0]!.slice(0, 80)})`);
+    }
+  }
+
+  console.log(`\nsingle-zone getTimeZoneAt(): ${GETONE_ZONE}, ${GETONE_CALLS} timestamps/sweep (${GETONE_STEP_HOURS}h step)\n`);
+
+  // cur/hist ns are per-call; 10k ms are the totals for each sweep. hist routes
+  // 07 through the baked era resolver and (on this Temporal runtime) 10 through
+  // live Temporal. formatters: one per zone for the live-Intl impls, none baked.
+  printTable(
+    ['impl', 'cur ns/call', 'hist ns/call', '10k cur ms', '10k hist ms', 'formatters'],
+    oneResults.map((r) => [
+      r.id,
+      ((r.curMs * 1e6) / r.calls).toFixed(0),
+      ((r.histMs * 1e6) / r.calls).toFixed(0),
+      r.curMs.toFixed(2),
+      r.histMs.toFixed(2),
+      String(r.formatters),
     ])
   );
 

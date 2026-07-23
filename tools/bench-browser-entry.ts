@@ -14,11 +14,11 @@ import { getInitInfo } from '../impls/08-verified-sharing/index.ts';
 import { scheduleClasses } from '../shared/schedule.ts';
 import { installKernel } from './browser-kernel.ts';
 
-export type { BenchResult, ValidateResult, Vs04 } from './browser-kernel.ts';
+export type { BenchResult, BenchOneResult, ValidateResult, Vs04 } from './browser-kernel.ts';
 
 const impl04 = impls.find((i) => i.id === '04-live-intl')!;
 
-installKernel(impls, impl04, (id) => (id === '08-verified-sharing' ? getInitInfo() : undefined));
+installKernel(impls, impl04, (id) => (id === '08-verified-sharing' ? getInitInfo() : null));
 
 (globalThis as { __implIds?: string[] }).__implIds = impls.map((i) => i.id);
 

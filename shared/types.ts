@@ -30,4 +30,8 @@ export interface Impl {
   // the benchmark; all impls must use the same keys in the same order
   features: Record<string, string>;
   getTimeZonesAt: GetTimeZonesAt;
+  // single-zone resolver, present only on this repo's impls (the comparison
+  // libraries expose no such API); the getTimeZoneAt benchmark iterates only
+  // impls that define it
+  getTimeZoneAt?: GetTimeZoneAt;
 }
