@@ -58,9 +58,9 @@ component. A small, fast replacement did not exist for this purpose (see
 My [first attempt](https://github.com/leeoniya/timezones) split the
 difference with a generated offset→abbreviation lookup plus live Intl
 offsets. The implementations here further explore the full live-to-baked spectrum,
-ending in `07-baked-rules`: vs moment-timezone it cuts cold start ~80x
-(24.8ms → 0.3ms) and memory ~3x (22MB → 6.5MB) at ~1.3% of the bundle size
-(773.5KB → 10.2KB), while passing all 62 edge-case fixtures and improving
+ending in `07-baked-rules`: vs moment-timezone it cuts cold start ~40x
+(24.3ms → 0.6ms) and memory ~3x (22.5MB → 7.3MB) at ~3% of the bundle size
+(768KB → 23.8KB), while passing all 62 edge-case fixtures and improving
 abbreviation coverage for 159 zones where modern tzdata dropped letter
 abbreviations (Santiago CLT/CLST, Kathmandu NPT, Chatham CHAST/CHADT,
 Kiritimati LINT, Lord Howe LHST/LHDT, Istanbul TRT, …).
@@ -73,10 +73,35 @@ until `04-live-intl` ships no generated data at all.
 
 | impl | trust model | cold ms | miss ms | rss MB | bundle KB |
 |---|---|--:|--:|--:|--:|
-| `07-baked-rules` | trusts baked tables completely | 0.3 | <0.1 | 6.5 | 10.2 |
-| `10-audited-rules` | baked tables, Temporal-audited at first call; failing zones recovered live | 2.3 | <0.1 | 7.4 | 11.7 |
-| `08-verified-sharing` | live Intl values; baked data only hints formatter sharing, Temporal-verified at first call | 22.2 | 0.6 | 18.4 | 10.6 |
-| `04-live-intl` | fully live — no generated data to trust | 38.9 | 1.4 | 25.6 | 6.3 |
+| `07-baked-rules` | trusts baked tables completely | 0.6 | <0.1 | 7.3 | 23.8 |
+| `10-audited-rules` | baked tables, Temporal-audited at first call; failing zones recovered live | 6.2 | <0.1 | 9.2 | 25.6 |
+| `08-verified-sharing` | live Intl values; baked data only hints formatter sharing, Temporal-verified at first call | 26.0 | 0.7 | 20.5 | 11.7 |
+| `04-live-intl` | fully live — no generated data to trust | 42.3 | 1.4 | 27.8 | 7.3 |
+
+Full-list `getTimeZonesAt()`, measured on chrome-headless-shell (the primary
+target) via `bun run bench`. `cold` is the first call; `miss` an hour-bucket
+recompute; `hit` (not shown) is ~0.01-0.03µs on cache repeats. `bundle` is
+minified, not gzipped (`07`/`10` carry the [1995+ history eras](#historical-coverage-1995);
+gzip roughly halves them: `07` ≈ 11.7KB).
+
+### Single-zone lookups
+
+`getTimeZoneAt(name, timestamp)` resolves one zone without building the full
+list — the single-zone / many-timestamps counterpart. Same ordering,
+sweeping `America/New_York` across 10,000 timestamps (6h step), timed in a
+current (projected) year and a historical one:
+
+| impl | cur ns/call | hist ns/call | formatters |
+|---|--:|--:|--:|
+| `07-baked-rules` | 310 | 310 | 0 |
+| `10-audited-rules` | 420 | 1940 | 0 |
+| `08-verified-sharing` | 3480 | 3260 | 1 |
+| `04-live-intl` | 3640 | 3420 | 1 |
+
+Baked history costs `07` nothing extra — 310ns whether the instant is past or
+present. On a Temporal runtime `10` resolves the past live (Temporal is
+authoritative for history), hence its heavier `hist`; the live impls build one
+formatter for the zone and reuse it across the whole sweep either way.
 
 <details>
 <summary><b>Implementation details</b> — strategies and per-impl notes</summary>
@@ -141,8 +166,8 @@ for curated-quality recovery labels.)
 
 `08-verified-sharing` applies the same verify-at-first-call idea but flips
 the trust model: values always come from live Intl, and the generated class
-table is demoted to a *hint* about which zones can share one formatter (188
-formatters instead of 445, cutting 04's cold start roughly in half). At
+table is demoted to a *hint* about which zones can share one formatter (180
+formatters instead of 433, cutting 04's cold start by ~40%). At
 first call each group member's exact offset behavior for the year is
 compared against its representative's via Temporal's transition walk
 (`getTimeZoneTransition`, no formatters, ~4-5ms once), and diverged members
@@ -186,8 +211,8 @@ falls outside it, so only same-bucket repeats hit — suited to clock-driven
 queries near "now". The underlying compute always runs at the bucket start,
 so DST transitions (hour-aligned in UTC for nearly all zones) resolve
 deterministically at bucket boundaries. Cache hits return the same array
-reference — treat results as immutable. Hits cost ~0.1-0.3µs vs a miss's
-~1-4ms (live impls) or ~0.05-0.1ms (baked impls); `tests/cache.test.ts`
+reference — treat results as immutable. Hits cost ~0.01-0.3µs vs a miss's
+~0.7-5ms (live impls) or <0.1ms (baked impls); `tests/cache.test.ts`
 benches hit and miss loops separately for every impl.
 
 </details>
