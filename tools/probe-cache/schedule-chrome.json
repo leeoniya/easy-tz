@@ -1,0 +1,2098 @@
+{
+"schema":2,
+"fingerprint":"6xotz1rce1",
+"from":2026,
+"to":2028,
+"segs":{
+"Africa/Abidjan":{
+"2026":"0:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time"
+},
+"Africa/Accra":{
+"2026":"0:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time"
+},
+"Africa/Addis_Ababa":{
+"2026":"0:180:East Africa Time",
+"2027":"0:180:East Africa Time",
+"2028":"0:180:East Africa Time"
+},
+"Africa/Algiers":{
+"2026":"0:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time"
+},
+"Africa/Asmera":{
+"2026":"0:180:East Africa Time",
+"2027":"0:180:East Africa Time",
+"2028":"0:180:East Africa Time"
+},
+"Africa/Bamako":{
+"2026":"0:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time"
+},
+"Africa/Bangui":{
+"2026":"0:60:West Africa Time",
+"2027":"0:60:West Africa Time",
+"2028":"0:60:West Africa Time"
+},
+"Africa/Banjul":{
+"2026":"0:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time"
+},
+"Africa/Bissau":{
+"2026":"0:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time"
+},
+"Africa/Blantyre":{
+"2026":"0:120:Central Africa Time",
+"2027":"0:120:Central Africa Time",
+"2028":"0:120:Central Africa Time"
+},
+"Africa/Brazzaville":{
+"2026":"0:60:West Africa Time",
+"2027":"0:60:West Africa Time",
+"2028":"0:60:West Africa Time"
+},
+"Africa/Bujumbura":{
+"2026":"0:120:Central Africa Time",
+"2027":"0:120:Central Africa Time",
+"2028":"0:120:Central Africa Time"
+},
+"Africa/Cairo":{
+"2026":"0:120:Eastern European Standard Time;10840:180:Eastern European Summer Time;28980:120:Eastern European Standard Time",
+"2027":"0:120:Eastern European Standard Time;11416:180:Eastern European Summer Time;28884:120:Eastern European Standard Time",
+"2028":"0:120:Eastern European Standard Time;11320:180:Eastern European Summer Time;28788:120:Eastern European Standard Time"
+},
+"Africa/Casablanca":{
+"2026":"0:60:GMT+01:00;4328:0:GMT+00:00;7688:60:GMT+01:00",
+"2027":"0:60:GMT+01:00;3560:0:GMT+00:00;6920:60:GMT+01:00",
+"2028":"0:60:GMT+01:00;2120:0:GMT+00:00;6152:60:GMT+01:00"
+},
+"Africa/Ceuta":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Africa/Conakry":{
+"2026":"0:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time"
+},
+"Africa/Dakar":{
+"2026":"0:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time"
+},
+"Africa/Dar_es_Salaam":{
+"2026":"0:180:East Africa Time",
+"2027":"0:180:East Africa Time",
+"2028":"0:180:East Africa Time"
+},
+"Africa/Djibouti":{
+"2026":"0:180:East Africa Time",
+"2027":"0:180:East Africa Time",
+"2028":"0:180:East Africa Time"
+},
+"Africa/Douala":{
+"2026":"0:60:West Africa Time",
+"2027":"0:60:West Africa Time",
+"2028":"0:60:West Africa Time"
+},
+"Africa/El_Aaiun":{
+"2026":"0:60:GMT+01:00;4328:0:GMT+00:00;7688:60:GMT+01:00",
+"2027":"0:60:GMT+01:00;3560:0:GMT+00:00;6920:60:GMT+01:00",
+"2028":"0:60:GMT+01:00;2120:0:GMT+00:00;6152:60:GMT+01:00"
+},
+"Africa/Freetown":{
+"2026":"0:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time"
+},
+"Africa/Gaborone":{
+"2026":"0:120:Central Africa Time",
+"2027":"0:120:Central Africa Time",
+"2028":"0:120:Central Africa Time"
+},
+"Africa/Harare":{
+"2026":"0:120:Central Africa Time",
+"2027":"0:120:Central Africa Time",
+"2028":"0:120:Central Africa Time"
+},
+"Africa/Johannesburg":{
+"2026":"0:120:South Africa Standard Time",
+"2027":"0:120:South Africa Standard Time",
+"2028":"0:120:South Africa Standard Time"
+},
+"Africa/Juba":{
+"2026":"0:120:Central Africa Time",
+"2027":"0:120:Central Africa Time",
+"2028":"0:120:Central Africa Time"
+},
+"Africa/Kampala":{
+"2026":"0:180:East Africa Time",
+"2027":"0:180:East Africa Time",
+"2028":"0:180:East Africa Time"
+},
+"Africa/Khartoum":{
+"2026":"0:120:Central Africa Time",
+"2027":"0:120:Central Africa Time",
+"2028":"0:120:Central Africa Time"
+},
+"Africa/Kigali":{
+"2026":"0:120:Central Africa Time",
+"2027":"0:120:Central Africa Time",
+"2028":"0:120:Central Africa Time"
+},
+"Africa/Kinshasa":{
+"2026":"0:60:West Africa Time",
+"2027":"0:60:West Africa Time",
+"2028":"0:60:West Africa Time"
+},
+"Africa/Lagos":{
+"2026":"0:60:West Africa Time",
+"2027":"0:60:West Africa Time",
+"2028":"0:60:West Africa Time"
+},
+"Africa/Libreville":{
+"2026":"0:60:West Africa Time",
+"2027":"0:60:West Africa Time",
+"2028":"0:60:West Africa Time"
+},
+"Africa/Lome":{
+"2026":"0:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time"
+},
+"Africa/Luanda":{
+"2026":"0:60:West Africa Time",
+"2027":"0:60:West Africa Time",
+"2028":"0:60:West Africa Time"
+},
+"Africa/Lubumbashi":{
+"2026":"0:120:Central Africa Time",
+"2027":"0:120:Central Africa Time",
+"2028":"0:120:Central Africa Time"
+},
+"Africa/Lusaka":{
+"2026":"0:120:Central Africa Time",
+"2027":"0:120:Central Africa Time",
+"2028":"0:120:Central Africa Time"
+},
+"Africa/Malabo":{
+"2026":"0:60:West Africa Time",
+"2027":"0:60:West Africa Time",
+"2028":"0:60:West Africa Time"
+},
+"Africa/Maputo":{
+"2026":"0:120:Central Africa Time",
+"2027":"0:120:Central Africa Time",
+"2028":"0:120:Central Africa Time"
+},
+"Africa/Maseru":{
+"2026":"0:120:South Africa Standard Time",
+"2027":"0:120:South Africa Standard Time",
+"2028":"0:120:South Africa Standard Time"
+},
+"Africa/Mbabane":{
+"2026":"0:120:South Africa Standard Time",
+"2027":"0:120:South Africa Standard Time",
+"2028":"0:120:South Africa Standard Time"
+},
+"Africa/Mogadishu":{
+"2026":"0:180:East Africa Time",
+"2027":"0:180:East Africa Time",
+"2028":"0:180:East Africa Time"
+},
+"Africa/Monrovia":{
+"2026":"0:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time"
+},
+"Africa/Nairobi":{
+"2026":"0:180:East Africa Time",
+"2027":"0:180:East Africa Time",
+"2028":"0:180:East Africa Time"
+},
+"Africa/Ndjamena":{
+"2026":"0:60:West Africa Time",
+"2027":"0:60:West Africa Time",
+"2028":"0:60:West Africa Time"
+},
+"Africa/Niamey":{
+"2026":"0:60:West Africa Time",
+"2027":"0:60:West Africa Time",
+"2028":"0:60:West Africa Time"
+},
+"Africa/Nouakchott":{
+"2026":"0:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time"
+},
+"Africa/Ouagadougou":{
+"2026":"0:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time"
+},
+"Africa/Porto-Novo":{
+"2026":"0:60:West Africa Time",
+"2027":"0:60:West Africa Time",
+"2028":"0:60:West Africa Time"
+},
+"Africa/Sao_Tome":{
+"2026":"0:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time"
+},
+"Africa/Tripoli":{
+"2026":"0:120:Eastern European Standard Time",
+"2027":"0:120:Eastern European Standard Time",
+"2028":"0:120:Eastern European Standard Time"
+},
+"Africa/Tunis":{
+"2026":"0:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time"
+},
+"Africa/Windhoek":{
+"2026":"0:120:Central Africa Time",
+"2027":"0:120:Central Africa Time",
+"2028":"0:120:Central Africa Time"
+},
+"America/Adak":{
+"2026":"0:-600:Hawaii-Aleutian Standard Time;6384:-540:Hawaii-Aleutian Daylight Time;29228:-600:Hawaii-Aleutian Standard Time",
+"2027":"0:-600:Hawaii-Aleutian Standard Time;6960:-540:Hawaii-Aleutian Daylight Time;29804:-600:Hawaii-Aleutian Standard Time",
+"2028":"0:-600:Hawaii-Aleutian Standard Time;6864:-540:Hawaii-Aleutian Daylight Time;29708:-600:Hawaii-Aleutian Standard Time"
+},
+"America/Anchorage":{
+"2026":"0:-540:Alaska Standard Time;6380:-480:Alaska Daylight Time;29224:-540:Alaska Standard Time",
+"2027":"0:-540:Alaska Standard Time;6956:-480:Alaska Daylight Time;29800:-540:Alaska Standard Time",
+"2028":"0:-540:Alaska Standard Time;6860:-480:Alaska Daylight Time;29704:-540:Alaska Standard Time"
+},
+"America/Anguilla":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/Antigua":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/Araguaina":{
+"2026":"0:-180:Brasilia Standard Time",
+"2027":"0:-180:Brasilia Standard Time",
+"2028":"0:-180:Brasilia Standard Time"
+},
+"America/Argentina/La_Rioja":{
+"2026":"0:-180:Argentina Standard Time",
+"2027":"0:-180:Argentina Standard Time",
+"2028":"0:-180:Argentina Standard Time"
+},
+"America/Argentina/Rio_Gallegos":{
+"2026":"0:-180:Argentina Standard Time",
+"2027":"0:-180:Argentina Standard Time",
+"2028":"0:-180:Argentina Standard Time"
+},
+"America/Argentina/Salta":{
+"2026":"0:-180:Argentina Standard Time",
+"2027":"0:-180:Argentina Standard Time",
+"2028":"0:-180:Argentina Standard Time"
+},
+"America/Argentina/San_Juan":{
+"2026":"0:-180:Argentina Standard Time",
+"2027":"0:-180:Argentina Standard Time",
+"2028":"0:-180:Argentina Standard Time"
+},
+"America/Argentina/San_Luis":{
+"2026":"0:-180:Argentina Standard Time",
+"2027":"0:-180:Argentina Standard Time",
+"2028":"0:-180:Argentina Standard Time"
+},
+"America/Argentina/Tucuman":{
+"2026":"0:-180:Argentina Standard Time",
+"2027":"0:-180:Argentina Standard Time",
+"2028":"0:-180:Argentina Standard Time"
+},
+"America/Argentina/Ushuaia":{
+"2026":"0:-180:Argentina Standard Time",
+"2027":"0:-180:Argentina Standard Time",
+"2028":"0:-180:Argentina Standard Time"
+},
+"America/Aruba":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/Asuncion":{
+"2026":"0:-180:Paraguay Standard Time",
+"2027":"0:-180:Paraguay Standard Time",
+"2028":"0:-180:Paraguay Standard Time"
+},
+"America/Bahia":{
+"2026":"0:-180:Brasilia Standard Time",
+"2027":"0:-180:Brasilia Standard Time",
+"2028":"0:-180:Brasilia Standard Time"
+},
+"America/Bahia_Banderas":{
+"2026":"0:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time"
+},
+"America/Barbados":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/Belem":{
+"2026":"0:-180:Brasilia Standard Time",
+"2027":"0:-180:Brasilia Standard Time",
+"2028":"0:-180:Brasilia Standard Time"
+},
+"America/Belize":{
+"2026":"0:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time"
+},
+"America/Blanc-Sablon":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/Boa_Vista":{
+"2026":"0:-240:Amazon Standard Time",
+"2027":"0:-240:Amazon Standard Time",
+"2028":"0:-240:Amazon Standard Time"
+},
+"America/Bogota":{
+"2026":"0:-300:Colombia Standard Time",
+"2027":"0:-300:Colombia Standard Time",
+"2028":"0:-300:Colombia Standard Time"
+},
+"America/Boise":{
+"2026":"0:-420:Mountain Standard Time;6372:-360:Mountain Daylight Time;29216:-420:Mountain Standard Time",
+"2027":"0:-420:Mountain Standard Time;6948:-360:Mountain Daylight Time;29792:-420:Mountain Standard Time",
+"2028":"0:-420:Mountain Standard Time;6852:-360:Mountain Daylight Time;29696:-420:Mountain Standard Time"
+},
+"America/Buenos_Aires":{
+"2026":"0:-180:Argentina Standard Time",
+"2027":"0:-180:Argentina Standard Time",
+"2028":"0:-180:Argentina Standard Time"
+},
+"America/Cambridge_Bay":{
+"2026":"0:-420:Mountain Standard Time;6372:-360:Mountain Daylight Time;29216:-420:Mountain Standard Time",
+"2027":"0:-420:Mountain Standard Time;6948:-360:Mountain Daylight Time;29792:-420:Mountain Standard Time",
+"2028":"0:-420:Mountain Standard Time;6852:-360:Mountain Daylight Time;29696:-420:Mountain Standard Time"
+},
+"America/Campo_Grande":{
+"2026":"0:-240:Amazon Standard Time",
+"2027":"0:-240:Amazon Standard Time",
+"2028":"0:-240:Amazon Standard Time"
+},
+"America/Cancun":{
+"2026":"0:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time"
+},
+"America/Caracas":{
+"2026":"0:-240:Venezuela Time",
+"2027":"0:-240:Venezuela Time",
+"2028":"0:-240:Venezuela Time"
+},
+"America/Catamarca":{
+"2026":"0:-180:Argentina Standard Time",
+"2027":"0:-180:Argentina Standard Time",
+"2028":"0:-180:Argentina Standard Time"
+},
+"America/Cayenne":{
+"2026":"0:-180:French Guiana Time",
+"2027":"0:-180:French Guiana Time",
+"2028":"0:-180:French Guiana Time"
+},
+"America/Cayman":{
+"2026":"0:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time"
+},
+"America/Chicago":{
+"2026":"0:-360:Central Standard Time;6368:-300:Central Daylight Time;29212:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time;6944:-300:Central Daylight Time;29788:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time;6848:-300:Central Daylight Time;29692:-360:Central Standard Time"
+},
+"America/Chihuahua":{
+"2026":"0:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time"
+},
+"America/Ciudad_Juarez":{
+"2026":"0:-420:Mountain Standard Time;6372:-360:Mountain Daylight Time;29216:-420:Mountain Standard Time",
+"2027":"0:-420:Mountain Standard Time;6948:-360:Mountain Daylight Time;29792:-420:Mountain Standard Time",
+"2028":"0:-420:Mountain Standard Time;6852:-360:Mountain Daylight Time;29696:-420:Mountain Standard Time"
+},
+"America/Coral_Harbour":{
+"2026":"0:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time"
+},
+"America/Cordoba":{
+"2026":"0:-180:Argentina Standard Time",
+"2027":"0:-180:Argentina Standard Time",
+"2028":"0:-180:Argentina Standard Time"
+},
+"America/Costa_Rica":{
+"2026":"0:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time"
+},
+"America/Coyhaique":{
+"2026":"0:-180:GMT-03:00",
+"2027":"0:-180:GMT-03:00",
+"2028":"0:-180:GMT-03:00"
+},
+"America/Creston":{
+"2026":"0:-420:Mountain Standard Time",
+"2027":"0:-420:Mountain Standard Time",
+"2028":"0:-420:Mountain Standard Time"
+},
+"America/Cuiaba":{
+"2026":"0:-240:Amazon Standard Time",
+"2027":"0:-240:Amazon Standard Time",
+"2028":"0:-240:Amazon Standard Time"
+},
+"America/Curacao":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/Danmarkshavn":{
+"2026":"0:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time"
+},
+"America/Dawson":{
+"2026":"0:-420:Yukon Time",
+"2027":"0:-420:Yukon Time",
+"2028":"0:-420:Yukon Time"
+},
+"America/Dawson_Creek":{
+"2026":"0:-420:Mountain Standard Time",
+"2027":"0:-420:Mountain Standard Time",
+"2028":"0:-420:Mountain Standard Time"
+},
+"America/Denver":{
+"2026":"0:-420:Mountain Standard Time;6372:-360:Mountain Daylight Time;29216:-420:Mountain Standard Time",
+"2027":"0:-420:Mountain Standard Time;6948:-360:Mountain Daylight Time;29792:-420:Mountain Standard Time",
+"2028":"0:-420:Mountain Standard Time;6852:-360:Mountain Daylight Time;29696:-420:Mountain Standard Time"
+},
+"America/Detroit":{
+"2026":"0:-300:Eastern Standard Time;6364:-240:Eastern Daylight Time;29208:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time;6940:-240:Eastern Daylight Time;29784:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time;6844:-240:Eastern Daylight Time;29688:-300:Eastern Standard Time"
+},
+"America/Dominica":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/Edmonton":{
+"2026":"0:-420:Mountain Standard Time;6372:-360:Mountain Daylight Time;29216:-420:Mountain Standard Time",
+"2027":"0:-420:Mountain Standard Time;6948:-360:Mountain Daylight Time;29792:-420:Mountain Standard Time",
+"2028":"0:-420:Mountain Standard Time;6852:-360:Mountain Daylight Time;29696:-420:Mountain Standard Time"
+},
+"America/Eirunepe":{
+"2026":"0:-300:Acre Standard Time",
+"2027":"0:-300:Acre Standard Time",
+"2028":"0:-300:Acre Standard Time"
+},
+"America/El_Salvador":{
+"2026":"0:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time"
+},
+"America/Fort_Nelson":{
+"2026":"0:-420:Mountain Standard Time",
+"2027":"0:-420:Mountain Standard Time",
+"2028":"0:-420:Mountain Standard Time"
+},
+"America/Fortaleza":{
+"2026":"0:-180:Brasilia Standard Time",
+"2027":"0:-180:Brasilia Standard Time",
+"2028":"0:-180:Brasilia Standard Time"
+},
+"America/Glace_Bay":{
+"2026":"0:-240:Atlantic Standard Time;6360:-180:Atlantic Daylight Time;29204:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time;6936:-180:Atlantic Daylight Time;29780:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time;6840:-180:Atlantic Daylight Time;29684:-240:Atlantic Standard Time"
+},
+"America/Godthab":{
+"2026":"0:-120:Greenland Standard Time;8356:-60:Greenland Summer Time;28516:-120:Greenland Standard Time",
+"2027":"0:-120:Greenland Standard Time;8260:-60:Greenland Summer Time;29092:-120:Greenland Standard Time",
+"2028":"0:-120:Greenland Standard Time;8164:-60:Greenland Summer Time;28996:-120:Greenland Standard Time"
+},
+"America/Goose_Bay":{
+"2026":"0:-240:Atlantic Standard Time;6360:-180:Atlantic Daylight Time;29204:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time;6936:-180:Atlantic Daylight Time;29780:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time;6840:-180:Atlantic Daylight Time;29684:-240:Atlantic Standard Time"
+},
+"America/Grand_Turk":{
+"2026":"0:-300:Eastern Standard Time;6364:-240:Eastern Daylight Time;29208:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time;6940:-240:Eastern Daylight Time;29784:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time;6844:-240:Eastern Daylight Time;29688:-300:Eastern Standard Time"
+},
+"America/Grenada":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/Guadeloupe":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/Guatemala":{
+"2026":"0:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time"
+},
+"America/Guayaquil":{
+"2026":"0:-300:Ecuador Time",
+"2027":"0:-300:Ecuador Time",
+"2028":"0:-300:Ecuador Time"
+},
+"America/Guyana":{
+"2026":"0:-240:Guyana Time",
+"2027":"0:-240:Guyana Time",
+"2028":"0:-240:Guyana Time"
+},
+"America/Halifax":{
+"2026":"0:-240:Atlantic Standard Time;6360:-180:Atlantic Daylight Time;29204:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time;6936:-180:Atlantic Daylight Time;29780:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time;6840:-180:Atlantic Daylight Time;29684:-240:Atlantic Standard Time"
+},
+"America/Havana":{
+"2026":"0:-300:Cuba Standard Time;6356:-240:Cuba Daylight Time;29204:-300:Cuba Standard Time",
+"2027":"0:-300:Cuba Standard Time;6932:-240:Cuba Daylight Time;29780:-300:Cuba Standard Time",
+"2028":"0:-300:Cuba Standard Time;6836:-240:Cuba Daylight Time;29684:-300:Cuba Standard Time"
+},
+"America/Hermosillo":{
+"2026":"0:-420:Mexican Pacific Standard Time",
+"2027":"0:-420:Mexican Pacific Standard Time",
+"2028":"0:-420:Mexican Pacific Standard Time"
+},
+"America/Indiana/Knox":{
+"2026":"0:-360:Central Standard Time;6368:-300:Central Daylight Time;29212:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time;6944:-300:Central Daylight Time;29788:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time;6848:-300:Central Daylight Time;29692:-360:Central Standard Time"
+},
+"America/Indiana/Marengo":{
+"2026":"0:-300:Eastern Standard Time;6364:-240:Eastern Daylight Time;29208:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time;6940:-240:Eastern Daylight Time;29784:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time;6844:-240:Eastern Daylight Time;29688:-300:Eastern Standard Time"
+},
+"America/Indiana/Petersburg":{
+"2026":"0:-300:Eastern Standard Time;6364:-240:Eastern Daylight Time;29208:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time;6940:-240:Eastern Daylight Time;29784:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time;6844:-240:Eastern Daylight Time;29688:-300:Eastern Standard Time"
+},
+"America/Indiana/Tell_City":{
+"2026":"0:-360:Central Standard Time;6368:-300:Central Daylight Time;29212:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time;6944:-300:Central Daylight Time;29788:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time;6848:-300:Central Daylight Time;29692:-360:Central Standard Time"
+},
+"America/Indiana/Vevay":{
+"2026":"0:-300:Eastern Standard Time;6364:-240:Eastern Daylight Time;29208:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time;6940:-240:Eastern Daylight Time;29784:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time;6844:-240:Eastern Daylight Time;29688:-300:Eastern Standard Time"
+},
+"America/Indiana/Vincennes":{
+"2026":"0:-300:Eastern Standard Time;6364:-240:Eastern Daylight Time;29208:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time;6940:-240:Eastern Daylight Time;29784:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time;6844:-240:Eastern Daylight Time;29688:-300:Eastern Standard Time"
+},
+"America/Indiana/Winamac":{
+"2026":"0:-300:Eastern Standard Time;6364:-240:Eastern Daylight Time;29208:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time;6940:-240:Eastern Daylight Time;29784:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time;6844:-240:Eastern Daylight Time;29688:-300:Eastern Standard Time"
+},
+"America/Indianapolis":{
+"2026":"0:-300:Eastern Standard Time;6364:-240:Eastern Daylight Time;29208:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time;6940:-240:Eastern Daylight Time;29784:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time;6844:-240:Eastern Daylight Time;29688:-300:Eastern Standard Time"
+},
+"America/Inuvik":{
+"2026":"0:-420:Mountain Standard Time;6372:-360:Mountain Daylight Time;29216:-420:Mountain Standard Time",
+"2027":"0:-420:Mountain Standard Time;6948:-360:Mountain Daylight Time;29792:-420:Mountain Standard Time",
+"2028":"0:-420:Mountain Standard Time;6852:-360:Mountain Daylight Time;29696:-420:Mountain Standard Time"
+},
+"America/Iqaluit":{
+"2026":"0:-300:Eastern Standard Time;6364:-240:Eastern Daylight Time;29208:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time;6940:-240:Eastern Daylight Time;29784:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time;6844:-240:Eastern Daylight Time;29688:-300:Eastern Standard Time"
+},
+"America/Jamaica":{
+"2026":"0:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time"
+},
+"America/Jujuy":{
+"2026":"0:-180:Argentina Standard Time",
+"2027":"0:-180:Argentina Standard Time",
+"2028":"0:-180:Argentina Standard Time"
+},
+"America/Juneau":{
+"2026":"0:-540:Alaska Standard Time;6380:-480:Alaska Daylight Time;29224:-540:Alaska Standard Time",
+"2027":"0:-540:Alaska Standard Time;6956:-480:Alaska Daylight Time;29800:-540:Alaska Standard Time",
+"2028":"0:-540:Alaska Standard Time;6860:-480:Alaska Daylight Time;29704:-540:Alaska Standard Time"
+},
+"America/Kentucky/Monticello":{
+"2026":"0:-300:Eastern Standard Time;6364:-240:Eastern Daylight Time;29208:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time;6940:-240:Eastern Daylight Time;29784:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time;6844:-240:Eastern Daylight Time;29688:-300:Eastern Standard Time"
+},
+"America/Kralendijk":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/La_Paz":{
+"2026":"0:-240:Bolivia Time",
+"2027":"0:-240:Bolivia Time",
+"2028":"0:-240:Bolivia Time"
+},
+"America/Lima":{
+"2026":"0:-300:Peru Standard Time",
+"2027":"0:-300:Peru Standard Time",
+"2028":"0:-300:Peru Standard Time"
+},
+"America/Los_Angeles":{
+"2026":"0:-480:Pacific Standard Time;6376:-420:Pacific Daylight Time;29220:-480:Pacific Standard Time",
+"2027":"0:-480:Pacific Standard Time;6952:-420:Pacific Daylight Time;29796:-480:Pacific Standard Time",
+"2028":"0:-480:Pacific Standard Time;6856:-420:Pacific Daylight Time;29700:-480:Pacific Standard Time"
+},
+"America/Louisville":{
+"2026":"0:-300:Eastern Standard Time;6364:-240:Eastern Daylight Time;29208:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time;6940:-240:Eastern Daylight Time;29784:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time;6844:-240:Eastern Daylight Time;29688:-300:Eastern Standard Time"
+},
+"America/Lower_Princes":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/Maceio":{
+"2026":"0:-180:Brasilia Standard Time",
+"2027":"0:-180:Brasilia Standard Time",
+"2028":"0:-180:Brasilia Standard Time"
+},
+"America/Managua":{
+"2026":"0:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time"
+},
+"America/Manaus":{
+"2026":"0:-240:Amazon Standard Time",
+"2027":"0:-240:Amazon Standard Time",
+"2028":"0:-240:Amazon Standard Time"
+},
+"America/Marigot":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/Martinique":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/Matamoros":{
+"2026":"0:-360:Central Standard Time;6368:-300:Central Daylight Time;29212:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time;6944:-300:Central Daylight Time;29788:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time;6848:-300:Central Daylight Time;29692:-360:Central Standard Time"
+},
+"America/Mazatlan":{
+"2026":"0:-420:Mexican Pacific Standard Time",
+"2027":"0:-420:Mexican Pacific Standard Time",
+"2028":"0:-420:Mexican Pacific Standard Time"
+},
+"America/Mendoza":{
+"2026":"0:-180:Argentina Standard Time",
+"2027":"0:-180:Argentina Standard Time",
+"2028":"0:-180:Argentina Standard Time"
+},
+"America/Menominee":{
+"2026":"0:-360:Central Standard Time;6368:-300:Central Daylight Time;29212:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time;6944:-300:Central Daylight Time;29788:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time;6848:-300:Central Daylight Time;29692:-360:Central Standard Time"
+},
+"America/Merida":{
+"2026":"0:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time"
+},
+"America/Metlakatla":{
+"2026":"0:-540:Alaska Standard Time;6380:-480:Alaska Daylight Time;29224:-540:Alaska Standard Time",
+"2027":"0:-540:Alaska Standard Time;6956:-480:Alaska Daylight Time;29800:-540:Alaska Standard Time",
+"2028":"0:-540:Alaska Standard Time;6860:-480:Alaska Daylight Time;29704:-540:Alaska Standard Time"
+},
+"America/Mexico_City":{
+"2026":"0:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time"
+},
+"America/Miquelon":{
+"2026":"0:-180:St. Pierre & Miquelon Standard Time;6356:-120:St. Pierre & Miquelon Daylight Time;29200:-180:St. Pierre & Miquelon Standard Time",
+"2027":"0:-180:St. Pierre & Miquelon Standard Time;6932:-120:St. Pierre & Miquelon Daylight Time;29776:-180:St. Pierre & Miquelon Standard Time",
+"2028":"0:-180:St. Pierre & Miquelon Standard Time;6836:-120:St. Pierre & Miquelon Daylight Time;29680:-180:St. Pierre & Miquelon Standard Time"
+},
+"America/Moncton":{
+"2026":"0:-240:Atlantic Standard Time;6360:-180:Atlantic Daylight Time;29204:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time;6936:-180:Atlantic Daylight Time;29780:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time;6840:-180:Atlantic Daylight Time;29684:-240:Atlantic Standard Time"
+},
+"America/Monterrey":{
+"2026":"0:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time"
+},
+"America/Montevideo":{
+"2026":"0:-180:Uruguay Standard Time",
+"2027":"0:-180:Uruguay Standard Time",
+"2028":"0:-180:Uruguay Standard Time"
+},
+"America/Montserrat":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/Nassau":{
+"2026":"0:-300:Eastern Standard Time;6364:-240:Eastern Daylight Time;29208:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time;6940:-240:Eastern Daylight Time;29784:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time;6844:-240:Eastern Daylight Time;29688:-300:Eastern Standard Time"
+},
+"America/New_York":{
+"2026":"0:-300:Eastern Standard Time;6364:-240:Eastern Daylight Time;29208:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time;6940:-240:Eastern Daylight Time;29784:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time;6844:-240:Eastern Daylight Time;29688:-300:Eastern Standard Time"
+},
+"America/Nome":{
+"2026":"0:-540:Alaska Standard Time;6380:-480:Alaska Daylight Time;29224:-540:Alaska Standard Time",
+"2027":"0:-540:Alaska Standard Time;6956:-480:Alaska Daylight Time;29800:-540:Alaska Standard Time",
+"2028":"0:-540:Alaska Standard Time;6860:-480:Alaska Daylight Time;29704:-540:Alaska Standard Time"
+},
+"America/Noronha":{
+"2026":"0:-120:Fernando de Noronha Standard Time",
+"2027":"0:-120:Fernando de Noronha Standard Time",
+"2028":"0:-120:Fernando de Noronha Standard Time"
+},
+"America/North_Dakota/Beulah":{
+"2026":"0:-360:Central Standard Time;6368:-300:Central Daylight Time;29212:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time;6944:-300:Central Daylight Time;29788:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time;6848:-300:Central Daylight Time;29692:-360:Central Standard Time"
+},
+"America/North_Dakota/Center":{
+"2026":"0:-360:Central Standard Time;6368:-300:Central Daylight Time;29212:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time;6944:-300:Central Daylight Time;29788:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time;6848:-300:Central Daylight Time;29692:-360:Central Standard Time"
+},
+"America/North_Dakota/New_Salem":{
+"2026":"0:-360:Central Standard Time;6368:-300:Central Daylight Time;29212:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time;6944:-300:Central Daylight Time;29788:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time;6848:-300:Central Daylight Time;29692:-360:Central Standard Time"
+},
+"America/Ojinaga":{
+"2026":"0:-360:Central Standard Time;6368:-300:Central Daylight Time;29212:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time;6944:-300:Central Daylight Time;29788:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time;6848:-300:Central Daylight Time;29692:-360:Central Standard Time"
+},
+"America/Panama":{
+"2026":"0:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time"
+},
+"America/Paramaribo":{
+"2026":"0:-180:Suriname Time",
+"2027":"0:-180:Suriname Time",
+"2028":"0:-180:Suriname Time"
+},
+"America/Phoenix":{
+"2026":"0:-420:Mountain Standard Time",
+"2027":"0:-420:Mountain Standard Time",
+"2028":"0:-420:Mountain Standard Time"
+},
+"America/Port-au-Prince":{
+"2026":"0:-300:Eastern Standard Time;6364:-240:Eastern Daylight Time;29208:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time;6940:-240:Eastern Daylight Time;29784:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time;6844:-240:Eastern Daylight Time;29688:-300:Eastern Standard Time"
+},
+"America/Port_of_Spain":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/Porto_Velho":{
+"2026":"0:-240:Amazon Standard Time",
+"2027":"0:-240:Amazon Standard Time",
+"2028":"0:-240:Amazon Standard Time"
+},
+"America/Puerto_Rico":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/Punta_Arenas":{
+"2026":"0:-180:GMT-03:00",
+"2027":"0:-180:GMT-03:00",
+"2028":"0:-180:GMT-03:00"
+},
+"America/Rankin_Inlet":{
+"2026":"0:-360:Central Standard Time;6368:-300:Central Daylight Time;29212:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time;6944:-300:Central Daylight Time;29788:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time;6848:-300:Central Daylight Time;29692:-360:Central Standard Time"
+},
+"America/Recife":{
+"2026":"0:-180:Brasilia Standard Time",
+"2027":"0:-180:Brasilia Standard Time",
+"2028":"0:-180:Brasilia Standard Time"
+},
+"America/Regina":{
+"2026":"0:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time"
+},
+"America/Resolute":{
+"2026":"0:-360:Central Standard Time;6368:-300:Central Daylight Time;29212:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time;6944:-300:Central Daylight Time;29788:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time;6848:-300:Central Daylight Time;29692:-360:Central Standard Time"
+},
+"America/Rio_Branco":{
+"2026":"0:-300:Acre Standard Time",
+"2027":"0:-300:Acre Standard Time",
+"2028":"0:-300:Acre Standard Time"
+},
+"America/Santarem":{
+"2026":"0:-180:Brasilia Standard Time",
+"2027":"0:-180:Brasilia Standard Time",
+"2028":"0:-180:Brasilia Standard Time"
+},
+"America/Santiago":{
+"2026":"0:-180:Chile Summer Time;9036:-240:Chile Standard Time;23824:-180:Chile Summer Time",
+"2027":"0:-180:Chile Summer Time;8940:-240:Chile Standard Time;23728:-180:Chile Summer Time",
+"2028":"0:-180:Chile Summer Time;8844:-240:Chile Standard Time;23632:-180:Chile Summer Time"
+},
+"America/Santo_Domingo":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/Sao_Paulo":{
+"2026":"0:-180:Brasilia Standard Time",
+"2027":"0:-180:Brasilia Standard Time",
+"2028":"0:-180:Brasilia Standard Time"
+},
+"America/Scoresbysund":{
+"2026":"0:-120:Greenland Standard Time;8356:-60:Greenland Summer Time;28516:-120:Greenland Standard Time",
+"2027":"0:-120:Greenland Standard Time;8260:-60:Greenland Summer Time;29092:-120:Greenland Standard Time",
+"2028":"0:-120:Greenland Standard Time;8164:-60:Greenland Summer Time;28996:-120:Greenland Standard Time"
+},
+"America/Sitka":{
+"2026":"0:-540:Alaska Standard Time;6380:-480:Alaska Daylight Time;29224:-540:Alaska Standard Time",
+"2027":"0:-540:Alaska Standard Time;6956:-480:Alaska Daylight Time;29800:-540:Alaska Standard Time",
+"2028":"0:-540:Alaska Standard Time;6860:-480:Alaska Daylight Time;29704:-540:Alaska Standard Time"
+},
+"America/St_Barthelemy":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/St_Johns":{
+"2026":"0:-210:Newfoundland Standard Time;6358:-150:Newfoundland Daylight Time;29202:-210:Newfoundland Standard Time",
+"2027":"0:-210:Newfoundland Standard Time;6934:-150:Newfoundland Daylight Time;29778:-210:Newfoundland Standard Time",
+"2028":"0:-210:Newfoundland Standard Time;6838:-150:Newfoundland Daylight Time;29682:-210:Newfoundland Standard Time"
+},
+"America/St_Kitts":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/St_Lucia":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/St_Thomas":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/St_Vincent":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/Swift_Current":{
+"2026":"0:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time"
+},
+"America/Tegucigalpa":{
+"2026":"0:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time"
+},
+"America/Thule":{
+"2026":"0:-240:Atlantic Standard Time;6360:-180:Atlantic Daylight Time;29204:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time;6936:-180:Atlantic Daylight Time;29780:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time;6840:-180:Atlantic Daylight Time;29684:-240:Atlantic Standard Time"
+},
+"America/Tijuana":{
+"2026":"0:-480:Pacific Standard Time;6376:-420:Pacific Daylight Time;29220:-480:Pacific Standard Time",
+"2027":"0:-480:Pacific Standard Time;6952:-420:Pacific Daylight Time;29796:-480:Pacific Standard Time",
+"2028":"0:-480:Pacific Standard Time;6856:-420:Pacific Daylight Time;29700:-480:Pacific Standard Time"
+},
+"America/Toronto":{
+"2026":"0:-300:Eastern Standard Time;6364:-240:Eastern Daylight Time;29208:-300:Eastern Standard Time",
+"2027":"0:-300:Eastern Standard Time;6940:-240:Eastern Daylight Time;29784:-300:Eastern Standard Time",
+"2028":"0:-300:Eastern Standard Time;6844:-240:Eastern Daylight Time;29688:-300:Eastern Standard Time"
+},
+"America/Tortola":{
+"2026":"0:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time"
+},
+"America/Vancouver":{
+"2026":"0:-480:Pacific Standard Time;6376:-420:Pacific Daylight Time;29220:-480:Pacific Standard Time",
+"2027":"0:-480:Pacific Standard Time;6952:-420:Pacific Daylight Time;29796:-480:Pacific Standard Time",
+"2028":"0:-480:Pacific Standard Time;6856:-420:Pacific Daylight Time;29700:-480:Pacific Standard Time"
+},
+"America/Whitehorse":{
+"2026":"0:-420:Yukon Time",
+"2027":"0:-420:Yukon Time",
+"2028":"0:-420:Yukon Time"
+},
+"America/Winnipeg":{
+"2026":"0:-360:Central Standard Time;6368:-300:Central Daylight Time;29212:-360:Central Standard Time",
+"2027":"0:-360:Central Standard Time;6944:-300:Central Daylight Time;29788:-360:Central Standard Time",
+"2028":"0:-360:Central Standard Time;6848:-300:Central Daylight Time;29692:-360:Central Standard Time"
+},
+"America/Yakutat":{
+"2026":"0:-540:Alaska Standard Time;6380:-480:Alaska Daylight Time;29224:-540:Alaska Standard Time",
+"2027":"0:-540:Alaska Standard Time;6956:-480:Alaska Daylight Time;29800:-540:Alaska Standard Time",
+"2028":"0:-540:Alaska Standard Time;6860:-480:Alaska Daylight Time;29704:-540:Alaska Standard Time"
+},
+"Antarctica/Casey":{
+"2026":"0:480:Australian Western Standard Time",
+"2027":"0:480:Australian Western Standard Time",
+"2028":"0:480:Australian Western Standard Time"
+},
+"Antarctica/Davis":{
+"2026":"0:420:Davis Time",
+"2027":"0:420:Davis Time",
+"2028":"0:420:Davis Time"
+},
+"Antarctica/DumontDUrville":{
+"2026":"0:600:Dumont d’Urville Time",
+"2027":"0:600:Dumont d’Urville Time",
+"2028":"0:600:Dumont d’Urville Time"
+},
+"Antarctica/Macquarie":{
+"2026":"0:660:Australian Eastern Daylight Time;8992:600:Australian Eastern Standard Time;26464:660:Australian Eastern Daylight Time",
+"2027":"0:660:Australian Eastern Daylight Time;8896:600:Australian Eastern Standard Time;26368:660:Australian Eastern Daylight Time",
+"2028":"0:660:Australian Eastern Daylight Time;8800:600:Australian Eastern Standard Time;26272:660:Australian Eastern Daylight Time"
+},
+"Antarctica/Mawson":{
+"2026":"0:300:Mawson Time",
+"2027":"0:300:Mawson Time",
+"2028":"0:300:Mawson Time"
+},
+"Antarctica/McMurdo":{
+"2026":"0:780:New Zealand Daylight Time;8984:720:New Zealand Standard Time;25784:780:New Zealand Daylight Time",
+"2027":"0:780:New Zealand Daylight Time;8888:720:New Zealand Standard Time;25688:780:New Zealand Daylight Time",
+"2028":"0:780:New Zealand Daylight Time;8792:720:New Zealand Standard Time;25592:780:New Zealand Daylight Time"
+},
+"Antarctica/Palmer":{
+"2026":"0:-180:GMT-03:00",
+"2027":"0:-180:GMT-03:00",
+"2028":"0:-180:GMT-03:00"
+},
+"Antarctica/Rothera":{
+"2026":"0:-180:Rothera Time",
+"2027":"0:-180:Rothera Time",
+"2028":"0:-180:Rothera Time"
+},
+"Antarctica/Syowa":{
+"2026":"0:180:Syowa Time",
+"2027":"0:180:Syowa Time",
+"2028":"0:180:Syowa Time"
+},
+"Antarctica/Troll":{
+"2026":"0:0:Greenwich Mean Time;8356:120:GMT+02:00;28516:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time;8260:120:GMT+02:00;29092:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time;8164:120:GMT+02:00;28996:0:Greenwich Mean Time"
+},
+"Antarctica/Vostok":{
+"2026":"0:300:Vostok Time",
+"2027":"0:300:Vostok Time",
+"2028":"0:300:Vostok Time"
+},
+"Arctic/Longyearbyen":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Asia/Aden":{
+"2026":"0:180:Arabian Standard Time",
+"2027":"0:180:Arabian Standard Time",
+"2028":"0:180:Arabian Standard Time"
+},
+"Asia/Almaty":{
+"2026":"0:300:Kazakhstan Time",
+"2027":"0:300:Kazakhstan Time",
+"2028":"0:300:Kazakhstan Time"
+},
+"Asia/Amman":{
+"2026":"0:180:GMT+03:00",
+"2027":"0:180:GMT+03:00",
+"2028":"0:180:GMT+03:00"
+},
+"Asia/Anadyr":{
+"2026":"0:720:Kamchatka Standard Time",
+"2027":"0:720:Kamchatka Standard Time",
+"2028":"0:720:Kamchatka Standard Time"
+},
+"Asia/Aqtau":{
+"2026":"0:300:Kazakhstan Time",
+"2027":"0:300:Kazakhstan Time",
+"2028":"0:300:Kazakhstan Time"
+},
+"Asia/Aqtobe":{
+"2026":"0:300:Kazakhstan Time",
+"2027":"0:300:Kazakhstan Time",
+"2028":"0:300:Kazakhstan Time"
+},
+"Asia/Ashgabat":{
+"2026":"0:300:Turkmenistan Standard Time",
+"2027":"0:300:Turkmenistan Standard Time",
+"2028":"0:300:Turkmenistan Standard Time"
+},
+"Asia/Atyrau":{
+"2026":"0:300:Kazakhstan Time",
+"2027":"0:300:Kazakhstan Time",
+"2028":"0:300:Kazakhstan Time"
+},
+"Asia/Baghdad":{
+"2026":"0:180:Arabian Standard Time",
+"2027":"0:180:Arabian Standard Time",
+"2028":"0:180:Arabian Standard Time"
+},
+"Asia/Bahrain":{
+"2026":"0:180:Arabian Standard Time",
+"2027":"0:180:Arabian Standard Time",
+"2028":"0:180:Arabian Standard Time"
+},
+"Asia/Baku":{
+"2026":"0:240:Azerbaijan Standard Time",
+"2027":"0:240:Azerbaijan Standard Time",
+"2028":"0:240:Azerbaijan Standard Time"
+},
+"Asia/Bangkok":{
+"2026":"0:420:Indochina Time",
+"2027":"0:420:Indochina Time",
+"2028":"0:420:Indochina Time"
+},
+"Asia/Barnaul":{
+"2026":"0:420:Krasnoyarsk Standard Time",
+"2027":"0:420:Krasnoyarsk Standard Time",
+"2028":"0:420:Krasnoyarsk Standard Time"
+},
+"Asia/Beirut":{
+"2026":"0:120:Eastern European Standard Time;8344:180:Eastern European Summer Time;28500:120:Eastern European Standard Time",
+"2027":"0:120:Eastern European Standard Time;8248:180:Eastern European Summer Time;29076:120:Eastern European Standard Time",
+"2028":"0:120:Eastern European Standard Time;8152:180:Eastern European Summer Time;28980:120:Eastern European Standard Time"
+},
+"Asia/Bishkek":{
+"2026":"0:360:Kyrgyzstan Time",
+"2027":"0:360:Kyrgyzstan Time",
+"2028":"0:360:Kyrgyzstan Time"
+},
+"Asia/Brunei":{
+"2026":"0:480:Brunei Time",
+"2027":"0:480:Brunei Time",
+"2028":"0:480:Brunei Time"
+},
+"Asia/Calcutta":{
+"2026":"0:330:India Standard Time",
+"2027":"0:330:India Standard Time",
+"2028":"0:330:India Standard Time"
+},
+"Asia/Chita":{
+"2026":"0:540:Yakutsk Standard Time",
+"2027":"0:540:Yakutsk Standard Time",
+"2028":"0:540:Yakutsk Standard Time"
+},
+"Asia/Colombo":{
+"2026":"0:330:India Standard Time",
+"2027":"0:330:India Standard Time",
+"2028":"0:330:India Standard Time"
+},
+"Asia/Damascus":{
+"2026":"0:180:GMT+03:00",
+"2027":"0:180:GMT+03:00",
+"2028":"0:180:GMT+03:00"
+},
+"Asia/Dhaka":{
+"2026":"0:360:Bangladesh Standard Time",
+"2027":"0:360:Bangladesh Standard Time",
+"2028":"0:360:Bangladesh Standard Time"
+},
+"Asia/Dili":{
+"2026":"0:540:Timor-Leste Time",
+"2027":"0:540:Timor-Leste Time",
+"2028":"0:540:Timor-Leste Time"
+},
+"Asia/Dubai":{
+"2026":"0:240:Gulf Standard Time",
+"2027":"0:240:Gulf Standard Time",
+"2028":"0:240:Gulf Standard Time"
+},
+"Asia/Dushanbe":{
+"2026":"0:300:Tajikistan Time",
+"2027":"0:300:Tajikistan Time",
+"2028":"0:300:Tajikistan Time"
+},
+"Asia/Famagusta":{
+"2026":"0:120:Eastern European Standard Time;8356:180:Eastern European Summer Time;28516:120:Eastern European Standard Time",
+"2027":"0:120:Eastern European Standard Time;8260:180:Eastern European Summer Time;29092:120:Eastern European Standard Time",
+"2028":"0:120:Eastern European Standard Time;8164:180:Eastern European Summer Time;28996:120:Eastern European Standard Time"
+},
+"Asia/Gaza":{
+"2026":"0:120:Eastern European Standard Time;8256:180:Eastern European Summer Time;28412:120:Eastern European Standard Time",
+"2027":"0:120:Eastern European Standard Time;8160:180:Eastern European Summer Time;28988:120:Eastern European Standard Time",
+"2028":"0:120:Eastern European Standard Time;8064:180:Eastern European Summer Time;28892:120:Eastern European Standard Time"
+},
+"Asia/Hebron":{
+"2026":"0:120:Eastern European Standard Time;8256:180:Eastern European Summer Time;28412:120:Eastern European Standard Time",
+"2027":"0:120:Eastern European Standard Time;8160:180:Eastern European Summer Time;28988:120:Eastern European Standard Time",
+"2028":"0:120:Eastern European Standard Time;8064:180:Eastern European Summer Time;28892:120:Eastern European Standard Time"
+},
+"Asia/Hong_Kong":{
+"2026":"0:480:Hong Kong Standard Time",
+"2027":"0:480:Hong Kong Standard Time",
+"2028":"0:480:Hong Kong Standard Time"
+},
+"Asia/Hovd":{
+"2026":"0:420:Khovd Standard Time",
+"2027":"0:420:Khovd Standard Time",
+"2028":"0:420:Khovd Standard Time"
+},
+"Asia/Irkutsk":{
+"2026":"0:480:Irkutsk Standard Time",
+"2027":"0:480:Irkutsk Standard Time",
+"2028":"0:480:Irkutsk Standard Time"
+},
+"Asia/Jakarta":{
+"2026":"0:420:Western Indonesia Time",
+"2027":"0:420:Western Indonesia Time",
+"2028":"0:420:Western Indonesia Time"
+},
+"Asia/Jayapura":{
+"2026":"0:540:Eastern Indonesia Time",
+"2027":"0:540:Eastern Indonesia Time",
+"2028":"0:540:Eastern Indonesia Time"
+},
+"Asia/Jerusalem":{
+"2026":"0:120:Israel Standard Time;8160:180:Israel Daylight Time;28508:120:Israel Standard Time",
+"2027":"0:120:Israel Standard Time;8064:180:Israel Daylight Time;29084:120:Israel Standard Time",
+"2028":"0:120:Israel Standard Time;7968:180:Israel Daylight Time;28988:120:Israel Standard Time"
+},
+"Asia/Kabul":{
+"2026":"0:270:Afghanistan Time",
+"2027":"0:270:Afghanistan Time",
+"2028":"0:270:Afghanistan Time"
+},
+"Asia/Kamchatka":{
+"2026":"0:720:Kamchatka Standard Time",
+"2027":"0:720:Kamchatka Standard Time",
+"2028":"0:720:Kamchatka Standard Time"
+},
+"Asia/Karachi":{
+"2026":"0:300:Pakistan Standard Time",
+"2027":"0:300:Pakistan Standard Time",
+"2028":"0:300:Pakistan Standard Time"
+},
+"Asia/Katmandu":{
+"2026":"0:345:Nepal Time",
+"2027":"0:345:Nepal Time",
+"2028":"0:345:Nepal Time"
+},
+"Asia/Khandyga":{
+"2026":"0:540:Yakutsk Standard Time",
+"2027":"0:540:Yakutsk Standard Time",
+"2028":"0:540:Yakutsk Standard Time"
+},
+"Asia/Krasnoyarsk":{
+"2026":"0:420:Krasnoyarsk Standard Time",
+"2027":"0:420:Krasnoyarsk Standard Time",
+"2028":"0:420:Krasnoyarsk Standard Time"
+},
+"Asia/Kuala_Lumpur":{
+"2026":"0:480:Malaysia Time",
+"2027":"0:480:Malaysia Time",
+"2028":"0:480:Malaysia Time"
+},
+"Asia/Kuching":{
+"2026":"0:480:Malaysia Time",
+"2027":"0:480:Malaysia Time",
+"2028":"0:480:Malaysia Time"
+},
+"Asia/Kuwait":{
+"2026":"0:180:Arabian Standard Time",
+"2027":"0:180:Arabian Standard Time",
+"2028":"0:180:Arabian Standard Time"
+},
+"Asia/Macau":{
+"2026":"0:480:China Standard Time",
+"2027":"0:480:China Standard Time",
+"2028":"0:480:China Standard Time"
+},
+"Asia/Magadan":{
+"2026":"0:660:Magadan Standard Time",
+"2027":"0:660:Magadan Standard Time",
+"2028":"0:660:Magadan Standard Time"
+},
+"Asia/Makassar":{
+"2026":"0:480:Central Indonesia Time",
+"2027":"0:480:Central Indonesia Time",
+"2028":"0:480:Central Indonesia Time"
+},
+"Asia/Manila":{
+"2026":"0:480:Philippine Standard Time",
+"2027":"0:480:Philippine Standard Time",
+"2028":"0:480:Philippine Standard Time"
+},
+"Asia/Muscat":{
+"2026":"0:240:Gulf Standard Time",
+"2027":"0:240:Gulf Standard Time",
+"2028":"0:240:Gulf Standard Time"
+},
+"Asia/Nicosia":{
+"2026":"0:120:Eastern European Standard Time;8356:180:Eastern European Summer Time;28516:120:Eastern European Standard Time",
+"2027":"0:120:Eastern European Standard Time;8260:180:Eastern European Summer Time;29092:120:Eastern European Standard Time",
+"2028":"0:120:Eastern European Standard Time;8164:180:Eastern European Summer Time;28996:120:Eastern European Standard Time"
+},
+"Asia/Novokuznetsk":{
+"2026":"0:420:Krasnoyarsk Standard Time",
+"2027":"0:420:Krasnoyarsk Standard Time",
+"2028":"0:420:Krasnoyarsk Standard Time"
+},
+"Asia/Novosibirsk":{
+"2026":"0:420:Krasnoyarsk Standard Time",
+"2027":"0:420:Krasnoyarsk Standard Time",
+"2028":"0:420:Krasnoyarsk Standard Time"
+},
+"Asia/Omsk":{
+"2026":"0:360:Omsk Standard Time",
+"2027":"0:360:Omsk Standard Time",
+"2028":"0:360:Omsk Standard Time"
+},
+"Asia/Oral":{
+"2026":"0:300:Kazakhstan Time",
+"2027":"0:300:Kazakhstan Time",
+"2028":"0:300:Kazakhstan Time"
+},
+"Asia/Phnom_Penh":{
+"2026":"0:420:Indochina Time",
+"2027":"0:420:Indochina Time",
+"2028":"0:420:Indochina Time"
+},
+"Asia/Pontianak":{
+"2026":"0:420:Western Indonesia Time",
+"2027":"0:420:Western Indonesia Time",
+"2028":"0:420:Western Indonesia Time"
+},
+"Asia/Pyongyang":{
+"2026":"0:540:Korean Standard Time",
+"2027":"0:540:Korean Standard Time",
+"2028":"0:540:Korean Standard Time"
+},
+"Asia/Qatar":{
+"2026":"0:180:Arabian Standard Time",
+"2027":"0:180:Arabian Standard Time",
+"2028":"0:180:Arabian Standard Time"
+},
+"Asia/Qostanay":{
+"2026":"0:300:Kazakhstan Time",
+"2027":"0:300:Kazakhstan Time",
+"2028":"0:300:Kazakhstan Time"
+},
+"Asia/Qyzylorda":{
+"2026":"0:300:Kazakhstan Time",
+"2027":"0:300:Kazakhstan Time",
+"2028":"0:300:Kazakhstan Time"
+},
+"Asia/Rangoon":{
+"2026":"0:390:Myanmar Time",
+"2027":"0:390:Myanmar Time",
+"2028":"0:390:Myanmar Time"
+},
+"Asia/Riyadh":{
+"2026":"0:180:Arabian Standard Time",
+"2027":"0:180:Arabian Standard Time",
+"2028":"0:180:Arabian Standard Time"
+},
+"Asia/Saigon":{
+"2026":"0:420:Indochina Time",
+"2027":"0:420:Indochina Time",
+"2028":"0:420:Indochina Time"
+},
+"Asia/Sakhalin":{
+"2026":"0:660:Magadan Standard Time",
+"2027":"0:660:Magadan Standard Time",
+"2028":"0:660:Magadan Standard Time"
+},
+"Asia/Samarkand":{
+"2026":"0:300:Uzbekistan Standard Time",
+"2027":"0:300:Uzbekistan Standard Time",
+"2028":"0:300:Uzbekistan Standard Time"
+},
+"Asia/Seoul":{
+"2026":"0:540:Korean Standard Time",
+"2027":"0:540:Korean Standard Time",
+"2028":"0:540:Korean Standard Time"
+},
+"Asia/Shanghai":{
+"2026":"0:480:China Standard Time",
+"2027":"0:480:China Standard Time",
+"2028":"0:480:China Standard Time"
+},
+"Asia/Singapore":{
+"2026":"0:480:Singapore Standard Time",
+"2027":"0:480:Singapore Standard Time",
+"2028":"0:480:Singapore Standard Time"
+},
+"Asia/Srednekolymsk":{
+"2026":"0:660:Magadan Standard Time",
+"2027":"0:660:Magadan Standard Time",
+"2028":"0:660:Magadan Standard Time"
+},
+"Asia/Taipei":{
+"2026":"0:480:Taiwan Standard Time",
+"2027":"0:480:Taiwan Standard Time",
+"2028":"0:480:Taiwan Standard Time"
+},
+"Asia/Tashkent":{
+"2026":"0:300:Uzbekistan Standard Time",
+"2027":"0:300:Uzbekistan Standard Time",
+"2028":"0:300:Uzbekistan Standard Time"
+},
+"Asia/Tbilisi":{
+"2026":"0:240:Georgia Standard Time",
+"2027":"0:240:Georgia Standard Time",
+"2028":"0:240:Georgia Standard Time"
+},
+"Asia/Tehran":{
+"2026":"0:210:Iran Standard Time",
+"2027":"0:210:Iran Standard Time",
+"2028":"0:210:Iran Standard Time"
+},
+"Asia/Thimphu":{
+"2026":"0:360:Bhutan Time",
+"2027":"0:360:Bhutan Time",
+"2028":"0:360:Bhutan Time"
+},
+"Asia/Tokyo":{
+"2026":"0:540:Japan Standard Time",
+"2027":"0:540:Japan Standard Time",
+"2028":"0:540:Japan Standard Time"
+},
+"Asia/Tomsk":{
+"2026":"0:420:Krasnoyarsk Standard Time",
+"2027":"0:420:Krasnoyarsk Standard Time",
+"2028":"0:420:Krasnoyarsk Standard Time"
+},
+"Asia/Ulaanbaatar":{
+"2026":"0:480:Ulaanbaatar Standard Time",
+"2027":"0:480:Ulaanbaatar Standard Time",
+"2028":"0:480:Ulaanbaatar Standard Time"
+},
+"Asia/Urumqi":{
+"2026":"0:360:GMT+06:00",
+"2027":"0:360:GMT+06:00",
+"2028":"0:360:GMT+06:00"
+},
+"Asia/Ust-Nera":{
+"2026":"0:600:Vladivostok Standard Time",
+"2027":"0:600:Vladivostok Standard Time",
+"2028":"0:600:Vladivostok Standard Time"
+},
+"Asia/Vientiane":{
+"2026":"0:420:Indochina Time",
+"2027":"0:420:Indochina Time",
+"2028":"0:420:Indochina Time"
+},
+"Asia/Vladivostok":{
+"2026":"0:600:Vladivostok Standard Time",
+"2027":"0:600:Vladivostok Standard Time",
+"2028":"0:600:Vladivostok Standard Time"
+},
+"Asia/Yakutsk":{
+"2026":"0:540:Yakutsk Standard Time",
+"2027":"0:540:Yakutsk Standard Time",
+"2028":"0:540:Yakutsk Standard Time"
+},
+"Asia/Yekaterinburg":{
+"2026":"0:300:Yekaterinburg Standard Time",
+"2027":"0:300:Yekaterinburg Standard Time",
+"2028":"0:300:Yekaterinburg Standard Time"
+},
+"Asia/Yerevan":{
+"2026":"0:240:Armenia Standard Time",
+"2027":"0:240:Armenia Standard Time",
+"2028":"0:240:Armenia Standard Time"
+},
+"Atlantic/Azores":{
+"2026":"0:-60:Azores Standard Time;8356:0:Azores Summer Time;28516:-60:Azores Standard Time",
+"2027":"0:-60:Azores Standard Time;8260:0:Azores Summer Time;29092:-60:Azores Standard Time",
+"2028":"0:-60:Azores Standard Time;8164:0:Azores Summer Time;28996:-60:Azores Standard Time"
+},
+"Atlantic/Bermuda":{
+"2026":"0:-240:Atlantic Standard Time;6360:-180:Atlantic Daylight Time;29204:-240:Atlantic Standard Time",
+"2027":"0:-240:Atlantic Standard Time;6936:-180:Atlantic Daylight Time;29780:-240:Atlantic Standard Time",
+"2028":"0:-240:Atlantic Standard Time;6840:-180:Atlantic Daylight Time;29684:-240:Atlantic Standard Time"
+},
+"Atlantic/Canary":{
+"2026":"0:0:Western European Standard Time;8356:60:Western European Summer Time;28516:0:Western European Standard Time",
+"2027":"0:0:Western European Standard Time;8260:60:Western European Summer Time;29092:0:Western European Standard Time",
+"2028":"0:0:Western European Standard Time;8164:60:Western European Summer Time;28996:0:Western European Standard Time"
+},
+"Atlantic/Cape_Verde":{
+"2026":"0:-60:Cape Verde Standard Time",
+"2027":"0:-60:Cape Verde Standard Time",
+"2028":"0:-60:Cape Verde Standard Time"
+},
+"Atlantic/Faeroe":{
+"2026":"0:0:Western European Standard Time;8356:60:Western European Summer Time;28516:0:Western European Standard Time",
+"2027":"0:0:Western European Standard Time;8260:60:Western European Summer Time;29092:0:Western European Standard Time",
+"2028":"0:0:Western European Standard Time;8164:60:Western European Summer Time;28996:0:Western European Standard Time"
+},
+"Atlantic/Madeira":{
+"2026":"0:0:Western European Standard Time;8356:60:Western European Summer Time;28516:0:Western European Standard Time",
+"2027":"0:0:Western European Standard Time;8260:60:Western European Summer Time;29092:0:Western European Standard Time",
+"2028":"0:0:Western European Standard Time;8164:60:Western European Summer Time;28996:0:Western European Standard Time"
+},
+"Atlantic/Reykjavik":{
+"2026":"0:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time"
+},
+"Atlantic/South_Georgia":{
+"2026":"0:-120:South Georgia Time",
+"2027":"0:-120:South Georgia Time",
+"2028":"0:-120:South Georgia Time"
+},
+"Atlantic/St_Helena":{
+"2026":"0:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time"
+},
+"Atlantic/Stanley":{
+"2026":"0:-180:Falkland Islands Standard Time",
+"2027":"0:-180:Falkland Islands Standard Time",
+"2028":"0:-180:Falkland Islands Standard Time"
+},
+"Australia/Adelaide":{
+"2026":"0:630:Australian Central Daylight Time;8994:570:Australian Central Standard Time;26466:630:Australian Central Daylight Time",
+"2027":"0:630:Australian Central Daylight Time;8898:570:Australian Central Standard Time;26370:630:Australian Central Daylight Time",
+"2028":"0:630:Australian Central Daylight Time;8802:570:Australian Central Standard Time;26274:630:Australian Central Daylight Time"
+},
+"Australia/Brisbane":{
+"2026":"0:600:Australian Eastern Standard Time",
+"2027":"0:600:Australian Eastern Standard Time",
+"2028":"0:600:Australian Eastern Standard Time"
+},
+"Australia/Broken_Hill":{
+"2026":"0:630:Australian Central Daylight Time;8994:570:Australian Central Standard Time;26466:630:Australian Central Daylight Time",
+"2027":"0:630:Australian Central Daylight Time;8898:570:Australian Central Standard Time;26370:630:Australian Central Daylight Time",
+"2028":"0:630:Australian Central Daylight Time;8802:570:Australian Central Standard Time;26274:630:Australian Central Daylight Time"
+},
+"Australia/Darwin":{
+"2026":"0:570:Australian Central Standard Time",
+"2027":"0:570:Australian Central Standard Time",
+"2028":"0:570:Australian Central Standard Time"
+},
+"Australia/Eucla":{
+"2026":"0:525:Australian Central Western Standard Time",
+"2027":"0:525:Australian Central Western Standard Time",
+"2028":"0:525:Australian Central Western Standard Time"
+},
+"Australia/Hobart":{
+"2026":"0:660:Australian Eastern Daylight Time;8992:600:Australian Eastern Standard Time;26464:660:Australian Eastern Daylight Time",
+"2027":"0:660:Australian Eastern Daylight Time;8896:600:Australian Eastern Standard Time;26368:660:Australian Eastern Daylight Time",
+"2028":"0:660:Australian Eastern Daylight Time;8800:600:Australian Eastern Standard Time;26272:660:Australian Eastern Daylight Time"
+},
+"Australia/Lindeman":{
+"2026":"0:600:Australian Eastern Standard Time",
+"2027":"0:600:Australian Eastern Standard Time",
+"2028":"0:600:Australian Eastern Standard Time"
+},
+"Australia/Lord_Howe":{
+"2026":"0:660:Lord Howe Daylight Time;8988:630:Lord Howe Standard Time;26462:660:Lord Howe Daylight Time",
+"2027":"0:660:Lord Howe Daylight Time;8892:630:Lord Howe Standard Time;26366:660:Lord Howe Daylight Time",
+"2028":"0:660:Lord Howe Daylight Time;8796:630:Lord Howe Standard Time;26270:660:Lord Howe Daylight Time"
+},
+"Australia/Melbourne":{
+"2026":"0:660:Australian Eastern Daylight Time;8992:600:Australian Eastern Standard Time;26464:660:Australian Eastern Daylight Time",
+"2027":"0:660:Australian Eastern Daylight Time;8896:600:Australian Eastern Standard Time;26368:660:Australian Eastern Daylight Time",
+"2028":"0:660:Australian Eastern Daylight Time;8800:600:Australian Eastern Standard Time;26272:660:Australian Eastern Daylight Time"
+},
+"Australia/Perth":{
+"2026":"0:480:Australian Western Standard Time",
+"2027":"0:480:Australian Western Standard Time",
+"2028":"0:480:Australian Western Standard Time"
+},
+"Australia/Sydney":{
+"2026":"0:660:Australian Eastern Daylight Time;8992:600:Australian Eastern Standard Time;26464:660:Australian Eastern Daylight Time",
+"2027":"0:660:Australian Eastern Daylight Time;8896:600:Australian Eastern Standard Time;26368:660:Australian Eastern Daylight Time",
+"2028":"0:660:Australian Eastern Daylight Time;8800:600:Australian Eastern Standard Time;26272:660:Australian Eastern Daylight Time"
+},
+"Europe/Amsterdam":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Andorra":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Astrakhan":{
+"2026":"0:240:Samara Standard Time",
+"2027":"0:240:Samara Standard Time",
+"2028":"0:240:Samara Standard Time"
+},
+"Europe/Athens":{
+"2026":"0:120:Eastern European Standard Time;8356:180:Eastern European Summer Time;28516:120:Eastern European Standard Time",
+"2027":"0:120:Eastern European Standard Time;8260:180:Eastern European Summer Time;29092:120:Eastern European Standard Time",
+"2028":"0:120:Eastern European Standard Time;8164:180:Eastern European Summer Time;28996:120:Eastern European Standard Time"
+},
+"Europe/Belgrade":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Berlin":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Bratislava":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Brussels":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Bucharest":{
+"2026":"0:120:Eastern European Standard Time;8356:180:Eastern European Summer Time;28516:120:Eastern European Standard Time",
+"2027":"0:120:Eastern European Standard Time;8260:180:Eastern European Summer Time;29092:120:Eastern European Standard Time",
+"2028":"0:120:Eastern European Standard Time;8164:180:Eastern European Summer Time;28996:120:Eastern European Standard Time"
+},
+"Europe/Budapest":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Busingen":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Chisinau":{
+"2026":"0:120:Eastern European Standard Time;8352:180:Eastern European Summer Time;28512:120:Eastern European Standard Time",
+"2027":"0:120:Eastern European Standard Time;8256:180:Eastern European Summer Time;29088:120:Eastern European Standard Time",
+"2028":"0:120:Eastern European Standard Time;8160:180:Eastern European Summer Time;28992:120:Eastern European Standard Time"
+},
+"Europe/Copenhagen":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Dublin":{
+"2026":"0:0:Greenwich Mean Time;8356:60:Irish Standard Time;28516:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time;8260:60:Irish Standard Time;29092:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time;8164:60:Irish Standard Time;28996:0:Greenwich Mean Time"
+},
+"Europe/Gibraltar":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Guernsey":{
+"2026":"0:0:Greenwich Mean Time;8356:60:GMT+01:00;28516:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time;8260:60:GMT+01:00;29092:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time;8164:60:GMT+01:00;28996:0:Greenwich Mean Time"
+},
+"Europe/Helsinki":{
+"2026":"0:120:Eastern European Standard Time;8356:180:Eastern European Summer Time;28516:120:Eastern European Standard Time",
+"2027":"0:120:Eastern European Standard Time;8260:180:Eastern European Summer Time;29092:120:Eastern European Standard Time",
+"2028":"0:120:Eastern European Standard Time;8164:180:Eastern European Summer Time;28996:120:Eastern European Standard Time"
+},
+"Europe/Isle_of_Man":{
+"2026":"0:0:Greenwich Mean Time;8356:60:GMT+01:00;28516:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time;8260:60:GMT+01:00;29092:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time;8164:60:GMT+01:00;28996:0:Greenwich Mean Time"
+},
+"Europe/Istanbul":{
+"2026":"0:180:Türkiye Standard Time",
+"2027":"0:180:Türkiye Standard Time",
+"2028":"0:180:Türkiye Standard Time"
+},
+"Europe/Jersey":{
+"2026":"0:0:Greenwich Mean Time;8356:60:GMT+01:00;28516:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time;8260:60:GMT+01:00;29092:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time;8164:60:GMT+01:00;28996:0:Greenwich Mean Time"
+},
+"Europe/Kaliningrad":{
+"2026":"0:120:Eastern European Standard Time",
+"2027":"0:120:Eastern European Standard Time",
+"2028":"0:120:Eastern European Standard Time"
+},
+"Europe/Kiev":{
+"2026":"0:120:Eastern European Standard Time;8356:180:Eastern European Summer Time;28516:120:Eastern European Standard Time",
+"2027":"0:120:Eastern European Standard Time;8260:180:Eastern European Summer Time;29092:120:Eastern European Standard Time",
+"2028":"0:120:Eastern European Standard Time;8164:180:Eastern European Summer Time;28996:120:Eastern European Standard Time"
+},
+"Europe/Kirov":{
+"2026":"0:180:Moscow Standard Time",
+"2027":"0:180:Moscow Standard Time",
+"2028":"0:180:Moscow Standard Time"
+},
+"Europe/Lisbon":{
+"2026":"0:0:Western European Standard Time;8356:60:Western European Summer Time;28516:0:Western European Standard Time",
+"2027":"0:0:Western European Standard Time;8260:60:Western European Summer Time;29092:0:Western European Standard Time",
+"2028":"0:0:Western European Standard Time;8164:60:Western European Summer Time;28996:0:Western European Standard Time"
+},
+"Europe/Ljubljana":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/London":{
+"2026":"0:0:Greenwich Mean Time;8356:60:British Summer Time;28516:0:Greenwich Mean Time",
+"2027":"0:0:Greenwich Mean Time;8260:60:British Summer Time;29092:0:Greenwich Mean Time",
+"2028":"0:0:Greenwich Mean Time;8164:60:British Summer Time;28996:0:Greenwich Mean Time"
+},
+"Europe/Luxembourg":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Madrid":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Malta":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Mariehamn":{
+"2026":"0:120:Eastern European Standard Time;8356:180:Eastern European Summer Time;28516:120:Eastern European Standard Time",
+"2027":"0:120:Eastern European Standard Time;8260:180:Eastern European Summer Time;29092:120:Eastern European Standard Time",
+"2028":"0:120:Eastern European Standard Time;8164:180:Eastern European Summer Time;28996:120:Eastern European Standard Time"
+},
+"Europe/Minsk":{
+"2026":"0:180:Moscow Standard Time",
+"2027":"0:180:Moscow Standard Time",
+"2028":"0:180:Moscow Standard Time"
+},
+"Europe/Monaco":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Moscow":{
+"2026":"0:180:Moscow Standard Time",
+"2027":"0:180:Moscow Standard Time",
+"2028":"0:180:Moscow Standard Time"
+},
+"Europe/Oslo":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Paris":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Podgorica":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Prague":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Riga":{
+"2026":"0:120:Eastern European Standard Time;8356:180:Eastern European Summer Time;28516:120:Eastern European Standard Time",
+"2027":"0:120:Eastern European Standard Time;8260:180:Eastern European Summer Time;29092:120:Eastern European Standard Time",
+"2028":"0:120:Eastern European Standard Time;8164:180:Eastern European Summer Time;28996:120:Eastern European Standard Time"
+},
+"Europe/Rome":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Samara":{
+"2026":"0:240:Samara Standard Time",
+"2027":"0:240:Samara Standard Time",
+"2028":"0:240:Samara Standard Time"
+},
+"Europe/San_Marino":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Sarajevo":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Saratov":{
+"2026":"0:240:Samara Standard Time",
+"2027":"0:240:Samara Standard Time",
+"2028":"0:240:Samara Standard Time"
+},
+"Europe/Simferopol":{
+"2026":"0:180:Moscow Standard Time",
+"2027":"0:180:Moscow Standard Time",
+"2028":"0:180:Moscow Standard Time"
+},
+"Europe/Skopje":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Sofia":{
+"2026":"0:120:Eastern European Standard Time;8356:180:Eastern European Summer Time;28516:120:Eastern European Standard Time",
+"2027":"0:120:Eastern European Standard Time;8260:180:Eastern European Summer Time;29092:120:Eastern European Standard Time",
+"2028":"0:120:Eastern European Standard Time;8164:180:Eastern European Summer Time;28996:120:Eastern European Standard Time"
+},
+"Europe/Stockholm":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Tallinn":{
+"2026":"0:120:Eastern European Standard Time;8356:180:Eastern European Summer Time;28516:120:Eastern European Standard Time",
+"2027":"0:120:Eastern European Standard Time;8260:180:Eastern European Summer Time;29092:120:Eastern European Standard Time",
+"2028":"0:120:Eastern European Standard Time;8164:180:Eastern European Summer Time;28996:120:Eastern European Standard Time"
+},
+"Europe/Tirane":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Ulyanovsk":{
+"2026":"0:240:Samara Standard Time",
+"2027":"0:240:Samara Standard Time",
+"2028":"0:240:Samara Standard Time"
+},
+"Europe/Vaduz":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Vatican":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Vienna":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Vilnius":{
+"2026":"0:120:Eastern European Standard Time;8356:180:Eastern European Summer Time;28516:120:Eastern European Standard Time",
+"2027":"0:120:Eastern European Standard Time;8260:180:Eastern European Summer Time;29092:120:Eastern European Standard Time",
+"2028":"0:120:Eastern European Standard Time;8164:180:Eastern European Summer Time;28996:120:Eastern European Standard Time"
+},
+"Europe/Volgograd":{
+"2026":"0:180:Moscow Standard Time",
+"2027":"0:180:Moscow Standard Time",
+"2028":"0:180:Moscow Standard Time"
+},
+"Europe/Warsaw":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Zagreb":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Europe/Zurich":{
+"2026":"0:60:Central European Standard Time;8356:120:Central European Summer Time;28516:60:Central European Standard Time",
+"2027":"0:60:Central European Standard Time;8260:120:Central European Summer Time;29092:60:Central European Standard Time",
+"2028":"0:60:Central European Standard Time;8164:120:Central European Summer Time;28996:60:Central European Standard Time"
+},
+"Indian/Antananarivo":{
+"2026":"0:180:East Africa Time",
+"2027":"0:180:East Africa Time",
+"2028":"0:180:East Africa Time"
+},
+"Indian/Chagos":{
+"2026":"0:360:Indian Ocean Time",
+"2027":"0:360:Indian Ocean Time",
+"2028":"0:360:Indian Ocean Time"
+},
+"Indian/Christmas":{
+"2026":"0:420:Christmas Island Time",
+"2027":"0:420:Christmas Island Time",
+"2028":"0:420:Christmas Island Time"
+},
+"Indian/Cocos":{
+"2026":"0:390:Cocos Islands Time",
+"2027":"0:390:Cocos Islands Time",
+"2028":"0:390:Cocos Islands Time"
+},
+"Indian/Comoro":{
+"2026":"0:180:East Africa Time",
+"2027":"0:180:East Africa Time",
+"2028":"0:180:East Africa Time"
+},
+"Indian/Kerguelen":{
+"2026":"0:300:French Southern & Antarctic Time",
+"2027":"0:300:French Southern & Antarctic Time",
+"2028":"0:300:French Southern & Antarctic Time"
+},
+"Indian/Mahe":{
+"2026":"0:240:Seychelles Time",
+"2027":"0:240:Seychelles Time",
+"2028":"0:240:Seychelles Time"
+},
+"Indian/Maldives":{
+"2026":"0:300:Maldives Time",
+"2027":"0:300:Maldives Time",
+"2028":"0:300:Maldives Time"
+},
+"Indian/Mauritius":{
+"2026":"0:240:Mauritius Standard Time",
+"2027":"0:240:Mauritius Standard Time",
+"2028":"0:240:Mauritius Standard Time"
+},
+"Indian/Mayotte":{
+"2026":"0:180:East Africa Time",
+"2027":"0:180:East Africa Time",
+"2028":"0:180:East Africa Time"
+},
+"Indian/Reunion":{
+"2026":"0:240:Réunion Time",
+"2027":"0:240:Réunion Time",
+"2028":"0:240:Réunion Time"
+},
+"Pacific/Apia":{
+"2026":"0:780:Samoa Standard Time",
+"2027":"0:780:Samoa Standard Time",
+"2028":"0:780:Samoa Standard Time"
+},
+"Pacific/Auckland":{
+"2026":"0:780:New Zealand Daylight Time;8984:720:New Zealand Standard Time;25784:780:New Zealand Daylight Time",
+"2027":"0:780:New Zealand Daylight Time;8888:720:New Zealand Standard Time;25688:780:New Zealand Daylight Time",
+"2028":"0:780:New Zealand Daylight Time;8792:720:New Zealand Standard Time;25592:780:New Zealand Daylight Time"
+},
+"Pacific/Bougainville":{
+"2026":"0:660:GMT+11:00",
+"2027":"0:660:GMT+11:00",
+"2028":"0:660:GMT+11:00"
+},
+"Pacific/Chatham":{
+"2026":"0:825:Chatham Daylight Time;8984:765:Chatham Standard Time;25784:825:Chatham Daylight Time",
+"2027":"0:825:Chatham Daylight Time;8888:765:Chatham Standard Time;25688:825:Chatham Daylight Time",
+"2028":"0:825:Chatham Daylight Time;8792:765:Chatham Standard Time;25592:825:Chatham Daylight Time"
+},
+"Pacific/Easter":{
+"2026":"0:-300:Easter Island Summer Time;9036:-360:Easter Island Standard Time;23824:-300:Easter Island Summer Time",
+"2027":"0:-300:Easter Island Summer Time;8940:-360:Easter Island Standard Time;23728:-300:Easter Island Summer Time",
+"2028":"0:-300:Easter Island Summer Time;8844:-360:Easter Island Standard Time;23632:-300:Easter Island Summer Time"
+},
+"Pacific/Efate":{
+"2026":"0:660:Vanuatu Standard Time",
+"2027":"0:660:Vanuatu Standard Time",
+"2028":"0:660:Vanuatu Standard Time"
+},
+"Pacific/Enderbury":{
+"2026":"0:780:Phoenix Islands Time",
+"2027":"0:780:Phoenix Islands Time",
+"2028":"0:780:Phoenix Islands Time"
+},
+"Pacific/Fakaofo":{
+"2026":"0:780:Tokelau Time",
+"2027":"0:780:Tokelau Time",
+"2028":"0:780:Tokelau Time"
+},
+"Pacific/Fiji":{
+"2026":"0:720:Fiji Standard Time",
+"2027":"0:720:Fiji Standard Time",
+"2028":"0:720:Fiji Standard Time"
+},
+"Pacific/Funafuti":{
+"2026":"0:720:Tuvalu Time",
+"2027":"0:720:Tuvalu Time",
+"2028":"0:720:Tuvalu Time"
+},
+"Pacific/Galapagos":{
+"2026":"0:-360:Galapagos Time",
+"2027":"0:-360:Galapagos Time",
+"2028":"0:-360:Galapagos Time"
+},
+"Pacific/Gambier":{
+"2026":"0:-540:Gambier Time",
+"2027":"0:-540:Gambier Time",
+"2028":"0:-540:Gambier Time"
+},
+"Pacific/Guadalcanal":{
+"2026":"0:660:Solomon Islands Time",
+"2027":"0:660:Solomon Islands Time",
+"2028":"0:660:Solomon Islands Time"
+},
+"Pacific/Guam":{
+"2026":"0:600:Chamorro Standard Time",
+"2027":"0:600:Chamorro Standard Time",
+"2028":"0:600:Chamorro Standard Time"
+},
+"Pacific/Honolulu":{
+"2026":"0:-600:Hawaii-Aleutian Standard Time",
+"2027":"0:-600:Hawaii-Aleutian Standard Time",
+"2028":"0:-600:Hawaii-Aleutian Standard Time"
+},
+"Pacific/Kiritimati":{
+"2026":"0:840:Line Islands Time",
+"2027":"0:840:Line Islands Time",
+"2028":"0:840:Line Islands Time"
+},
+"Pacific/Kosrae":{
+"2026":"0:660:Kosrae Time",
+"2027":"0:660:Kosrae Time",
+"2028":"0:660:Kosrae Time"
+},
+"Pacific/Kwajalein":{
+"2026":"0:720:Marshall Islands Time",
+"2027":"0:720:Marshall Islands Time",
+"2028":"0:720:Marshall Islands Time"
+},
+"Pacific/Majuro":{
+"2026":"0:720:Marshall Islands Time",
+"2027":"0:720:Marshall Islands Time",
+"2028":"0:720:Marshall Islands Time"
+},
+"Pacific/Marquesas":{
+"2026":"0:-570:Marquesas Time",
+"2027":"0:-570:Marquesas Time",
+"2028":"0:-570:Marquesas Time"
+},
+"Pacific/Midway":{
+"2026":"0:-660:American Samoa Standard Time",
+"2027":"0:-660:American Samoa Standard Time",
+"2028":"0:-660:American Samoa Standard Time"
+},
+"Pacific/Nauru":{
+"2026":"0:720:Nauru Time",
+"2027":"0:720:Nauru Time",
+"2028":"0:720:Nauru Time"
+},
+"Pacific/Niue":{
+"2026":"0:-660:Niue Time",
+"2027":"0:-660:Niue Time",
+"2028":"0:-660:Niue Time"
+},
+"Pacific/Norfolk":{
+"2026":"0:720:Norfolk Island Daylight Time;8988:660:Norfolk Island Standard Time;26460:720:Norfolk Island Daylight Time",
+"2027":"0:720:Norfolk Island Daylight Time;8892:660:Norfolk Island Standard Time;26364:720:Norfolk Island Daylight Time",
+"2028":"0:720:Norfolk Island Daylight Time;8796:660:Norfolk Island Standard Time;26268:720:Norfolk Island Daylight Time"
+},
+"Pacific/Noumea":{
+"2026":"0:660:New Caledonia Standard Time",
+"2027":"0:660:New Caledonia Standard Time",
+"2028":"0:660:New Caledonia Standard Time"
+},
+"Pacific/Pago_Pago":{
+"2026":"0:-660:American Samoa Standard Time",
+"2027":"0:-660:American Samoa Standard Time",
+"2028":"0:-660:American Samoa Standard Time"
+},
+"Pacific/Palau":{
+"2026":"0:540:Palau Time",
+"2027":"0:540:Palau Time",
+"2028":"0:540:Palau Time"
+},
+"Pacific/Pitcairn":{
+"2026":"0:-480:Pitcairn Time",
+"2027":"0:-480:Pitcairn Time",
+"2028":"0:-480:Pitcairn Time"
+},
+"Pacific/Ponape":{
+"2026":"0:660:Pohnpei Time",
+"2027":"0:660:Pohnpei Time",
+"2028":"0:660:Pohnpei Time"
+},
+"Pacific/Port_Moresby":{
+"2026":"0:600:Papua New Guinea Time",
+"2027":"0:600:Papua New Guinea Time",
+"2028":"0:600:Papua New Guinea Time"
+},
+"Pacific/Rarotonga":{
+"2026":"0:-600:Cook Islands Standard Time",
+"2027":"0:-600:Cook Islands Standard Time",
+"2028":"0:-600:Cook Islands Standard Time"
+},
+"Pacific/Saipan":{
+"2026":"0:600:Chamorro Standard Time",
+"2027":"0:600:Chamorro Standard Time",
+"2028":"0:600:Chamorro Standard Time"
+},
+"Pacific/Tahiti":{
+"2026":"0:-600:Tahiti Time",
+"2027":"0:-600:Tahiti Time",
+"2028":"0:-600:Tahiti Time"
+},
+"Pacific/Tarawa":{
+"2026":"0:720:Gilbert Islands Time",
+"2027":"0:720:Gilbert Islands Time",
+"2028":"0:720:Gilbert Islands Time"
+},
+"Pacific/Tongatapu":{
+"2026":"0:780:Tonga Standard Time",
+"2027":"0:780:Tonga Standard Time",
+"2028":"0:780:Tonga Standard Time"
+},
+"Pacific/Truk":{
+"2026":"0:600:Chuuk Time",
+"2027":"0:600:Chuuk Time",
+"2028":"0:600:Chuuk Time"
+},
+"Pacific/Wake":{
+"2026":"0:720:Wake Island Time",
+"2027":"0:720:Wake Island Time",
+"2028":"0:720:Wake Island Time"
+},
+"Pacific/Wallis":{
+"2026":"0:720:Wallis & Futuna Time",
+"2027":"0:720:Wallis & Futuna Time",
+"2028":"0:720:Wallis & Futuna Time"
+}
+}
+}

@@ -48,6 +48,7 @@ export interface GeneratedTables {
   stepMs: number;
   classGroups: string[][];
   scheduleClasses: ScheduleClass[];
+  cache: ProbeCache; // fingerprint + full 3-year probe, for tools/probe-cache.ts
   stats: {
     zones: number;
     sigClasses: number;
@@ -59,6 +60,8 @@ export interface GeneratedTables {
     irregularClasses: number;
     irregularZones: number;
     probeMs: number;
+    cachedZoneYears: number; // zone-years served from the seed cache
+    probedZoneYears: number; // zone-years freshly probed this run
   };
 }
 
@@ -113,24 +116,33 @@ interface Seg {
   offsetMin: number;
 }
 
-function signature(zone: string, start: number, end: number): Seg[] {
+// linear-scan stride for the schedule probe (generateTables). Transitions in
+// the bake window (current + 2 years) are months apart, so a coarse stride
+// finds the identical set as daily — verified equivalent up to 14d across all
+// zones — while binary search still refines each edge to the exact 15-min
+// step. History probing keeps the daily default (its 1995+ years aren't in
+// that equivalence check, and it's cached anyway). verifyTables() gates it.
+const SCHEDULE_STRIDE_DAYS = 7;
+
+function signature(zone: string, start: number, end: number, strideDays = 1): Seg[] {
   const toSeg = (step: number, key: string): Seg => {
     const cut = key.lastIndexOf('|');
     return { step, longName: key.slice(0, cut), offsetMin: +key.slice(cut + 1) };
   };
 
   const totalSteps = (end - start) / STEP_MS;
+  const stride = STEPS_PER_DAY * strideDays;
   const segs: Seg[] = [];
   let prev = probe(zone, start);
   let prevStep = 0; // last sampled step; probe(prevStep) === prev
 
   segs.push(toSeg(0, prev));
 
-  // daily samples, plus the year's final step — a transition in the last
+  // stride-day samples, plus the year's final step — a transition in the last
   // hours of Dec 31 (e.g. Kosrae's +12 -> +11 at local midnight 1999-01-01,
-  // mid-day Dec 31 UTC) would otherwise fall between the last daily sample
-  // and the year boundary
-  for (let step = STEPS_PER_DAY; ; step += STEPS_PER_DAY) {
+  // mid-day Dec 31 UTC) would otherwise fall between the last sample and the
+  // year boundary. Each detected change is binary-searched to its 15-min edge.
+  for (let step = stride; ; step += stride) {
     const s = Math.min(step, totalSteps - 1);
     const cur = probe(zone, start + s * STEP_MS);
 
@@ -238,16 +250,44 @@ function fitRule(perYear: EffSeg[][], years: number[], ti: number, to: 0 | 1): R
   return { month, nth, dow, atMin, to };
 }
 
-export function generateTables(): GeneratedTables {
+export function generateTables(seed: ProbeCache | null = null): GeneratedTables {
   const t0 = Date.now();
+  const fingerprint = scheduleFingerprint();
 
-  // ---- probe all zones across all years ----
+  // seed segments are trusted only when the runtime identity (names, offsets,
+  // bake year) matches; otherwise every zone-year is re-probed
+  const seedMap = new Map<string, Seg[]>();
+
+  if (seed != null && seed.fingerprint === fingerprint) {
+    for (const k in seed.segs) seedMap.set(k, decodeSig(seed.segs[k]!));
+  }
+
+  const usedSegs = new Map<string, Seg[]>(); // authoritative new cache
+  let cachedZoneYears = 0;
+  let probedZoneYears = 0;
+
+  // ---- probe all zones across all years (cache hit or coarse-stride scan) ----
   const rawByYear: Map<string, Seg[]>[] = YEARS.map((y) => {
     const start = Date.UTC(y, 0, 1);
     const end = Date.UTC(y + 1, 0, 1);
     const m = new Map<string, Seg[]>();
 
-    for (const zone of zones) m.set(zone, signature(zone, start, end));
+    for (const zone of zones) {
+      const key = `${zone}|${y}`;
+      const seeded = seedMap.get(key);
+      let segs: Seg[];
+
+      if (seeded != null) {
+        segs = seeded;
+        cachedZoneYears++;
+      } else {
+        segs = signature(zone, start, end, SCHEDULE_STRIDE_DAYS);
+        probedZoneYears++;
+      }
+
+      m.set(zone, segs);
+      usedSegs.set(key, segs);
+    }
 
     return m;
   });
@@ -335,6 +375,10 @@ export function generateTables(): GeneratedTables {
     }
   }
 
+  const segs: Record<string, string> = {};
+
+  for (const [k, v] of usedSegs) segs[k] = encodeSig(v);
+
   return {
     year: YEAR,
     years: YEARS,
@@ -342,6 +386,7 @@ export function generateTables(): GeneratedTables {
     stepMs: STEP_MS,
     classGroups,
     scheduleClasses,
+    cache: { fingerprint, segs },
     stats: {
       zones: zones.length,
       sigClasses: bySig.size,
@@ -353,6 +398,8 @@ export function generateTables(): GeneratedTables {
       irregularClasses,
       irregularZones,
       probeMs: Date.now() - t0,
+      cachedZoneYears,
+      probedZoneYears,
     },
   };
 }
@@ -377,6 +424,7 @@ export interface GeneratedHistory {
   fromYear: number;
   toYear: number; // exclusive: the bake year, where the main schedule takes over
   classes: HistoryClass[];
+  cache: ProbeCache; // fingerprint + full probed segments, for tools/probe-cache.ts
   stats: {
     zones: number;
     coveredZones: number; // schedule reproduces their whole history; no class stored
@@ -386,6 +434,8 @@ export interface GeneratedHistory {
     rawYears: number;
     deferEras: number;
     probeMs: number;
+    cachedZoneYears: number; // zone-years served from the seed cache
+    probedZoneYears: number; // zone-years freshly probed this run
   };
 }
 
@@ -404,7 +454,7 @@ interface YearFit {
   steps: number[] | null; // kind 2
 }
 
-interface OffSeg {
+export interface OffSeg {
   step: number;
   off: number;
 }
@@ -421,6 +471,119 @@ function probeOffSegs(zone: string, year: number): OffSeg[] {
 
   return segs;
 }
+
+// ---- probe cache (persisted by tools/probe-cache.ts) ----
+//
+// A zone-year's offset segments are a pure function of (zone, year, the
+// runtime's tzdata), so they never need re-probing while the tzdata is
+// unchanged. probeFingerprint() is a cheap content identity for that tzdata:
+// a matching fingerprint means every cached zone-year is valid VERBATIM, so a
+// re-gen only probes new years (a rolled bake year, or a widened window). Any
+// tzdata change flips the fingerprint and the whole cache is discarded (full
+// re-probe), so the cache can only speed up a correct run, never alter it.
+
+export interface ProbeCache {
+  fingerprint: string; // runtime identity; must match for `segs` to be trusted
+  segs: Record<string, string>; // "zone|year" -> encoded segments; the full probed set
+}
+
+// cyrb53 incremental hasher — deterministic and browser-safe (no node:crypto).
+// Collisions are astronomically unlikely and would at worst reuse a cache that
+// is identical on every probed instant, so still correct.
+function makeHasher() {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+
+  return {
+    feed(s: string): void {
+      for (let i = 0; i < s.length; i++) {
+        const ch = s.charCodeAt(i);
+        h1 = Math.imul(h1 ^ ch, 2654435761);
+        h2 = Math.imul(h2 ^ ch, 1597334677);
+      }
+    },
+    digest(): string {
+      let a = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+      a ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+      let b = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+      b ^= Math.imul(a ^ (a >>> 13), 3266489909);
+
+      return (4294967296 * (2097151 & b) + (a >>> 0)).toString(36);
+    },
+  };
+}
+
+// a spread of instants across the history window and a bit past the bake year,
+// in both hemispheres' summer — enough to fingerprint any offset/DST change
+const FP_INSTANTS = [1995, 2003, 2010, 2018, 2026, 2035].flatMap((y) => [
+  Date.UTC(y, 0, 15, 12),
+  Date.UTC(y, 6, 15, 12),
+]);
+
+// offset only: history stores offsets only, so CLDR NAME churn must not
+// invalidate it (the schedule, which carries names, has its own fingerprint)
+function offsetAt(zone: string, ts: number): number {
+  const key = probe(zone, ts);
+
+  return +key.slice(key.lastIndexOf('|') + 1);
+}
+
+// tzdata identity for the HISTORY cache: every zone's offset at the fixed
+// instants (offset-only, so CLDR name changes don't churn the offset history)
+export function probeFingerprint(): string {
+  const h = makeHasher();
+
+  for (const zone of zones) {
+    for (const ts of FP_INSTANTS) h.feed(`${zone}@${ts}=${offsetAt(zone, ts)};`);
+  }
+
+  return h.digest();
+}
+
+// identity for the SCHEDULE cache: full "name|offset" at instants IN the bake
+// window plus the bake year itself. Unlike probeFingerprint it DOES fold in
+// CLDR names (the schedule carries abbrs) and shifts yearly (the probed window
+// moves), so a name change or a year roll invalidates it — but not the
+// offset-only history cache.
+export function scheduleFingerprint(): string {
+  const h = makeHasher();
+  const insts = YEARS.flatMap((y) => [Date.UTC(y, 0, 15, 12), Date.UTC(y, 6, 15, 12)]);
+
+  h.feed(`Y${YEAR};`);
+
+  for (const zone of zones) {
+    for (const ts of insts) h.feed(`${zone}@${ts}=${probe(zone, ts)};`);
+  }
+
+  return h.digest();
+}
+
+const encodeSegs = (segs: OffSeg[]): string => segs.map((s) => `${s.step}:${s.off}`).join(',');
+const decodeSegs = (s: string): OffSeg[] =>
+  s.split(',').map((p) => {
+    const c = p.indexOf(':');
+
+    return { step: +p.slice(0, c), off: +p.slice(c + 1) };
+  });
+
+// schedule segments carry the CLDR long name (free text: spaces, digits, ':'
+// as in "GMT-05:00"), so put it LAST and slice off the two leading numeric
+// fields by index; segments join on ';', which long names never contain
+const encodeSig = (segs: Seg[]): string =>
+  segs
+    .map((s) => {
+      if (s.longName.includes(';')) throw new Error(`';' in zone long name: ${s.longName}`);
+
+      return `${s.step}:${s.offsetMin}:${s.longName}`;
+    })
+    .join(';');
+const decodeSig = (str: string): Seg[] =>
+  str.split(';').map((p) => {
+    const i1 = p.indexOf(':');
+    const i2 = p.indexOf(':', i1 + 1);
+
+    return { step: +p.slice(0, i1), offsetMin: +p.slice(i1 + 1, i2), longName: p.slice(i2 + 1) };
+  });
 
 // does the zone's SCHEDULE class reproduce this observed year exactly
 // (same offsets, transitions at the same 15-min instants)? Such years need
@@ -511,7 +674,13 @@ function mergeTrans(run: [TransFit, TransFit], f: [TransFit, TransFit]): boolean
 // eras for one zone, or null when the schedule class reproduces EVERY year
 // (the zone then needs no history class at all). Years the schedule gets
 // right become defer eras (kind 3) instead of stored data.
-function buildEras(zone: string, cls: ScheduleClass, fromYear: number, toYear: number): HistoryEra[] | null {
+function buildEras(
+  zone: string,
+  cls: ScheduleClass,
+  fromYear: number,
+  toYear: number,
+  segsOf: (year: number) => OffSeg[]
+): HistoryEra[] | null {
   const eras: HistoryEra[] = [];
   let run: YearFit | null = null; // open static/rule span
   let deferFrom = -1; // open defer span
@@ -554,7 +723,7 @@ function buildEras(zone: string, cls: ScheduleClass, fromYear: number, toYear: n
   };
 
   for (let year = fromYear; year < toYear; year++) {
-    const segs = probeOffSegs(zone, year);
+    const segs = segsOf(year);
 
     if (matchesSchedule(cls, year, segs)) {
       finalize();
@@ -588,9 +757,49 @@ function buildEras(zone: string, cls: ScheduleClass, fromYear: number, toYear: n
   return stored ? eras : null;
 }
 
-export function generateHistory(tables: GeneratedTables, fromYear: number = HISTORY_FROM): GeneratedHistory {
+export function generateHistory(
+  tables: GeneratedTables,
+  fromYear: number = HISTORY_FROM,
+  seed: ProbeCache | null = null
+): GeneratedHistory {
   const t0 = Date.now();
   const toYear = tables.year;
+  const fingerprint = probeFingerprint();
+
+  // seed segments are only trustworthy when the tzdata identity matches;
+  // otherwise every zone-year is re-probed (a tzdata change may have revised
+  // any historical year)
+  const seedMap = new Map<string, OffSeg[]>();
+
+  if (seed != null && seed.fingerprint === fingerprint) {
+    for (const k in seed.segs) seedMap.set(k, decodeSegs(seed.segs[k]!));
+  }
+
+  // authoritative new cache: exactly the zone-years touched this run, deduped
+  const probedSegs = new Map<string, OffSeg[]>();
+  let cachedZoneYears = 0;
+  let probedZoneYears = 0;
+
+  const segsOf = (zone: string, year: number): OffSeg[] => {
+    const key = `${zone}|${year}`;
+    const have = probedSegs.get(key);
+
+    if (have != null) return have;
+
+    const seeded = seedMap.get(key);
+    let segs: OffSeg[];
+
+    if (seeded != null) {
+      segs = seeded;
+      cachedZoneYears++;
+    } else {
+      segs = probeOffSegs(zone, year);
+      probedZoneYears++;
+    }
+
+    probedSegs.set(key, segs);
+    return segs;
+  };
 
   // the irregular-class zones are excluded: their behavior isn't
   // rule-expressible in ANY year, so history would be 31 raw years each
@@ -613,7 +822,7 @@ export function generateHistory(tables: GeneratedTables, fromYear: number = HIST
 
     zoneCount++;
 
-    const eras = buildEras(zone, classOf.get(zone)!, fromYear, toYear);
+    const eras = buildEras(zone, classOf.get(zone)!, fromYear, toYear, (y) => segsOf(zone, y));
 
     if (eras === null) {
       coveredZones++;
@@ -643,10 +852,15 @@ export function generateHistory(tables: GeneratedTables, fromYear: number = HIST
     }
   }
 
+  const segs: Record<string, string> = {};
+
+  for (const [k, v] of probedSegs) segs[k] = encodeSegs(v);
+
   return {
     fromYear,
     toYear,
     classes,
+    cache: { fingerprint, segs },
     stats: {
       zones: zoneCount,
       coveredZones,
@@ -656,6 +870,8 @@ export function generateHistory(tables: GeneratedTables, fromYear: number = HIST
       rawYears,
       deferEras,
       probeMs: Date.now() - t0,
+      cachedZoneYears,
+      probedZoneYears,
     },
   };
 }

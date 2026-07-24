@@ -10,8 +10,12 @@
 import { generateTables, verifyTables, generateHistory } from './gen-core.ts';
 import { emitClassesTs, emitScheduleTs, emitHistoryTs, type GenMeta } from './emitters.ts';
 import { writeTableSet } from './table-files.ts';
+import { loadProbeCache, saveProbeCache } from './probe-cache.ts';
 
-const tables = generateTables();
+const tables = generateTables(loadProbeCache('schedule', 'bun'));
+
+saveProbeCache('schedule', 'bun', tables.cache, tables.years[0]!, tables.years.at(-1)!);
+
 const verification = verifyTables(tables);
 
 if (verification.mismatches.length > 0) {
@@ -19,7 +23,9 @@ if (verification.mismatches.length > 0) {
   process.exit(1);
 }
 
-const history = generateHistory(tables);
+const history = generateHistory(tables, undefined, loadProbeCache('history', 'bun'));
+
+saveProbeCache('history', 'bun', history.cache, history.fromYear, history.toYear);
 
 const meta: GenMeta = {
   host: `bun ${Bun.version}`,
@@ -38,7 +44,7 @@ const h = history.stats;
 
 console.log(
   `wrote shared/tables/bun/{classes,schedule,history}.ts (host: ${meta.host}, icu ${meta.icu}, active variant: ${active}):\n` +
-    `  ${s.zones} zones -> ${s.sigClasses} classes / ${s.schedClasses} schedule classes (${s.staticClasses} static, ${s.ruleClasses} rule, ${s.irregularClasses} irregular w/ ${s.irregularZones} zones), probe ${s.probeMs}ms\n` +
-    `  history ${history.fromYear}-${history.toYear - 1}: ${h.zones} zones (${h.coveredZones} schedule-covered) -> ${h.classes} classes (${h.staticEras} static, ${h.ruleEras} rule, ${h.rawYears} raw, ${h.deferEras} defer eras), probe ${h.probeMs}ms\n` +
+    `  ${s.zones} zones -> ${s.sigClasses} classes / ${s.schedClasses} schedule classes (${s.staticClasses} static, ${s.ruleClasses} rule, ${s.irregularClasses} irregular w/ ${s.irregularZones} zones), probe ${s.probeMs}ms (${s.cachedZoneYears} cached / ${s.probedZoneYears} probed)\n` +
+    `  history ${history.fromYear}-${history.toYear - 1}: ${h.zones} zones (${h.coveredZones} schedule-covered) -> ${h.classes} classes (${h.staticEras} static, ${h.ruleEras} rule, ${h.rawYears} raw, ${h.deferEras} defer eras), probe ${h.probeMs}ms (${h.cachedZoneYears} cached / ${h.probedZoneYears} probed)\n` +
     `  self-verified: ${verification.checks} checks at ${verification.instants} instants, 0 mismatches`
 );

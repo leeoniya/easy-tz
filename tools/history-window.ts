@@ -1,19 +1,15 @@
-// Analysis: how does the historical window's start year trade off against
-// bundle size and fidelity? Regenerates the packed history at several cutoffs
-// (reusing the real generator + emitter, so the sizes are exactly what would
-// ship) and, from the full 1995 eras, counts how many zones would lose exact
-// coverage below each cutoff (a zone mismatches ICU in year Y under pure
-// schedule projection iff its history has a non-defer era live at mid-Y).
+// Analysis: how many zones would answer INCORRECTLY if we contract the
+// historical window one year at a time (1995 -> 2015)? A zone is incorrect for
+// year Y once Y is dropped iff pure schedule projection diverges from ICU that
+// year — i.e. its full-window history has a non-defer era live at mid-Y. This
+// derives everything from ONE full-window history generation (no per-cutoff
+// regeneration), so it's fast; it reports fidelity only, not bundle size.
 //
 // Run: bun tools/history-window.ts
 
-import { gzipSync } from 'bun';
 import { generateTables, generateHistory, HISTORY_FROM } from './gen-core.ts';
-import { emitHistoryTs, type GenMeta } from './emitters.ts';
 import { resolveHistory } from '../shared/rules.ts';
 import { STEP_MS } from '../shared/schedule.ts';
-
-const meta: GenMeta = { host: `bun ${Bun.version}`, icu: process.versions.icu ?? null, generated: new Date().toISOString() };
 
 const tables = generateTables();
 const bakeYear = tables.year;
@@ -22,79 +18,59 @@ const bakeYear = tables.year;
 // how many zones diverge from the schedule projection
 const full = generateHistory(tables, HISTORY_FROM);
 
-// zones that diverge from the schedule in year `y` (non-defer era live at mid-year)
-function divergingZones(y: number): number {
+// zones that diverge from ICU in year `y` under pure schedule projection
+// (a non-defer era live at mid-year) — the zones the history keeps exact
+function divergingZoneSet(y: number): string[] {
   const midY = Date.UTC(y, 5, 1, 12);
-  let n = 0;
+  const out: string[] = [];
 
   for (const c of full.classes) {
-    if (resolveHistory(c.eras, midY, STEP_MS) !== null) n += c.zones.length;
+    if (resolveHistory(c.eras, midY, STEP_MS) !== null) out.push(...c.zones);
   }
 
-  return n;
+  return out;
 }
 
 // per-year divergence across the full window (what each year "buys")
 const perYear: [number, number][] = [];
-for (let y = HISTORY_FROM; y < bakeYear; y++) perYear.push([y, divergingZones(y)]);
+for (let y = HISTORY_FROM; y < bakeYear; y++) perYear.push([y, divergingZoneSet(y).length]);
 
 console.log(`bake year ${bakeYear}; full window ${HISTORY_FROM}-${bakeYear - 1}\n`);
 console.log('zones diverging from pure schedule projection, by year:');
 console.log('  ' + perYear.map(([y, n]) => `${String(y).slice(2)}:${n}`).join('  '));
 console.log('  (these are the zones the history table exists to keep exact)\n');
 
-const gz = (s: string) => gzipSync(Buffer.from(s), { level: 9 }).length;
-
-const cutoffs = [1995, 2000, 2005, 2007, 2010, 2013, 2015, 2018, 2020, 2022, 2024];
+// contract the window one year at a time, 1995 -> 2015: for each start year,
+// how many zones would answer INCORRECTLY for some instant in the dropped
+// years [1995, start)? Cumulative + unique, derived from the full eras alone.
+const LAST_CUTOFF = 2015;
+const totalZones = tables.stats.zones;
 
 const rows: string[][] = [];
-let baseRaw = 0, baseGz = 0;
+const lostZones = new Set<string>();
+let prevLost = 0;
 
-for (const from of cutoffs) {
-  if (from >= bakeYear) continue;
+for (let from = HISTORY_FROM; from <= LAST_CUTOFF && from < bakeYear; from++) {
+  // starting at `from` drops year (from - 1); fold that year's divergers in
+  if (from > HISTORY_FROM) for (const z of divergingZoneSet(from - 1)) lostZones.add(z);
 
-  const h = generateHistory(tables, from);
-  const src = emitHistoryTs(h, tables, meta);
-  const raw = Buffer.byteLength(src);
-  const gzip = gz(src);
-
-  if (from === HISTORY_FROM) {
-    baseRaw = raw;
-    baseGz = gzip;
-  }
-
-  // zones that lose exact coverage if we start at `from`: any zone that
-  // diverges in some dropped year [HISTORY_FROM, from)
-  const lostZones = new Set<string>();
-
-  for (let y = HISTORY_FROM; y < from; y++) {
-    const midY = Date.UTC(y, 5, 1, 12);
-
-    for (const c of full.classes) {
-      if (resolveHistory(c.eras, midY, STEP_MS) !== null) for (const z of c.zones) lostZones.add(z);
-    }
-  }
-
-  const st = h.stats;
+  const newly = lostZones.size - prevLost;
+  prevLost = lostZones.size;
 
   rows.push([
     `${from}-${bakeYear - 1}`,
-    `${(raw / 1024).toFixed(1)} KB`,
-    `${(gzip / 1024).toFixed(2)} KB`,
-    baseGz ? `${gzip - baseGz > 0 ? '+' : ''}${((gzip - baseGz) / 1024).toFixed(2)} KB` : '-',
-    `${st.classes}`,
-    `${st.staticEras}/${st.ruleEras}/${st.rawYears}`,
-    `${st.coveredZones}`,
     `${lostZones.size}`,
+    from === HISTORY_FROM ? '-' : `+${newly}`,
+    `${((lostZones.size / totalZones) * 100).toFixed(1)}%`,
   ]);
 }
 
-console.log('window            raw       gzip      Δgzip     classes  s/r/raw eras  covered  zones losing exact coverage');
-console.log('-'.repeat(108));
+console.log(`contracting the window one year at a time (${HISTORY_FROM} -> ${LAST_CUTOFF}); ${totalZones} zones total\n`);
+console.log('window       incorrect zones  +new   % of all');
+console.log('-'.repeat(48));
 for (const r of rows) {
-  console.log(
-    `${r[0]!.padEnd(16)}  ${r[1]!.padStart(7)}  ${r[2]!.padStart(8)}  ${r[3]!.padStart(8)}  ${r[4]!.padStart(6)}  ${r[5]!.padStart(11)}  ${r[6]!.padStart(6)}  ${r[7]!.padStart(6)}`
-  );
+  console.log(`${r[0]!.padEnd(11)}  ${r[1]!.padStart(15)}  ${r[2]!.padStart(4)}  ${r[3]!.padStart(7)}`);
 }
-console.log(`\nbaseline (1995) history.ts: ${(baseRaw / 1024).toFixed(1)} KB raw, ${(baseGz / 1024).toFixed(2)} KB gzip`);
-console.log('Δgzip is the change in the SHIPPED per-impl (07/10) history payload vs the 1995 baseline.');
+console.log('\n"incorrect zones" = zones that would diverge from ICU for some instant in the dropped');
+console.log('years [1995, start) once the window begins at `start` (cumulative, unique).');
+console.log('"+new" = zones first made incorrect by dropping that one additional year.');
