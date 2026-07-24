@@ -288,8 +288,8 @@ function resolveAbbr(longName) {
   }
   return abbr;
 }
-function liveParts(fmtZone, timestamp, date) {
-  const parts = partsFmt(fmtZone).formatToParts(date);
+function liveParts(fmtZone, timestamp) {
+  const parts = partsFmt(fmtZone).formatToParts(timestamp);
   let year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;
   let longName = "";
   for (const p of parts) {
@@ -437,14 +437,13 @@ function formatZoneOf(name) {
 function compute(timestamp) {
   if (repOf === null)
     init();
-  const date = new Date(timestamp);
   const out = [];
   const repResults = new Map;
   for (const name of zones) {
     const fmtZone = formatZoneOf(name);
     let res = repResults.get(fmtZone);
     if (res == null) {
-      res = liveParts(fmtZone, timestamp, date);
+      res = liveParts(fmtZone, timestamp);
       repResults.set(fmtZone, res);
     }
     out.push(makeInfo(name, zoneAbbrOverrides[name] ?? res.abbr, res.offset));

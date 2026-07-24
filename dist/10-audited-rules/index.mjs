@@ -185,17 +185,40 @@ function buildScheduleIndex(zoneList, classes) {
   }
   return zoneList.map((z) => idxOf.get(z) ?? idxOf.get(zoneLinks.get(z) ?? "") ?? -1);
 }
+var DAY_MS = 86400000;
+var MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+var isLeap = (y) => y % 4 === 0 && y % 100 !== 0 || y % 400 === 0;
+var daysInMonth = (y, m) => m === 2 && isLeap(y) ? 29 : MONTH_DAYS[m - 1];
+function daysFromCivil(y, m, d) {
+  const yy = y - (m <= 2 ? 1 : 0);
+  const era = Math.floor((yy >= 0 ? yy : yy - 399) / 400);
+  const yoe = yy - era * 400;
+  const doy = Math.floor((153 * (m > 2 ? m - 3 : m + 9) + 2) / 5) + d - 1;
+  const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy;
+  return era * 146097 + doe - 719468;
+}
+var dowFromCivil = (y, m, d) => ((daysFromCivil(y, m, d) + 4) % 7 + 7) % 7;
+function yearFromMs(ts) {
+  let z = Math.floor(ts / DAY_MS) + 719468;
+  const era = Math.floor((z >= 0 ? z : z - 146096) / 146097);
+  const doe = z - era * 146097;
+  const yoe = Math.floor((doe - Math.floor(doe / 1460) + Math.floor(doe / 36524) - Math.floor(doe / 146096)) / 365);
+  const y = yoe + era * 400;
+  const doy = doe - (365 * yoe + Math.floor(yoe / 4) - Math.floor(yoe / 100));
+  const mp = Math.floor((5 * doy + 2) / 153);
+  return (mp < 10 ? mp + 3 : mp - 9) <= 2 ? y + 1 : y;
+}
 function ruleInstant(year, rule, offBeforeMin) {
   let day;
   if (rule.nth === 5) {
-    const daysInMonth = new Date(Date.UTC(year, rule.month, 0)).getUTCDate();
-    const lastDow = new Date(Date.UTC(year, rule.month - 1, daysInMonth)).getUTCDay();
-    day = daysInMonth - (lastDow - rule.dow + 7) % 7;
+    const dim = daysInMonth(year, rule.month);
+    const lastDow = dowFromCivil(year, rule.month, dim);
+    day = dim - (lastDow - rule.dow + 7) % 7;
   } else {
-    const firstDow = new Date(Date.UTC(year, rule.month - 1, 1)).getUTCDay();
+    const firstDow = dowFromCivil(year, rule.month, 1);
     day = 1 + (rule.dow - firstDow + 7) % 7 + (rule.nth - 1) * 7;
   }
-  return Date.UTC(year, rule.month - 1, day) + (rule.atMin - offBeforeMin) * 60000;
+  return daysFromCivil(year, rule.month, day) * DAY_MS + (rule.atMin - offBeforeMin) * 60000;
 }
 function ruleCycleIndex(off0, off1, r1, r2, year, ts) {
   const t1 = ruleInstant(year, r1, r1.to === 0 ? off1 : off0);
@@ -218,14 +241,14 @@ function resolveClass(cls, ts, yearStart, stepMs) {
     return cls.states[0];
   if (cls.kind === 1) {
     const [r1, r2] = cls.rules;
-    const year = new Date(ts).getUTCFullYear();
+    const year = yearFromMs(ts);
     return cls.states[ruleCycleIndex(cls.states[0].offMin, cls.states[1].offMin, r1, r2, year, ts)];
   }
   const i = segmentIndex(cls.starts, ts, yearStart, stepMs);
   return { abbr: cls.abbrs[i], offMin: cls.offMins[i] };
 }
 function resolveHistory(eras, ts, stepMs) {
-  const year = new Date(ts).getUTCFullYear();
+  const year = yearFromMs(ts);
   let e = eras[0];
   for (const era of eras) {
     if (era.fromYear <= year)

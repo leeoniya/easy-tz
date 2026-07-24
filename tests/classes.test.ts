@@ -54,13 +54,11 @@ describe('class table (impl 08 grouping hints)', () => {
     }
 
     for (const ts of instants) {
-      const date = new Date(ts);
-
       for (const group of classGroups) {
-        const rep = liveParts(group[0]!, ts, date);
+        const rep = liveParts(group[0]!, ts);
 
         for (let i = 1; i < group.length; i++) {
-          const member = liveParts(group[i]!, ts, date);
+          const member = liveParts(group[i]!, ts);
 
           expect(`${group[i]} ${member.abbr} ${member.offset}`).toBe(`${group[i]} ${rep.abbr} ${rep.offset}`);
         }

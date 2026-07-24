@@ -273,8 +273,8 @@ function resolveAbbr(longName) {
   }
   return abbr;
 }
-function liveParts(fmtZone, timestamp, date) {
-  const parts = partsFmt(fmtZone).formatToParts(date);
+function liveParts(fmtZone, timestamp) {
+  const parts = partsFmt(fmtZone).formatToParts(timestamp);
   let year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;
   let longName = "";
   for (const p of parts) {
@@ -306,8 +306,8 @@ function liveParts(fmtZone, timestamp, date) {
   const offsetMin = Math.round((asUTC - timestamp) / 60000);
   return { abbr: resolveAbbr(longName), offset: offsetMin };
 }
-function liveZoneInfo(name, timestamp, date) {
-  const r = liveParts(zoneAliases[name] ?? name, timestamp, date);
+function liveZoneInfo(name, timestamp) {
+  const r = liveParts(zoneAliases[name] ?? name, timestamp);
   return makeInfo(name, zoneAbbrOverrides[name] ?? r.abbr, r.offset);
 }
 
@@ -366,10 +366,9 @@ function formatOffset2(minutes) {
 
 // impls/04-live-intl/index.ts
 function compute(timestamp) {
-  const date = new Date(timestamp);
   const out = [];
   for (const name of zones) {
-    out.push(liveZoneInfo(name, timestamp, date));
+    out.push(liveZoneInfo(name, timestamp));
   }
   return out;
 }

@@ -44,6 +44,50 @@ export function buildScheduleIndex(zoneList: readonly string[], classes: readonl
   return zoneList.map((z) => idxOf.get(z) ?? idxOf.get(zoneLinks.get(z) ?? '') ?? -1);
 }
 
+// ---- allocation-free civil-date math (Howard Hinnant's algorithms) ----
+//
+// The rule/era resolvers run in tight per-zone loops (hundreds of classes per
+// getTimeZonesAt(), and one per call for getTimeZoneAt() sweeping thousands of
+// timestamps). Going through `new Date(...)` just to read a year, weekday, or
+// month length allocated a throwaway Date object each time; these do the same
+// arithmetic on epoch integers with zero allocation. Range-general (valid for
+// any Gregorian year), so pre-1970 history is fine too.
+
+const DAY_MS = 86_400_000;
+const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+const isLeap = (y: number): boolean => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+
+// days in month `m` (1-12) of `y`
+const daysInMonth = (y: number, m: number): number => (m === 2 && isLeap(y) ? 29 : MONTH_DAYS[m - 1]!);
+
+// days since 1970-01-01 (UTC) for the given civil date (m: 1-12)
+function daysFromCivil(y: number, m: number, d: number): number {
+  const yy = y - (m <= 2 ? 1 : 0);
+  const era = Math.floor((yy >= 0 ? yy : yy - 399) / 400);
+  const yoe = yy - era * 400;
+  const doy = Math.floor((153 * (m > 2 ? m - 3 : m + 9) + 2) / 5) + d - 1;
+  const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy;
+
+  return era * 146097 + doe - 719468;
+}
+
+// day of week (0 = Sunday) of a civil date; 1970-01-01 (day 0) was a Thursday
+const dowFromCivil = (y: number, m: number, d: number): number => ((daysFromCivil(y, m, d) + 4) % 7 + 7) % 7;
+
+// UTC year containing epoch-ms `ts`, with no Date allocation
+export function yearFromMs(ts: number): number {
+  let z = Math.floor(ts / DAY_MS) + 719468;
+  const era = Math.floor((z >= 0 ? z : z - 146096) / 146097);
+  const doe = z - era * 146097;
+  const yoe = Math.floor((doe - Math.floor(doe / 1460) + Math.floor(doe / 36524) - Math.floor(doe / 146096)) / 365);
+  const y = yoe + era * 400;
+  const doy = doe - (365 * yoe + Math.floor(yoe / 4) - Math.floor(yoe / 100));
+  const mp = Math.floor((5 * doy + 2) / 153);
+
+  return (mp < 10 ? mp + 3 : mp - 9) <= 2 ? y + 1 : y;
+}
+
 // UTC instant (ms) at which `rule` fires in `year`; offBeforeMin converts
 // the local wall time to UTC (the offset in effect BEFORE the transition)
 export function ruleInstant(year: number, rule: Rule, offBeforeMin: number): number {
@@ -51,15 +95,15 @@ export function ruleInstant(year: number, rule: Rule, offBeforeMin: number): num
 
   if (rule.nth === 5) {
     // last <dow> of month
-    const daysInMonth = new Date(Date.UTC(year, rule.month, 0)).getUTCDate();
-    const lastDow = new Date(Date.UTC(year, rule.month - 1, daysInMonth)).getUTCDay();
-    day = daysInMonth - ((lastDow - rule.dow + 7) % 7);
+    const dim = daysInMonth(year, rule.month);
+    const lastDow = dowFromCivil(year, rule.month, dim);
+    day = dim - ((lastDow - rule.dow + 7) % 7);
   } else {
-    const firstDow = new Date(Date.UTC(year, rule.month - 1, 1)).getUTCDay();
+    const firstDow = dowFromCivil(year, rule.month, 1);
     day = 1 + ((rule.dow - firstDow + 7) % 7) + (rule.nth - 1) * 7;
   }
 
-  return Date.UTC(year, rule.month - 1, day) + (rule.atMin - offBeforeMin) * 60_000;
+  return daysFromCivil(year, rule.month, day) * DAY_MS + (rule.atMin - offBeforeMin) * 60_000;
 }
 
 // ---- shared resolution primitives (used by both the schedule resolver and
@@ -100,7 +144,7 @@ export function resolveClass(cls: ScheduleClass, ts: number, yearStart: number, 
 
   if (cls.kind === 1) {
     const [r1, r2] = cls.rules; // emitted sorted by month
-    const year = new Date(ts).getUTCFullYear();
+    const year = yearFromMs(ts);
 
     return cls.states[ruleCycleIndex(cls.states[0].offMin, cls.states[1].offMin, r1, r2, year, ts)];
   }
@@ -146,7 +190,7 @@ export interface HistoryClass {
 // zone's schedule class (kind 3); clamps to the first/last era outside the
 // covered span (callers gate on [HISTORY_FROM, bake year) themselves)
 export function resolveHistory(eras: HistoryEra[], ts: number, stepMs: number): number | null {
-  const year = new Date(ts).getUTCFullYear();
+  const year = yearFromMs(ts);
   let e = eras[0]!;
 
   for (const era of eras) {

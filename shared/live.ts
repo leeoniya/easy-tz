@@ -40,8 +40,9 @@ function resolveAbbr(longName: string): string {
 // parses `fmtZone`'s live Intl output at an instant: resolved abbr + offset in
 // signed minutes. callers sharing one fmtZone across grouped zones (impl 08)
 // memoize this result per call and apply per-zone overrides themselves.
-export function liveParts(fmtZone: string, timestamp: number, date: Date): { abbr: string; offset: number } {
-  const parts = partsFmt(fmtZone).formatToParts(date);
+// formatToParts accepts the epoch-ms directly, so no Date is allocated.
+export function liveParts(fmtZone: string, timestamp: number): { abbr: string; offset: number } {
+  const parts = partsFmt(fmtZone).formatToParts(timestamp);
 
   let year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;
   let longName = '';
@@ -67,8 +68,8 @@ export function liveParts(fmtZone: string, timestamp: number, date: Date): { abb
 
 // full live resolution for one zone, applying the curated metazone alias
 // (e.g. Guernsey -> London) and zone-level abbr overrides (Istanbul -> TRT)
-export function liveZoneInfo(name: string, timestamp: number, date: Date): TimeZoneInfo {
-  const r = liveParts(zoneAliases[name] ?? name, timestamp, date);
+export function liveZoneInfo(name: string, timestamp: number): TimeZoneInfo {
+  const r = liveParts(zoneAliases[name] ?? name, timestamp);
 
   return makeInfo(name, zoneAbbrOverrides[name] ?? r.abbr, r.offset);
 }

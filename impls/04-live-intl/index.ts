@@ -17,11 +17,10 @@ import { hourBucketMemo } from '../../shared/hourCache.ts';
 import { liveZoneInfo } from '../../shared/live.ts';
 
 function compute(timestamp: number): TimeZoneInfo[] {
-  const date = new Date(timestamp);
   const out: TimeZoneInfo[] = [];
 
   for (const name of zones) {
-    out.push(liveZoneInfo(name, timestamp, date));
+    out.push(liveZoneInfo(name, timestamp));
   }
 
   return out;
@@ -36,5 +35,5 @@ export { formatOffset } from '../../shared/offsetFormat.ts';
 // single-zone resolver (single-zone / many-timestamps use case): the same
 // per-zone live-Intl leaf getTimeZonesAt() loops, resolved directly for `name`.
 export function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo {
-  return liveZoneInfo(name, timestamp, new Date(timestamp));
+  return liveZoneInfo(name, timestamp);
 }

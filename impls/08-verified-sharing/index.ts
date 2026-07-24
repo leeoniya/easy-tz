@@ -119,7 +119,6 @@ function formatZoneOf(name: string): string {
 function compute(timestamp: number): TimeZoneInfo[] {
   if (repOf === null) init();
 
-  const date = new Date(timestamp);
   const out: TimeZoneInfo[] = [];
   const repResults = new Map<string, { abbr: string; offset: number }>();
 
@@ -129,7 +128,7 @@ function compute(timestamp: number): TimeZoneInfo[] {
     let res = repResults.get(fmtZone);
 
     if (res == null) {
-      res = liveParts(fmtZone, timestamp, date);
+      res = liveParts(fmtZone, timestamp);
       repResults.set(fmtZone, res);
     }
 
@@ -152,7 +151,7 @@ export { formatOffset } from '../../shared/offsetFormat.ts';
 export function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo {
   if (repOf === null) init();
 
-  const res = liveParts(formatZoneOf(name), timestamp, new Date(timestamp));
+  const res = liveParts(formatZoneOf(name), timestamp);
 
   return makeInfo(name, zoneAbbrOverrides[name] ?? res.abbr, res.offset);
 }
