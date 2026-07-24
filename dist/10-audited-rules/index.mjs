@@ -316,6 +316,13 @@ var HISTORY_TO_MS = Date.UTC(HISTORY_TO, 0, 1);
 var nameIdx = new Map;
 for (let z = 0;z < zones.length; z++)
   nameIdx.set(zones[z], z);
+function zoneIndexOf(name) {
+  const z = nameIdx.get(name);
+  if (z != null)
+    return z;
+  const bridged = zoneLinks.get(name);
+  return bridged != null ? nameIdx.get(bridged) ?? -1 : -1;
+}
 function historyAbbr(cls, offMin) {
   if (cls.kind === 0) {
     if (cls.states[0].offMin === offMin)
@@ -353,6 +360,12 @@ function bakedZoneInfo(name, ci, hi, timestamp, historical, schedCache, histCach
       schedCache[ci] = st;
   }
   return makeInfo(name, st.abbr, st.offMin);
+}
+function getTimeZoneAt(name, timestamp) {
+  const z = zoneIndexOf(name);
+  const ci = z === -1 ? -1 : classIdx[z];
+  const hi = z === -1 ? -1 : histIdx[z];
+  return bakedZoneInfo(name, ci, hi, timestamp, timestamp < HISTORY_TO_MS);
 }
 function computeBaked(timestamp) {
   const historical = timestamp < HISTORY_TO_MS;
@@ -520,11 +533,27 @@ function compute(timestamp) {
   }
   return out;
 }
+function computeOne(name, timestamp) {
+  if (recovered === null)
+    init();
+  const z = zoneIndexOf(name);
+  if (z === -1)
+    return getTimeZoneAt(name, timestamp);
+  if (hasTemporal && timestamp < HISTORY_TO_MS) {
+    return liveInfo(name, classIdx[z], Temporal.Instant.fromEpochMilliseconds(timestamp));
+  }
+  if (recovered.size > 0 && recovered.has(z)) {
+    return liveRecovered(name, Temporal.Instant.fromEpochMilliseconds(timestamp));
+  }
+  return getTimeZoneAt(name, timestamp);
+}
 var memo = hourBucketMemo(compute);
 var getTimeZonesAt = memo.get;
 var clearCache = memo.clear;
+var getTimeZoneAt2 = computeOne;
 export {
   getTimeZonesAt,
+  getTimeZoneAt2 as getTimeZoneAt,
   formatOffset,
   clearCache
 };

@@ -1,10 +1,12 @@
 # 🌐 easy-tz
 
-Experiments in implementing a fast, dependency-free `getTimeZonesAt(timestamp)`. Scope: current-year accuracy in modern runtimes; results are independent of
-the host timezone (`TZ`). Historical tzdata accuracy is a non-goal.
+Experiments in implementing a fast, dependency-free `getTimeZonesAt(timestamp)`. Scope: current-year accuracy in modern runtimes, plus validated
+historical offsets back to 1995 for the baked impls (`07`/`10`); results are
+independent of the host timezone (`TZ`). Pre-1995 accuracy is a non-goal.
 
 ```ts
 function getTimeZonesAt(timestamp: number): TimeZoneInfo[];
+function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo; // one zone, many timestamps
 function formatOffset(minutes: number): string; // -300 -> "-05:00"
 
 interface TimeZoneInfo {
@@ -48,8 +50,10 @@ component. A small, fast replacement did not exist for this purpose (see
   first full-list call pays tens of milliseconds and tens of MB of ICU state.
 - Libraries with real abbreviations built in (moment-timezone,
   timezone-support, timezonecomplete, bigeasy/timezone) bundle full tzdata —
-  0.3-1.8 MB minified — carrying deep historical transition data this use
-  case doesn't need.
+  0.3-1.8 MB minified — carrying deep pre-modern transition data (sub-minute
+  19th-century offsets, every pre-1970 regime) this use case doesn't need.
+  The baked impls here instead bake a bounded, offsets-only 1995+ window (see
+  [Historical coverage](#historical-coverage-1995)).
 
 My [first attempt](https://github.com/leeoniya/timezones) split the
 difference with a generated offset→abbreviation lookup plus live Intl
@@ -153,6 +157,28 @@ Slowest cold start and heaviest memory (one formatter per zone forces the
 full ICU cost), but nothing can go stale except the small curated abbr map;
 it's the reference the other three are tested against.
 
+### Historical coverage (1995+)
+
+The baked impls answer timestamps *before* the bake year (back to 1995), not
+just projecting the current rules backward. `07` (and `10` on non-Temporal
+runtimes) resolves them through validated historical offset **eras** in
+`shared/history.ts` — a compact, offsets-only encoding of each zone's past
+DST regimes (e.g. the pre-2007 US rule, decree-driven one-off years). Offsets
+are exact; the label reuses the schedule class's abbreviation when the offset
+matches one of its states (the common "same abbreviations, different DST
+dates" case, like EST/EDT before 2007) and otherwise falls back to a
+GMT-style label — historical CLDR abbreviations aren't baked. On a Temporal
+runtime, `10` instead resolves the past live (Temporal is authoritative for
+history), and the live impls (`04`/`08`) always get history straight from
+Intl, so none of them need the baked eras.
+
+This window is deliberately bounded: `tools/sweep-validity.ts` checks every
+zone against the runtime's own ICU for each year from 1995 to the bake year
+(plus a couple ahead), and the eras are what makes those years exact. It's
+also the bulk of what makes `07`/`10` larger than `04`/`08` — a few KB of
+era data buys zero-Intl historical correctness. Pre-1995 timestamps clamp to
+the earliest era rather than erroring, but aren't validated.
+
 All impls memoize the full response per UTC hour bucket
 (`shared/hourCache.ts`): a single global
 slot keeps the last bucket's result and is refreshed whenever a timestamp
@@ -175,7 +201,7 @@ npm install @leeoniya/easy-tz
 ## Usage
 
 ```ts
-import { getTimeZonesAt, formatOffset } from '@leeoniya/easy-tz';
+import { getTimeZonesAt, getTimeZoneAt, formatOffset } from '@leeoniya/easy-tz';
 
 const zones = getTimeZonesAt(Date.now());
 // [
@@ -184,6 +210,11 @@ const zones = getTimeZonesAt(Date.now());
 //   { name: 'America/New_York',   abbr: 'EDT', offset: -240 },
 //   ...
 // ] — every IANA zone the runtime knows, sorted by name
+
+// resolve a SINGLE zone — the one-zone / many-timestamps counterpart, with
+// no full-list allocation. Unknown names resolve to a UTC sentinel.
+getTimeZoneAt('America/New_York', Date.now());
+// { name: 'America/New_York', abbr: 'EDT', offset: -240 }
 
 formatOffset(-240); // "-04:00" — render offset minutes as an ISO-style string
 ```

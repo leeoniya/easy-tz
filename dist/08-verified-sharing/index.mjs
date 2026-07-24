@@ -453,8 +453,15 @@ function compute(timestamp) {
 var memo = hourBucketMemo(compute);
 var getTimeZonesAt = memo.get;
 var clearCache = memo.clear;
+function getTimeZoneAt(name, timestamp) {
+  if (repOf === null)
+    init();
+  const res = liveParts(formatZoneOf(name), timestamp);
+  return makeInfo(name, zoneAbbrOverrides[name] ?? res.abbr, res.offset);
+}
 export {
   getTimeZonesAt,
+  getTimeZoneAt,
   formatOffset2 as formatOffset,
   clearCache
 };

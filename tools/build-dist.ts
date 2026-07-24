@@ -1,6 +1,6 @@
 // Builds shippable bundles of getTimeZonesAt() for every impl into
 // dist/<impl-id>/ (the npm package's `files`/`exports` surface):
-//   index.mjs      — ESM:  export { getTimeZonesAt, clearCache }
+//   index.mjs      — ESM:  export { getTimeZonesAt, getTimeZoneAt, clearCache, formatOffset }
 //   index.d.ts     — types (same tiny surface every impl)
 // Bundled with Bun.build (target browser) UNMINIFIED so the output stays
 // human-readable (minified sizes are reported by `bun run size`), against
@@ -27,7 +27,7 @@ async function buildEsm(implId: string): Promise<number> {
   const implPath = new URL(`../impls/${implId}/index.ts`, import.meta.url).pathname;
   const entry = join(entriesDir, `${implId}.ts`);
 
-  writeFileSync(entry, `export { getTimeZonesAt, clearCache, formatOffset } from '${implPath}';\n`);
+  writeFileSync(entry, `export { getTimeZonesAt, getTimeZoneAt, clearCache, formatOffset } from '${implPath}';\n`);
 
   const result = await Bun.build({
     entrypoints: [entry],
@@ -61,6 +61,15 @@ const dtsSource = `export interface TimeZoneInfo {
  * treat them as immutable.
  */
 export declare function getTimeZonesAt(timestamp: number): TimeZoneInfo[];
+
+/**
+ * A single zone's DST-correct abbreviation and UTC offset at \`timestamp\`
+ * (epoch ms) — the single-zone / many-timestamps counterpart to
+ * getTimeZonesAt(). Unknown zone names resolve to a UTC sentinel. Not
+ * memoized (each call is allocation-light), so it suits sweeping one zone
+ * across many instants.
+ */
+export declare function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo;
 
 /**
  * Drops the hour-bucket memo so the next call recomputes (first-call

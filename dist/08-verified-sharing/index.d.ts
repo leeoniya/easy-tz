@@ -20,6 +20,15 @@ export interface TimeZoneInfo {
 export declare function getTimeZonesAt(timestamp: number): TimeZoneInfo[];
 
 /**
+ * A single zone's DST-correct abbreviation and UTC offset at `timestamp`
+ * (epoch ms) — the single-zone / many-timestamps counterpart to
+ * getTimeZonesAt(). Unknown zone names resolve to a UTC sentinel. Not
+ * memoized (each call is allocation-light), so it suits sweeping one zone
+ * across many instants.
+ */
+export declare function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo;
+
+/**
  * Drops the hour-bucket memo so the next call recomputes (first-call
  * init/verification work is NOT redone). Only needed when the result
  * arrays were mutated or in test/bench harnesses.
