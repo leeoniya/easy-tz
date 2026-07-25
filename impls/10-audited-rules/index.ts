@@ -37,9 +37,10 @@ import { zones } from '../../shared/zones.ts';
 import { scheduleClasses, YEAR_START, STEP_MS } from '../../shared/schedule.ts';
 import { resolveClass, ruleInstant, type ScheduleClass } from '../../shared/rules.ts';
 import { gmtLabel } from '../../shared/fmt.ts';
-import { hourBucketMemo } from '../../shared/hourCache.ts';
+import { hourBucketMemo, type HourBucketMemo } from '../../shared/hourCache.ts';
 import { makeInfo } from '../../shared/zoneLinks.ts';
-import { computeBaked, classIdx, historyAbbr, zoneIndexOf, getTimeZoneAt as bakedGetTimeZoneAt, HISTORY_TO_MS } from '../../shared/bakedHistory.ts';
+import { computeSchedule, classIdx, historyAbbr, zoneIndexOf } from '../../shared/bakedSchedule.ts';
+import { computeBaked, getTimeZoneAt as bakedGetTimeZoneAt, HISTORY_TO_MS } from '../../shared/bakedHistory.ts';
 
 const hasTemporal = typeof Temporal !== 'undefined';
 
@@ -233,9 +234,43 @@ function computeOne(name: string, timestamp: number): TimeZoneInfo {
   return bakedGetTimeZoneAt(name, timestamp);
 }
 
-const memo = hourBucketMemo(compute);
+// current-instant response, schedule-only. The init-time audit and live
+// recovery still apply (both use Temporal + the schedule, never the baked
+// history table), so this matches compute() for current/future instants — but
+// it never references computeBaked/shared/history.ts, so importing only
+// getTimeZones() tree-shakes the history eras out of the bundle.
+function computeCurrent(timestamp: number): TimeZoneInfo[] {
+  if (recovered === null) init();
 
-export const getTimeZonesAt = memo.get;
-export const clearCache = memo.clear;
+  const out = computeSchedule(timestamp);
+
+  if (recovered!.size > 0) {
+    const instant = Temporal.Instant.fromEpochMilliseconds(timestamp);
+
+    for (const z of recovered!) out[z] = liveRecovered(zones[z]!, instant);
+  }
+
+  return out;
+}
+
+// memos created lazily so that a consumer importing only getTimeZones() never
+// references compute()/computeBaked() and drops the baked history eras
+let fullMemo: HourBucketMemo | null = null;
+let curMemo: HourBucketMemo | null = null;
+
+export function getTimeZonesAt(timestamp: number): TimeZoneInfo[] {
+  return (fullMemo ??= hourBucketMemo(compute)).get(timestamp);
+}
+
+export function getTimeZones(): TimeZoneInfo[] {
+  return (curMemo ??= hourBucketMemo(computeCurrent)).get(Date.now());
+}
+
 export const getTimeZoneAt = computeOne;
+
+export function clearCache(): void {
+  fullMemo?.clear();
+  curMemo?.clear();
+}
+
 export { formatOffset } from '../../shared/offsetFormatBaked.ts';

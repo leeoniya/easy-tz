@@ -25,12 +25,39 @@
 // many-timestamps use case) via the same baked resolver, without building or
 // memoizing the full response. getTimeZonesAt() loops that same per-zone core.
 
-import { computeBaked } from '../../shared/bakedHistory.ts';
-import { hourBucketMemo } from '../../shared/hourCache.ts';
+import type { TimeZoneInfo } from '../../shared/types.ts';
+import { computeSchedule } from '../../shared/bakedSchedule.ts';
+import { computeBaked, getTimeZoneAt as bakedGetTimeZoneAt } from '../../shared/bakedHistory.ts';
+import { hourBucketMemo, type HourBucketMemo } from '../../shared/hourCache.ts';
 
-const memo = hourBucketMemo(computeBaked);
+// Two hour-bucket memos, created lazily on first use. The history-backed one
+// is referenced ONLY inside getTimeZonesAt/getTimeZoneAt below, and the
+// history table is imported ONLY by shared/bakedHistory.ts — so a consumer that
+// imports just getTimeZones() never pulls computeBaked, and the baked history
+// eras tree-shake out of their bundle (see shared/bakedHistory.ts).
+let histMemo: HourBucketMemo | null = null;
+let schedMemo: HourBucketMemo | null = null;
 
-export const getTimeZonesAt = memo.get;
-export const clearCache = memo.clear;
-export { getTimeZoneAt } from '../../shared/bakedHistory.ts';
+// full response at `timestamp`: schedule for the bake year onward, baked
+// historical eras for earlier years.
+export function getTimeZonesAt(timestamp: number): TimeZoneInfo[] {
+  return (histMemo ??= hourBucketMemo(computeBaked)).get(timestamp);
+}
+
+// current-instant response, schedule-only — no history. Importing only this
+// lets shared/history.ts tree-shake away.
+export function getTimeZones(): TimeZoneInfo[] {
+  return (schedMemo ??= hourBucketMemo(computeSchedule)).get(Date.now());
+}
+
+// single-zone / many-timestamps resolver (history-capable, same as getTimeZonesAt)
+export function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo {
+  return bakedGetTimeZoneAt(name, timestamp);
+}
+
+export function clearCache(): void {
+  histMemo?.clear();
+  schedMemo?.clear();
+}
+
 export { formatOffset } from '../../shared/offsetFormatBaked.ts';

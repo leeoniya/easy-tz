@@ -141,6 +141,9 @@ function compute(timestamp: number): TimeZoneInfo[] {
 const memo = hourBucketMemo(compute);
 
 export const getTimeZonesAt = memo.get;
+// current-instant convenience; 08 is live (no baked history), so it shares the
+// same hour-bucket memo as getTimeZonesAt
+export const getTimeZones = (): TimeZoneInfo[] => memo.get(Date.now());
 export const clearCache = memo.clear;
 export { formatOffset } from '../../shared/offsetFormat.ts';
 

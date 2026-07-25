@@ -452,6 +452,7 @@ function compute(timestamp) {
 }
 var memo = hourBucketMemo(compute);
 var getTimeZonesAt = memo.get;
+var getTimeZones = () => memo.get(Date.now());
 var clearCache = memo.clear;
 function getTimeZoneAt(name, timestamp) {
   if (repOf === null)
@@ -461,6 +462,7 @@ function getTimeZoneAt(name, timestamp) {
 }
 export {
   getTimeZonesAt,
+  getTimeZones,
   getTimeZoneAt,
   formatOffset2 as formatOffset,
   clearCache

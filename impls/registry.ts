@@ -1,9 +1,9 @@
 import type { Impl } from '../shared/types.ts';
 
-import { getTimeZonesAt as intlSingleFmt, getTimeZoneAt as intlSingleFmtOne } from './04-live-intl/index.ts';
-import { getTimeZonesAt as verifiedReps, getTimeZoneAt as verifiedRepsOne } from './08-verified-sharing/index.ts';
-import { getTimeZonesAt as precomputed, getTimeZoneAt as precomputedOne } from './07-baked-rules/index.ts';
-import { getTimeZonesAt as auditedRules, getTimeZoneAt as auditedRulesOne } from './10-audited-rules/index.ts';
+import { getTimeZonesAt as intlSingleFmt, getTimeZoneAt as intlSingleFmtOne, getTimeZones as intlSingleFmtNow } from './04-live-intl/index.ts';
+import { getTimeZonesAt as verifiedReps, getTimeZoneAt as verifiedRepsOne, getTimeZones as verifiedRepsNow } from './08-verified-sharing/index.ts';
+import { getTimeZonesAt as precomputed, getTimeZoneAt as precomputedOne, getTimeZones as precomputedNow } from './07-baked-rules/index.ts';
+import { getTimeZonesAt as auditedRules, getTimeZoneAt as auditedRulesOne, getTimeZones as auditedRulesNow } from './10-audited-rules/index.ts';
 
 // all impls memoize the full response per UTC hour bucket (shared/hourCache)
 export const impls: Impl[] = [
@@ -25,6 +25,7 @@ export const impls: Impl[] = [
     },
     getTimeZonesAt: intlSingleFmt,
     getTimeZoneAt: intlSingleFmtOne,
+    getTimeZones: intlSingleFmtNow,
   },
   {
     id: '08-verified-sharing',
@@ -44,6 +45,7 @@ export const impls: Impl[] = [
     },
     getTimeZonesAt: verifiedReps,
     getTimeZoneAt: verifiedRepsOne,
+    getTimeZones: verifiedRepsNow,
   },
   {
     id: '10-audited-rules',
@@ -63,6 +65,7 @@ export const impls: Impl[] = [
     },
     getTimeZonesAt: auditedRules,
     getTimeZoneAt: auditedRulesOne,
+    getTimeZones: auditedRulesNow,
   },
   {
     id: '07-baked-rules',
@@ -82,5 +85,6 @@ export const impls: Impl[] = [
     },
     getTimeZonesAt: precomputed,
     getTimeZoneAt: precomputedOne,
+    getTimeZones: precomputedNow,
   },
 ];

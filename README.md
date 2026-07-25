@@ -7,6 +7,7 @@ independent of the host timezone (`TZ`). Pre-1995 accuracy is a non-goal.
 ```ts
 function getTimeZonesAt(timestamp: number): TimeZoneInfo[];
 function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo; // one zone, many timestamps
+function getTimeZones(): TimeZoneInfo[]; // all zones now; schedule-only, history tree-shakes out
 function formatOffset(minutes: number): string; // -300 -> "-05:00"
 
 interface TimeZoneInfo {
@@ -60,7 +61,7 @@ difference with a generated offset→abbreviation lookup plus live Intl
 offsets. The implementations here further explore the full live-to-baked spectrum,
 ending in `07-baked-rules`: vs moment-timezone it cuts cold start ~40x
 (24.3ms → 0.6ms) and memory ~3x (22.5MB → 7.3MB) at ~3% of the bundle size
-(768KB → 23.8KB), while passing all 62 edge-case fixtures and improving
+(768KB → 23.7KB), while passing all 62 edge-case fixtures and improving
 abbreviation coverage for 159 zones where modern tzdata dropped letter
 abbreviations (Santiago CLT/CLST, Kathmandu NPT, Chatham CHAST/CHADT,
 Kiritimati LINT, Lord Howe LHST/LHDT, Istanbul TRT, …).
@@ -73,7 +74,7 @@ until `04-live-intl` ships no generated data at all.
 
 | impl | trust model | cold ms | miss ms | rss MB | bundle KB |
 |---|---|--:|--:|--:|--:|
-| `07-baked-rules` | trusts baked tables completely | 0.6 | <0.1 | 7.3 | 23.8 |
+| `07-baked-rules` | trusts baked tables completely | 0.6 | <0.1 | 7.3 | 23.7 |
 | `10-audited-rules` | baked tables, Temporal-audited at first call; failing zones recovered live | 6.2 | <0.1 | 9.2 | 25.6 |
 | `08-verified-sharing` | live Intl values; baked data only hints formatter sharing, Temporal-verified at first call | 26.0 | 0.7 | 20.5 | 11.7 |
 | `04-live-intl` | fully live — no generated data to trust | 42.3 | 1.4 | 27.8 | 7.3 |
@@ -102,6 +103,26 @@ Baked history costs `07` nothing extra — 310ns whether the instant is past or
 present. On a Temporal runtime `10` resolves the past live (Temporal is
 authoritative for history), hence its heavier `hist`; the live impls build one
 formatter for the zone and reuse it across the whole sweep either way.
+
+### Schedule-only route (`getTimeZones()`)
+
+`getTimeZones()` takes no timestamp — it answers the current instant
+(`Date.now()`), which is always the bake year or later, so it never needs the
+historical eras. On the baked impls (`07`/`10`) it's wired through a
+history-free code path (`shared/bakedSchedule.ts`, with the eager history
+decode marked `/*@__PURE__*/`), so a bundler that sees you import **only**
+`getTimeZones` drops the entire 1995+ history table. Measured on the shipped
+`dist/` (consumer bundle, minified):
+
+| import | `07` KB | `10` KB |
+|---|--:|--:|
+| `getTimeZonesAt` (history-capable) | 22.5 | 24.0 |
+| `getTimeZones` (schedule-only) | 10.5 | 12.0 |
+
+Roughly halved — the ~12KB of baked eras tree-shake away. Import
+`getTimeZonesAt`/`getTimeZoneAt` anywhere and the history comes back. On the
+live impls (`04`/`08`) there's no history to shed; `getTimeZones()` is just
+`getTimeZonesAt(Date.now())` sharing the same hour-bucket memo.
 
 <details>
 <summary><b>Implementation details</b> — strategies and per-impl notes</summary>
@@ -226,7 +247,7 @@ npm install @leeoniya/easy-tz
 ## Usage
 
 ```ts
-import { getTimeZonesAt, getTimeZoneAt, formatOffset } from '@leeoniya/easy-tz';
+import { getTimeZonesAt, getTimeZoneAt, getTimeZones, formatOffset } from '@leeoniya/easy-tz';
 
 const zones = getTimeZonesAt(Date.now());
 // [
@@ -235,6 +256,11 @@ const zones = getTimeZonesAt(Date.now());
 //   { name: 'America/New_York',   abbr: 'EDT', offset: -240 },
 //   ...
 // ] — every IANA zone the runtime knows, sorted by name
+
+// same list at the CURRENT instant, no timestamp arg. On the baked root this
+// is the schedule-only route: import ONLY this and the 1995+ history table
+// tree-shakes out (~halves the bundle — see Schedule-only route above).
+getTimeZones();
 
 // resolve a SINGLE zone — the one-zone / many-timestamps counterpart, with
 // no full-list allocation. Unknown names resolve to a UTC sentinel.

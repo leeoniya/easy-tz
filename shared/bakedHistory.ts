@@ -1,83 +1,57 @@
-// Shared baked resolver for the rule-baking impls (07, and 10's no-Temporal
-// path). It answers a full getTimeZonesAt() from baked data only — no Intl,
-// no Temporal:
+// Historical layer on top of the schedule-only core (shared/bakedSchedule.ts),
+// used by the rule-baking impls (07, and 10's no-Temporal path). It answers a
+// full getTimeZonesAt() from baked data only — no Intl, no Temporal:
 //
-//   - bake year and later: the year-independent schedule (static states,
-//     nth-weekday rules, current-year irregular segments — shared/rules.ts),
-//     exactly as before history existed.
+//   - bake year and later: the year-independent schedule (shared/schedule.ts),
+//     resolved by shared/bakedSchedule.ts, exactly as before history existed.
 //   - earlier years: the validated historical offset eras (shared/history.ts,
 //     produced by tools/gen-core.ts, checked end-to-end by
 //     tools/sweep-validity.ts). Zones whose whole 1995+ history already
 //     matches the schedule have no era and fall through to it; a 'defer' era
 //     (kind 3) does the same for the spans that match.
 //
+// This module is the ONLY link from the baked resolver to shared/history.ts.
+// Entry points that never call computeBaked()/getTimeZoneAt() (e.g. the
+// schedule-only getTimeZones()) don't import it, so the history eras
+// tree-shake away; the eager decode/index below are /*@__PURE__*/ so a
+// bundler can drop them when unused.
+//
 // History stores OFFSETS only. The label reuses the zone's schedule-class
-// abbreviation when the historical offset equals one of its states — the
-// common "same abbreviations, different DST dates" case (e.g. US EST/EDT
-// before the 2007 rule change) — and otherwise falls back to a generic
-// GMT-style label (historical CLDR abbreviations aren't baked; offsets are
-// what historical coverage means). The offset is always exact.
+// abbreviation when the historical offset equals one of its states (the
+// common "same abbreviations, different DST dates" case, e.g. US EST/EDT
+// before the 2007 rule change) and otherwise falls back to a generic
+// GMT-style label. The offset is always exact.
 
 import type { TimeZoneInfo } from './types.ts';
 import { zones } from './zones.ts';
-import { scheduleClasses, YEAR_START, STEP_MS } from './schedule.ts';
+import { scheduleClasses, STEP_MS } from './schedule.ts';
 import { historyClasses, HISTORY_TO } from './history.ts';
-import { resolveClass, resolveHistory, buildScheduleIndex, type ScheduleClass, type ZoneState } from './rules.ts';
+import { resolveHistory, buildScheduleIndex, type ZoneState } from './rules.ts';
 import { gmtLabel } from './fmt.ts';
-import { makeInfo, zoneLinks } from './zoneLinks.ts';
+import { makeInfo } from './zoneLinks.ts';
+import { classIdx, zoneIndexOf, historyAbbr, scheduleZoneInfo } from './bakedSchedule.ts';
 
-// zones-list order -> schedule / history class index (bridging spelling
-// variants; -1 = not covered even after bridging). Both resolved once.
-export const classIdx = buildScheduleIndex(zones, scheduleClasses);
-export const histIdx = buildScheduleIndex(zones, historyClasses);
+// zones-list order -> history class index (bridging spelling variants; -1 =
+// not covered). Resolved once. /*@__PURE__*/ so that if nothing references it
+// (schedule-only bundles), it — and the historyClasses it reads — tree-shake.
+export const histIdx = /*@__PURE__*/ buildScheduleIndex(zones, historyClasses);
 
 // UTC start of the bake year: `ts < HISTORY_TO_MS` is exactly `year < HISTORY_TO`
 // (the timestamp falls before Jan 1 of the bake year) but with no Date
 // allocation on the per-call hot path.
 export const HISTORY_TO_MS = Date.UTC(HISTORY_TO, 0, 1);
 
-// zone name -> its index in `zones`. Both canonical and legacy spellings are
-// enumerated in `zones`, so most lookups hit directly; the zoneLinks fallback
-// bridges any remaining alias exactly as buildScheduleIndex does. Built once.
-const nameIdx = new Map<string, number>();
-for (let z = 0; z < zones.length; z++) nameIdx.set(zones[z]!, z);
-
-// index of `name` in the zones list (bridging alias spellings); -1 if unknown.
-export function zoneIndexOf(name: string): number {
-  const z = nameIdx.get(name);
-
-  if (z != null) return z;
-
-  const bridged = zoneLinks.get(name);
-
-  return bridged != null ? nameIdx.get(bridged) ?? -1 : -1;
-}
-
-// label for a historical offset: the schedule class's abbr for that offset
-// when it has one, else a generic GMT label
-export function historyAbbr(cls: ScheduleClass, offMin: number): string {
-  if (cls.kind === 0) {
-    if (cls.states[0].offMin === offMin) return cls.states[0].abbr;
-  } else if (cls.kind === 1) {
-    for (const st of cls.states) if (st.offMin === offMin) return st.abbr;
-  } else {
-    for (let i = 0; i < cls.offMins.length; i++) if (cls.offMins[i] === offMin) return cls.abbrs[i]!;
-  }
-
-  return gmtLabel(offMin);
-}
-
 // Resolve ONE zone's TimeZoneInfo at `timestamp`. `ci`/`hi` are its schedule
-// and history class indices (from classIdx/histIdx; -1 = uncovered). This is
-// the single source of truth for the per-zone answer, shared by the single-zone
-// getTimeZoneAt() and the all-zones computeBaked() loop.
+// and history class indices (from classIdx/histIdx; -1 = uncovered). Single
+// source of truth for the per-zone answer, shared by the single-zone
+// getTimeZoneAt() and the all-zones computeBaked() loop. Historical eras win
+// when the zone has one live at this instant; otherwise it defers to the
+// schedule-only resolver (shared/bakedSchedule.ts).
 //
 // The optional per-class caches let the all-zones path resolve each schedule /
-// history class at most once and reuse it across the (avg ~2.5) zones in that
-// class — the batching that keeps getTimeZonesAt() fast. undefined entry = not
-// yet computed (a resolved schedule state is an object and a resolved history
-// offset is number|null, so undefined is an unambiguous "miss"). getTimeZoneAt()
-// passes no caches and resolves directly.
+// history class at most once. undefined history entry = not yet computed (a
+// resolved history offset is number|null, so undefined is an unambiguous
+// "miss"). getTimeZoneAt() passes no caches and resolves directly.
 function bakedZoneInfo(
   name: string,
   ci: number,
@@ -104,18 +78,8 @@ function bakedZoneInfo(
     }
   }
 
-  // uncovered zone -> UTC sentinel
-  if (ci < 0) return makeInfo(name, 'UTC', 0);
-
-  // schedule: bake year onward, or an earlier year whose history defers/absent
-  let st = schedCache != null ? schedCache[ci] : undefined;
-
-  if (st == null) {
-    st = resolveClass(scheduleClasses[ci]!, timestamp, YEAR_START, STEP_MS);
-    if (schedCache != null) schedCache[ci] = st;
-  }
-
-  return makeInfo(name, st.abbr, st.offMin);
+  // bake year onward, or an earlier year whose history defers/absent
+  return scheduleZoneInfo(name, ci, timestamp, schedCache);
 }
 
 // Single-zone resolver for the single-zone / many-timestamps use case: resolves

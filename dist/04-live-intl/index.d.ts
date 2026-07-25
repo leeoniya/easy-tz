@@ -29,6 +29,16 @@ export declare function getTimeZonesAt(timestamp: number): TimeZoneInfo[];
 export declare function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo;
 
 /**
+ * All zones at the current instant (Date.now()) — a no-argument convenience
+ * over getTimeZonesAt(). On the baked impls (07/10) this is the schedule-only
+ * route: it never touches the baked historical eras, so importing ONLY
+ * getTimeZones() lets a bundler tree-shake the history tables out entirely
+ * (the current instant is always the bake year or later). Same hour-bucket
+ * memoization as getTimeZonesAt().
+ */
+export declare function getTimeZones(): TimeZoneInfo[];
+
+/**
  * Drops the hour-bucket memo so the next call recomputes (first-call
  * init/verification work is NOT redone). Only needed when the result
  * arrays were mutated or in test/bench harnesses.

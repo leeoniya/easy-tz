@@ -1,6 +1,6 @@
 // Builds shippable bundles of getTimeZonesAt() for every impl into
 // dist/<impl-id>/ (the npm package's `files`/`exports` surface):
-//   index.mjs      — ESM:  export { getTimeZonesAt, getTimeZoneAt, clearCache, formatOffset }
+//   index.mjs      — ESM:  export { getTimeZonesAt, getTimeZoneAt, getTimeZones, clearCache, formatOffset }
 //   index.d.ts     — types (same tiny surface every impl)
 // Bundled with Bun.build (target browser) UNMINIFIED so the output stays
 // human-readable (minified sizes are reported by `bun run size`), against
@@ -22,23 +22,24 @@ const distUrl = new URL('../dist/', import.meta.url);
 // build can't leave scratch files behind for git to pick up
 const entriesDir = mkdtempSync(join(tmpdir(), 'tz-dist-'));
 
-// bundle entries are generated re-export files
+// bundle entries are generated re-export files. Writes the UNMINIFIED bundle to
+// dist/ (kept readable) and returns the MINIFIED size — built in-memory only to
+// report the number consumers actually ship; the minified bundle is never
+// written to disk.
 async function buildEsm(implId: string): Promise<number> {
   const implPath = new URL(`../impls/${implId}/index.ts`, import.meta.url).pathname;
   const entry = join(entriesDir, `${implId}.ts`);
 
-  writeFileSync(entry, `export { getTimeZonesAt, getTimeZoneAt, clearCache, formatOffset } from '${implPath}';\n`);
+  writeFileSync(entry, `export { getTimeZonesAt, getTimeZoneAt, getTimeZones, clearCache, formatOffset } from '${implPath}';\n`);
 
-  const result = await Bun.build({
-    entrypoints: [entry],
-    target: 'browser',
-    format: 'esm',
-  });
+  // shipped bundle: readable, written to dist/
+  const readable = await Bun.build({ entrypoints: [entry], target: 'browser', format: 'esm' });
+  await Bun.write(new URL(`${implId}/index.mjs`, distUrl).pathname, await readable.outputs[0]!.text());
 
-  const code = await result.outputs[0]!.text();
-  await Bun.write(new URL(`${implId}/index.mjs`, distUrl).pathname, code);
+  // minified: measured only (mirrors `bun run size`), not persisted
+  const minified = await Bun.build({ entrypoints: [entry], target: 'browser', format: 'esm', minify: true });
 
-  return Buffer.byteLength(code);
+  return Buffer.byteLength(await minified.outputs[0]!.text());
 }
 
 const dtsSource = `export interface TimeZoneInfo {
@@ -72,6 +73,16 @@ export declare function getTimeZonesAt(timestamp: number): TimeZoneInfo[];
 export declare function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo;
 
 /**
+ * All zones at the current instant (Date.now()) — a no-argument convenience
+ * over getTimeZonesAt(). On the baked impls (07/10) this is the schedule-only
+ * route: it never touches the baked historical eras, so importing ONLY
+ * getTimeZones() lets a bundler tree-shake the history tables out entirely
+ * (the current instant is always the bake year or later). Same hour-bucket
+ * memoization as getTimeZonesAt().
+ */
+export declare function getTimeZones(): TimeZoneInfo[];
+
+/**
  * Drops the hour-bucket memo so the next call recomputes (first-call
  * init/verification work is NOT redone). Only needed when the result
  * arrays were mutated or in test/bench harnesses.
@@ -95,15 +106,16 @@ try {
   const rows: string[][] = [];
 
   for (const impl of impls) {
-    const esmBytes = await buildEsm(impl.id);
+    const minBytes = await buildEsm(impl.id);
 
     await Bun.write(new URL(`${impl.id}/index.d.ts`, distUrl).pathname, dtsSource);
 
-    rows.push([impl.id, (esmBytes / 1024).toFixed(1)]);
+    rows.push([impl.id, (minBytes / 1024).toFixed(1)]);
   }
 
-  console.log('dist/<impl>/{index.mjs,index.d.ts} — unminified (readable), chrome tables\n');
-  printTable(['impl', 'esm KB'], rows);
+  console.log('dist/<impl>/{index.mjs,index.d.ts} — chrome tables. index.mjs ships unminified');
+  console.log('(readable); "min KB" is measured in-memory (what ships minified), not written.\n');
+  printTable(['impl', 'min KB'], rows);
 } finally {
   rmSync(entriesDir, { recursive: true, force: true });
   selectTables(previousVariant);

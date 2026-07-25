@@ -20,6 +20,12 @@ export interface TimeZoneInfo {
 
 export type GetTimeZonesAt = (timestamp: number) => TimeZoneInfo[];
 
+// no-argument convenience over GetTimeZonesAt at the current instant
+// (Date.now()). On the baked impls (07/10) this is the schedule-only route: it
+// never references the baked history eras, so importing only getTimeZones()
+// lets shared/history.ts tree-shake out of the consumer's bundle.
+export type GetTimeZones = () => TimeZoneInfo[];
+
 // single-zone / many-timestamps counterpart to GetTimeZonesAt: resolves one
 // zone at one instant without building the full response. Exported by the
 // first-party impls (04, 07, 08, 10).
@@ -32,6 +38,9 @@ export interface Impl {
   // the benchmark; all impls must use the same keys in the same order
   features: Record<string, string>;
   getTimeZonesAt: GetTimeZonesAt;
+  // no-arg current-instant convenience (schedule-only on the baked impls);
+  // present on this repo's impls, absent on the comparison libraries
+  getTimeZones?: GetTimeZones;
   // single-zone resolver, present only on this repo's impls (the comparison
   // libraries expose no such API); the getTimeZoneAt benchmark iterates only
   // impls that define it

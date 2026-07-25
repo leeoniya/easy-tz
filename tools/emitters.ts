@@ -246,14 +246,16 @@ ${metaExport(meta)}
 export const HISTORY_FROM = ${h.fromYear};
 export const HISTORY_TO = ${h.toYear}; // exclusive; the bake year
 
-// see emitHistoryTs: this flatten order is the zone-index space
-const Z = scheduleClasses.flatMap((c) => c.zones);
+// see emitHistoryTs: this flatten order is the zone-index space. The eager
+// decode is /*@__PURE__*/ so bundlers drop this whole table when nothing
+// references historyClasses (schedule-only entry points like getTimeZones()).
+const Z = /*@__PURE__*/ scheduleClasses.flatMap((c) => c.zones);
 const P = '${pairs.join('|')}';
 const T = '${tuples.join('')}';
 const E = '${dict.join('|')}';
 const H = '${classes.join('|')}';
 
-export const historyClasses = decodeHistory(Z, P, T, E, H, HISTORY_FROM);
+export const historyClasses = /*@__PURE__*/ decodeHistory(Z, P, T, E, H, HISTORY_FROM);
 `;
 }
 
