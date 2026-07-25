@@ -163,15 +163,13 @@ try {
 
   console.log(`\nsingle-zone getTimeZoneAt(): ${GETONE_ZONE}, ${GETONE_CALLS} timestamps/sweep (${GETONE_STEP_HOURS}h step)\n`);
 
-  // cur/hist ns are per-call; 10k ms are the totals for each sweep. hist routes
-  // 07 through the baked era resolver and (on this Temporal runtime) 10 through
-  // live Temporal. formatters: one per zone for the live-Intl impls, none baked.
+  // 10k ms are the total wall time for each sweep. hist routes 07 through the
+  // baked era resolver and (on this Temporal runtime) 10 through live Temporal.
+  // formatters: one per zone for the live-Intl impls, none baked.
   printTable(
-    ['impl', 'cur ns/call', 'hist ns/call', '10k cur ms', '10k hist ms', 'formatters'],
+    ['impl', '10k cur ms', '10k hist ms', 'formatters'],
     oneResults.map((r) => [
       r.id,
-      ((r.curMs * 1e6) / r.calls).toFixed(0),
-      ((r.histMs * 1e6) / r.calls).toFixed(0),
       r.curMs.toFixed(2),
       r.histMs.toFixed(2),
       String(r.formatters),

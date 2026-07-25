@@ -157,8 +157,6 @@ printTable(
 // none) and unpolluted by the getTimeZonesAt warm-up above.
 interface OneRow {
   id: string;
-  curNs: string;
-  histNs: string;
   curMs: string;
   histMs: string;
   formatters: string;
@@ -198,8 +196,6 @@ for (const impl of impls) {
 
   oneRows.push({
     id: impl.id,
-    curNs: p.curMs != null ? ((p.curMs * 1e6) / GETONE_CALLS).toFixed(0) : 'err',
-    histNs: p.histMs != null ? ((p.histMs * 1e6) / GETONE_CALLS).toFixed(0) : 'err',
     curMs: p.curMs != null ? p.curMs.toFixed(2) : 'err',
     histMs: p.histMs != null ? p.histMs.toFixed(2) : 'err',
     formatters: String(p.formatters ?? '-'),
@@ -208,12 +204,12 @@ for (const impl of impls) {
 
 console.log(`\nsingle-zone getTimeZoneAt(): ${GETONE_ZONE}, ${GETONE_CALLS} timestamps/sweep (${GETONE_STEP_HOURS}h step)\n`);
 
-// cur/hist ns are per-call; 10k ms are the totals for each sweep (hist routes
-// 07/10 through the baked era resolver — bun has no Temporal). formatters: one
-// per zone for the live-Intl impls, none for the baked ones.
+// 10k ms are the total wall time for each sweep (hist routes 07/10 through the
+// baked era resolver — bun has no Temporal). formatters: one per zone for the
+// live-Intl impls, none for the baked ones.
 printTable(
-  ['impl', 'cur ns/call', 'hist ns/call', '10k cur ms', '10k hist ms', 'formatters'],
-  oneRows.map((r) => [r.id, r.curNs, r.histNs, r.curMs, r.histMs, r.formatters])
+  ['impl', '10k cur ms', '10k hist ms', 'formatters'],
+  oneRows.map((r) => [r.id, r.curMs, r.histMs, r.formatters])
 );
 
 // strategy/feature comparison matrix: features as rows, impls as columns
