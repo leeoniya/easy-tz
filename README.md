@@ -60,7 +60,7 @@ My [first attempt](https://github.com/leeoniya/timezones) split the
 difference with a generated offset→abbreviation lookup plus live Intl
 offsets. The implementations here further explore the full live-to-baked spectrum,
 ending in `07-baked-rules`: vs moment-timezone it cuts cold start ~40x
-(24.3ms → 0.6ms) and memory ~3x (22.5MB → 7.3MB) at ~3% of the bundle size
+(22.9ms → 0.6ms) and memory ~2.5x (22.6MB → 9.1MB) at ~3% of the bundle size
 (768KB → 23.7KB), while passing all 62 edge-case fixtures and improving
 abbreviation coverage for 159 zones where modern tzdata dropped letter
 abbreviations (Santiago CLT/CLST, Kathmandu NPT, Chatham CHAST/CHADT,
@@ -74,10 +74,10 @@ until `04-live-intl` ships no generated data at all.
 
 | impl | trust model | cold ms | miss ms | rss MB | bundle KB |
 |---|---|--:|--:|--:|--:|
-| `07-baked-rules` | trusts baked tables completely | 0.6 | <0.1 | 7.3 | 23.7 |
-| `10-audited-rules` | baked tables, Temporal-audited at first call; failing zones recovered live | 6.2 | <0.1 | 9.2 | 25.6 |
-| `08-verified-sharing` | live Intl values; baked data only hints formatter sharing, Temporal-verified at first call | 26.0 | 0.7 | 20.5 | 11.7 |
-| `04-live-intl` | fully live — no generated data to trust | 42.3 | 1.4 | 27.8 | 7.3 |
+| `07-baked-rules` | trusts baked tables completely | 0.6 | <0.1 | 9.1 | 23.7 |
+| `10-audited-rules` | baked tables, Temporal-audited at first call; failing zones recovered live | 3.7 | <0.1 | 10.4 | 25.6 |
+| `08-verified-sharing` | live Intl values; baked data only hints formatter sharing, Temporal-verified at first call | 24.7 | 0.7 | 20.2 | 11.7 |
+| `04-live-intl` | fully live — no generated data to trust | 44.5 | 1.4 | 27.0 | 7.4 |
 
 Full-list `getTimeZonesAt()`, measured on chrome-headless-shell (the primary
 target) via `bun run bench`. `cold` is the first call; `miss` an hour-bucket
@@ -88,21 +88,23 @@ gzip roughly halves them: `07` ≈ 11.7KB).
 ### Single-zone lookups
 
 `getTimeZoneAt(name, timestamp)` resolves one zone without building the full
-list — the single-zone / many-timestamps counterpart. Same ordering,
-sweeping `America/New_York` across 10,000 timestamps (6h step), timed in a
-current (projected) year and a historical one:
+list — the single-zone / many-timestamps counterpart. Same ordering; each
+column is the total wall time to sweep `America/New_York` across 10,000
+timestamps (6h step), once in a current (projected) year and once in a
+historical one:
 
-| impl | cur ns/call | hist ns/call | formatters |
+| impl | 10k cur ms | 10k hist ms | formatters |
 |---|--:|--:|--:|
-| `07-baked-rules` | 310 | 310 | 0 |
-| `10-audited-rules` | 420 | 1940 | 0 |
-| `08-verified-sharing` | 3480 | 3260 | 1 |
-| `04-live-intl` | 3640 | 3420 | 1 |
+| `07-baked-rules` | 3.4 | 3.0 | 0 |
+| `10-audited-rules` | 3.6 | 17.9 | 0 |
+| `08-verified-sharing` | 35.5 | 33.4 | 1 |
+| `04-live-intl` | 35.7 | 35.6 | 1 |
 
-Baked history costs `07` nothing extra — 310ns whether the instant is past or
-present. On a Temporal runtime `10` resolves the past live (Temporal is
-authoritative for history), hence its heavier `hist`; the live impls build one
-formatter for the zone and reuse it across the whole sweep either way.
+Baked history costs `07` nothing extra — ~3ms for the whole 10k-instant sweep
+whether the instants are past or present. On a Temporal runtime `10` resolves
+the past live (Temporal is authoritative for history), hence its heavier
+historical sweep (17.9ms vs 3.6ms); the live impls build one formatter for the
+zone and reuse it across the whole sweep either way.
 
 ### Schedule-only route (`getTimeZones()`)
 
