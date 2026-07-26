@@ -158,3 +158,9 @@ export function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo {
 
   return makeInfo(name, zoneAbbrOverrides[name] ?? res.abbr, res.offset);
 }
+
+// single zone at the current instant. 08 is live (no baked history), so — like
+// getTimeZones() vs getTimeZonesAt() — there's nothing to shed here.
+export function getTimeZone(name: string): TimeZoneInfo {
+  return getTimeZoneAt(name, Date.now());
+}

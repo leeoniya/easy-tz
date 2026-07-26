@@ -265,6 +265,38 @@ export function installKernel(
     return { checked, mismatchCount, mismatches };
   };
 
+  // the two current-instant APIs must agree zone for zone. Worth checking
+  // HERE specifically: on a Temporal runtime impl 10 answers its
+  // session-recovered zones live, and that branch is unreachable from the bun
+  // tests (no Temporal), where both APIs collapse onto the baked schedule.
+  (globalThis as { __verifyCurrentApis?: unknown }).__verifyCurrentApis = (implId: string): Vs04 => {
+    const impl = find(implId);
+
+    let checked = 0;
+    let mismatchCount = 0;
+    const mismatches: string[] = [];
+
+    if (impl.getTimeZones != null && impl.getTimeZone != null) {
+      const one = impl.getTimeZone;
+
+      for (const z of impl.getTimeZones()) {
+        checked++;
+
+        const o = one(z.name);
+
+        if (o.name !== z.name || o.abbr !== z.abbr || o.offset !== z.offset) {
+          mismatchCount++;
+
+          if (mismatches.length < 10) {
+            mismatches.push(`${z.name}: getTimeZone()=${o.abbr} ${o.offset} vs getTimeZones()=${z.abbr} ${z.offset}`);
+          }
+        }
+      }
+    }
+
+    return { checked, mismatchCount, mismatches };
+  };
+
   // deep output-equality against the live-Intl baseline at monthly +
   // transition-edge instants
   (globalThis as { __verifyVs04?: unknown }).__verifyVs04 = (implId: string): Vs04 => {

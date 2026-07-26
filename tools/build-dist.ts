@@ -1,6 +1,6 @@
 // Builds shippable bundles of getTimeZonesAt() for every impl into
 // dist/<impl-id>/ (the npm package's `files`/`exports` surface):
-//   index.mjs      — ESM:  export { getTimeZonesAt, getTimeZoneAt, getTimeZones, clearCache, formatOffset }
+//   index.mjs      — ESM:  export { getTimeZonesAt, getTimeZoneAt, getTimeZones, getTimeZone, clearCache, formatOffset }
 //   index.d.ts     — types (same tiny surface every impl)
 // Bundled with Bun.build (target browser) UNMINIFIED so the output stays
 // human-readable (minified sizes are reported by `bun run size`), against
@@ -30,7 +30,7 @@ async function buildEsm(implId: string): Promise<number> {
   const implPath = new URL(`../impls/${implId}/index.ts`, import.meta.url).pathname;
   const entry = join(entriesDir, `${implId}.ts`);
 
-  writeFileSync(entry, `export { getTimeZonesAt, getTimeZoneAt, getTimeZones, clearCache, formatOffset } from '${implPath}';\n`);
+  writeFileSync(entry, `export { getTimeZonesAt, getTimeZoneAt, getTimeZones, getTimeZone, clearCache, formatOffset } from '${implPath}';\n`);
 
   // shipped bundle: readable, written to dist/
   const readable = await Bun.build({ entrypoints: [entry], target: 'browser', format: 'esm' });
@@ -81,6 +81,17 @@ export declare function getTimeZoneAt(name: string, timestamp: number): TimeZone
  * memoization as getTimeZonesAt().
  */
 export declare function getTimeZones(): TimeZoneInfo[];
+
+/**
+ * One zone at the current instant (Date.now()) — the single-zone counterpart
+ * to getTimeZones(), and the no-timestamp counterpart to getTimeZoneAt().
+ * On the baked impls (07/10) it takes the same schedule-only route, so
+ * importing only getTimeZone()/getTimeZones() lets a bundler tree-shake the
+ * history tables out entirely. Unknown zone names resolve to a UTC sentinel.
+ * Not memoized — the result is an interned instance, so each call allocates
+ * nothing.
+ */
+export declare function getTimeZone(name: string): TimeZoneInfo;
 
 /**
  * Drops the hour-bucket memo so the next call recomputes (first-call

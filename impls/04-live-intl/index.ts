@@ -40,3 +40,10 @@ export { formatOffset } from '../../shared/offsetFormat.ts';
 export function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo {
   return liveZoneInfo(name, timestamp);
 }
+
+// single zone at the current instant. 04 is fully live, so — like getTimeZones()
+// vs getTimeZonesAt() — there's no history path to shed: this is exactly
+// getTimeZoneAt(name, Date.now()).
+export function getTimeZone(name: string): TimeZoneInfo {
+  return liveZoneInfo(name, Date.now());
+}

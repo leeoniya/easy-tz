@@ -379,10 +379,14 @@ var clearCache = memo.clear;
 function getTimeZoneAt(name, timestamp) {
   return liveZoneInfo(name, timestamp);
 }
+function getTimeZone(name) {
+  return liveZoneInfo(name, Date.now());
+}
 export {
   getTimeZonesAt,
   getTimeZones,
   getTimeZoneAt,
+  getTimeZone,
   formatOffset2 as formatOffset,
   clearCache
 };

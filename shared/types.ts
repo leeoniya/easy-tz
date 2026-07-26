@@ -31,6 +31,12 @@ export type GetTimeZones = () => TimeZoneInfo[];
 // first-party impls (04, 07, 08, 10).
 export type GetTimeZoneAt = (name: string, timestamp: number) => TimeZoneInfo;
 
+// single-zone counterpart to GetTimeZones (and current-instant counterpart to
+// GetTimeZoneAt): one zone at Date.now(). Takes the same schedule-only route as
+// GetTimeZones on the baked impls, so a consumer importing only the
+// current-instant APIs tree-shakes shared/history.ts out.
+export type GetTimeZone = (name: string) => TimeZoneInfo;
+
 export interface Impl {
   id: string;
   label: string;
@@ -45,4 +51,7 @@ export interface Impl {
   // libraries expose no such API); the getTimeZoneAt benchmark iterates only
   // impls that define it
   getTimeZoneAt?: GetTimeZoneAt;
+  // single-zone current-instant resolver (schedule-only on the baked impls);
+  // present on this repo's impls, absent on the comparison libraries
+  getTimeZone?: GetTimeZone;
 }

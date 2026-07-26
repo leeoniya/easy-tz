@@ -7,7 +7,8 @@ independent of the host timezone (`TZ`). Pre-1995 accuracy is a non-goal.
 ```ts
 function getTimeZonesAt(timestamp: number): TimeZoneInfo[];
 function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo; // one zone, many timestamps
-function getTimeZones(): TimeZoneInfo[]; // all zones now; schedule-only, history tree-shakes out
+function getTimeZones(): TimeZoneInfo[];           // all zones now; schedule-only, history tree-shakes out
+function getTimeZone(name: string): TimeZoneInfo;  // one zone now;   schedule-only, history tree-shakes out
 function formatOffset(minutes: number): string; // -300 -> "-05:00"
 
 interface TimeZoneInfo {
@@ -61,7 +62,7 @@ difference with a generated offset→abbreviation lookup plus live Intl
 offsets. The implementations here further explore the full live-to-baked spectrum,
 ending in `07-baked-rules`: vs moment-timezone it cuts cold start ~40x
 (22.9ms → 0.6ms) and memory ~2.5x (22.6MB → 9.1MB) at ~3% of the bundle size
-(768KB → 23.7KB), while passing all 62 edge-case fixtures and improving
+(768KB → 23.8KB), while passing all 62 edge-case fixtures and improving
 abbreviation coverage for 159 zones where modern tzdata dropped letter
 abbreviations (Santiago CLT/CLST, Kathmandu NPT, Chatham CHAST/CHADT,
 Kiritimati LINT, Lord Howe LHST/LHDT, Istanbul TRT, …).
@@ -74,8 +75,8 @@ until `04-live-intl` ships no generated data at all.
 
 | impl | trust model | cold ms | miss ms | rss MB | bundle KB |
 |---|---|--:|--:|--:|--:|
-| `07-baked-rules` | trusts baked tables completely | 0.6 | <0.1 | 9.1 | 23.7 |
-| `10-audited-rules` | baked tables, Temporal-audited at first call; failing zones recovered live | 3.7 | <0.1 | 10.4 | 25.6 |
+| `07-baked-rules` | trusts baked tables completely | 0.6 | <0.1 | 9.1 | 23.8 |
+| `10-audited-rules` | baked tables, Temporal-audited at first call; failing zones recovered live | 3.7 | <0.1 | 10.4 | 25.8 |
 | `08-verified-sharing` | live Intl values; baked data only hints formatter sharing, Temporal-verified at first call | 24.7 | 0.7 | 20.2 | 11.7 |
 | `04-live-intl` | fully live — no generated data to trust | 44.5 | 1.4 | 27.0 | 7.4 |
 
@@ -106,25 +107,33 @@ the past live (Temporal is authoritative for history), hence its heavier
 historical sweep (17.9ms vs 3.6ms); the live impls build one formatter for the
 zone and reuse it across the whole sweep either way.
 
-### Schedule-only route (`getTimeZones()`)
+### Schedule-only route (`getTimeZones()` / `getTimeZone()`)
 
-`getTimeZones()` takes no timestamp — it answers the current instant
-(`Date.now()`), which is always the bake year or later, so it never needs the
-historical eras. On the baked impls (`07`/`10`) it's wired through a
+The two current-instant entry points take no timestamp — they answer
+`Date.now()`, which is always the bake year or later, so they never need the
+historical eras. On the baked impls (`07`/`10`) both are wired through a
 history-free code path (`shared/bakedSchedule.ts`, with the eager history
 decode marked `/*@__PURE__*/`), so a bundler that sees you import **only**
-`getTimeZones` drops the entire 1995+ history table. Measured on the shipped
-`dist/` (consumer bundle, minified):
+current-instant APIs drops the entire 1995+ history table. Measured on the
+shipped `dist/` (consumer bundle, minified):
 
 | import | `07` KB | `10` KB |
 |---|--:|--:|
 | `getTimeZonesAt` (history-capable) | 22.5 | 24.0 |
+| `getTimeZoneAt` (history-capable) | 22.3 | 23.8 |
 | `getTimeZones` (schedule-only) | 10.5 | 12.0 |
+| `getTimeZone` (schedule-only) | 10.4 | 11.9 |
 
 Roughly halved — the ~12KB of baked eras tree-shake away. Import
 `getTimeZonesAt`/`getTimeZoneAt` anywhere and the history comes back. On the
 live impls (`04`/`08`) there's no history to shed; `getTimeZones()` is just
-`getTimeZonesAt(Date.now())` sharing the same hour-bucket memo.
+`getTimeZonesAt(Date.now())` sharing the same hour-bucket memo, and
+`getTimeZone()` is `getTimeZoneAt(name, Date.now())`.
+
+The four resolvers are a 2x2 grid — all zones or one, at a given instant or
+now — and every cell agrees with the others by construction: they funnel
+through one per-zone core (`tests/single-zone.test.ts`,
+`tests/get-timezones.test.ts` pin this for every zone).
 
 <details>
 <summary><b>Implementation details</b> — strategies and per-impl notes</summary>
@@ -249,7 +258,7 @@ npm install @leeoniya/easy-tz
 ## Usage
 
 ```ts
-import { getTimeZonesAt, getTimeZoneAt, getTimeZones, formatOffset } from '@leeoniya/easy-tz';
+import { getTimeZonesAt, getTimeZoneAt, getTimeZones, getTimeZone, formatOffset } from '@leeoniya/easy-tz';
 
 const zones = getTimeZonesAt(Date.now());
 // [
@@ -269,6 +278,12 @@ getTimeZones();
 getTimeZoneAt('America/New_York', Date.now());
 // { name: 'America/New_York', abbr: 'EDT', offset: -240 }
 
+// same single zone at the CURRENT instant, no timestamp arg — schedule-only
+// like getTimeZones(), so a picker that only ever asks about "now" can import
+// just these two and ship neither the history table nor a timestamp.
+getTimeZone('America/New_York');
+// { name: 'America/New_York', abbr: 'EDT', offset: -240 }
+
 formatOffset(-240); // "-04:00" — render offset minutes as an ISO-style string
 ```
 
@@ -283,8 +298,10 @@ import { getTimeZonesAt } from '@leeoniya/easy-tz/08-verified-sharing'; // live 
 import { getTimeZonesAt } from '@leeoniya/easy-tz/04-live-intl';        // fully live baseline
 ```
 
-Results are memoized per UTC hour bucket and returned by reference — treat
-them as immutable. Every entry also exports `clearCache()`, which drops
-that memo so the next call recomputes (first-call init/verification work is
-not redone); it exists for test/bench harnesses and for recovering from
-accidental mutation of a returned array.
+Full-list results are memoized per UTC hour bucket and returned by reference —
+treat them as immutable. The single-zone resolvers aren't memoized and don't
+need to be: every `TimeZoneInfo` is an interned, frozen instance shared across
+calls, so resolving one zone allocates nothing. Every entry also exports
+`clearCache()`, which drops that memo so the next call recomputes (first-call
+init/verification work is not redone); it exists for test/bench harnesses and
+for recovering from accidental mutation of a returned array.

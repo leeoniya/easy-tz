@@ -571,6 +571,16 @@ function computeCurrent(timestamp) {
   }
   return out;
 }
+function computeOneCurrent(name, timestamp) {
+  if (recovered === null)
+    init();
+  const z = zoneIndexOf(name);
+  if (z === -1)
+    return scheduleZoneInfo(name, -1, timestamp);
+  if (recovered.has(z))
+    return liveRecovered(name, Temporal.Instant.fromEpochMilliseconds(timestamp));
+  return scheduleZoneInfo(name, classIdx[z], timestamp);
+}
 var fullMemo = null;
 var curMemo = null;
 function getTimeZonesAt(timestamp) {
@@ -580,6 +590,7 @@ function getTimeZones() {
   return (curMemo ??= hourBucketMemo(computeCurrent)).get(Date.now());
 }
 var getTimeZoneAt2 = computeOne;
+var getTimeZone = (name) => computeOneCurrent(name, Date.now());
 function clearCache() {
   fullMemo?.clear();
   curMemo?.clear();
@@ -588,6 +599,7 @@ export {
   getTimeZonesAt,
   getTimeZones,
   getTimeZoneAt2 as getTimeZoneAt,
+  getTimeZone,
   formatOffset,
   clearCache
 };

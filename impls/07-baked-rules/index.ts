@@ -24,9 +24,11 @@
 // getTimeZoneAt(name, ts) resolves a SINGLE zone (the single-zone /
 // many-timestamps use case) via the same baked resolver, without building or
 // memoizing the full response. getTimeZonesAt() loops that same per-zone core.
+// getTimeZone(name) is the current-instant, schedule-only counterpart — the
+// single-zone twin of getTimeZones(), and history-free for the same reason.
 
 import type { TimeZoneInfo } from '../../shared/types.ts';
-import { computeSchedule } from '../../shared/bakedSchedule.ts';
+import { computeSchedule, scheduleGetTimeZoneAt } from '../../shared/bakedSchedule.ts';
 import { computeBaked, getTimeZoneAt as bakedGetTimeZoneAt } from '../../shared/bakedHistory.ts';
 import { hourBucketMemo, type HourBucketMemo } from '../../shared/hourCache.ts';
 
@@ -53,6 +55,14 @@ export function getTimeZones(): TimeZoneInfo[] {
 // single-zone / many-timestamps resolver (history-capable, same as getTimeZonesAt)
 export function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo {
   return bakedGetTimeZoneAt(name, timestamp);
+}
+
+// single zone at the current instant, schedule-only — no history. The
+// single-zone counterpart to getTimeZones(); importing only the two of them
+// lets shared/history.ts tree-shake away. Nothing to memoize: the result is an
+// interned instance and the lookup is a map get plus the class's date math.
+export function getTimeZone(name: string): TimeZoneInfo {
+  return scheduleGetTimeZoneAt(name, Date.now());
 }
 
 export function clearCache(): void {

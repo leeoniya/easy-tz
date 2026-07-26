@@ -37,12 +37,14 @@ try {
   const rows: (ValidateResult & { label: string })[] = [];
   const vs04 = new Map<string, Vs04>();
   const aliasPairs = new Map<string, Vs04>();
+  const currentApis = new Map<string, Vs04>();
 
   for (const id of implIds) {
     const r = (await page.evaluate(`__validate(${JSON.stringify(id)})`)) as ValidateResult;
     rows.push({ ...r, label: id });
 
     aliasPairs.set(id, (await page.evaluate(`__verifyAliasPairs(${JSON.stringify(id)})`)) as Vs04);
+    currentApis.set(id, (await page.evaluate(`__verifyCurrentApis(${JSON.stringify(id)})`)) as Vs04);
   }
 
   for (const id of VS04_IDS) {
@@ -99,6 +101,13 @@ try {
 
   console.log('\n(no-T) = Temporal global removed before load: Safari fallback paths under V8/Chrome ICU');
   console.log(`intl zone names: ${intlNames.checked - intlNames.failures.length}/${intlNames.checked} link pair spellings constructible`);
+
+  // current-instant pair (getTimeZone vs getTimeZones); on a Temporal runtime
+  // this is the only place impl 10's live-recovered zones get exercised
+  const curChecked = [...currentApis.values()].reduce((n, c) => n + c.checked, 0);
+  const curBad = [...currentApis.values()].reduce((n, c) => n + c.mismatchCount, 0);
+
+  console.log(`current-instant APIs: ${curChecked - curBad}/${curChecked} getTimeZone() results match getTimeZones()`);
 
   if (init08) {
     console.log(
@@ -159,6 +168,15 @@ try {
       console.error(`\nFAIL ${label} alias pairs: ${ap.mismatchCount}/${ap.checked} mismatched (first ${ap.mismatches.length}):`);
 
       for (const m of ap.mismatches) console.error(`  ${m}`);
+    }
+  }
+
+  for (const [label, c] of currentApis) {
+    if (c.mismatchCount > 0) {
+      failed = true;
+      console.error(`\nFAIL ${label} current-instant APIs: ${c.mismatchCount}/${c.checked} mismatched (first ${c.mismatches.length}):`);
+
+      for (const m of c.mismatches) console.error(`  ${m}`);
     }
   }
 

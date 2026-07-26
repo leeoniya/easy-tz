@@ -72,6 +72,18 @@ export function scheduleZoneInfo(
   return makeInfo(name, st.abbr, st.offMin);
 }
 
+// schedule-only single-zone resolver: the history-free counterpart to
+// shared/bakedHistory.ts's getTimeZoneAt(), reached via getTimeZone() at the
+// current instant (always the bake year or later, so there is no history to
+// consult). Living HERE rather than in bakedHistory.ts is what lets a consumer
+// importing only the current-instant APIs drop the baked eras. Unknown names
+// resolve to the same UTC sentinel the history-capable resolver answers.
+export function scheduleGetTimeZoneAt(name: string, timestamp: number): TimeZoneInfo {
+  const z = zoneIndexOf(name);
+
+  return scheduleZoneInfo(name, z === -1 ? -1 : classIdx[z]!, timestamp);
+}
+
 // full schedule-only response at `timestamp` (no history). Importing only this
 // path (via getTimeZones()) keeps shared/history.ts and its baked eras out of
 // the bundle. Loops the same per-zone resolver as scheduleZoneInfo, with a

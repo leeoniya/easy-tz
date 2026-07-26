@@ -316,6 +316,10 @@ function scheduleZoneInfo(name, ci, timestamp, schedCache) {
   }
   return makeInfo(name, st.abbr, st.offMin);
 }
+function scheduleGetTimeZoneAt(name, timestamp) {
+  const z = zoneIndexOf(name);
+  return scheduleZoneInfo(name, z === -1 ? -1 : classIdx[z], timestamp);
+}
 function computeSchedule(timestamp) {
   const schedCache = new Array(scheduleClasses.length);
   const out = new Array(zones.length);
@@ -456,6 +460,9 @@ function getTimeZones() {
 function getTimeZoneAt2(name, timestamp) {
   return getTimeZoneAt(name, timestamp);
 }
+function getTimeZone(name) {
+  return scheduleGetTimeZoneAt(name, Date.now());
+}
 function clearCache() {
   histMemo?.clear();
   schedMemo?.clear();
@@ -464,6 +471,7 @@ export {
   getTimeZonesAt,
   getTimeZones,
   getTimeZoneAt2 as getTimeZoneAt,
+  getTimeZone,
   formatOffset,
   clearCache
 };

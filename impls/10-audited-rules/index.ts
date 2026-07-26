@@ -30,7 +30,8 @@
 // getTimeZoneAt(name, ts) resolves a SINGLE zone (single-zone / many-timestamps
 // use case) through the same three regimes as getTimeZonesAt() — live-Temporal
 // history, live-Temporal recovered, else shared baked resolver — for one zone,
-// with no full-response allocation.
+// with no full-response allocation. getTimeZone(name) is its current-instant
+// counterpart, taking the same history-free route as getTimeZones().
 
 import type { TimeZoneInfo } from '../../shared/types.ts';
 import { zones } from '../../shared/zones.ts';
@@ -39,7 +40,7 @@ import { resolveClass, ruleInstant, type ScheduleClass } from '../../shared/rule
 import { gmtLabel } from '../../shared/fmt.ts';
 import { hourBucketMemo, type HourBucketMemo } from '../../shared/hourCache.ts';
 import { makeInfo } from '../../shared/zoneLinks.ts';
-import { computeSchedule, classIdx, historyAbbr, zoneIndexOf } from '../../shared/bakedSchedule.ts';
+import { computeSchedule, scheduleZoneInfo, classIdx, historyAbbr, zoneIndexOf } from '../../shared/bakedSchedule.ts';
 import { computeBaked, getTimeZoneAt as bakedGetTimeZoneAt, HISTORY_TO_MS } from '../../shared/bakedHistory.ts';
 
 const hasTemporal = typeof Temporal !== 'undefined';
@@ -253,6 +254,25 @@ function computeCurrent(timestamp: number): TimeZoneInfo[] {
   return out;
 }
 
+// single-zone counterpart to computeCurrent(): the same two current-instant
+// regimes (session-recovered zones go Temporal-live, everything else runs the
+// baked schedule) resolved for one zone. Like computeCurrent() it never
+// references computeBaked/bakedGetTimeZoneAt, so importing only the
+// current-instant APIs tree-shakes the history eras out.
+function computeOneCurrent(name: string, timestamp: number): TimeZoneInfo {
+  if (recovered === null) init();
+
+  const z = zoneIndexOf(name);
+
+  // unknown zone: UTC sentinel (never live — a bad name would make Temporal
+  // throw), the same answer the history-capable computeOne() gives
+  if (z === -1) return scheduleZoneInfo(name, -1, timestamp);
+
+  if (recovered!.has(z)) return liveRecovered(name, Temporal.Instant.fromEpochMilliseconds(timestamp));
+
+  return scheduleZoneInfo(name, classIdx[z]!, timestamp);
+}
+
 // memos created lazily so that a consumer importing only getTimeZones() never
 // references compute()/computeBaked() and drops the baked history eras
 let fullMemo: HourBucketMemo | null = null;
@@ -267,6 +287,8 @@ export function getTimeZones(): TimeZoneInfo[] {
 }
 
 export const getTimeZoneAt = computeOne;
+
+export const getTimeZone = (name: string): TimeZoneInfo => computeOneCurrent(name, Date.now());
 
 export function clearCache(): void {
   fullMemo?.clear();

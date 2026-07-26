@@ -460,10 +460,14 @@ function getTimeZoneAt(name, timestamp) {
   const res = liveParts(formatZoneOf(name), timestamp);
   return makeInfo(name, zoneAbbrOverrides[name] ?? res.abbr, res.offset);
 }
+function getTimeZone(name) {
+  return getTimeZoneAt(name, Date.now());
+}
 export {
   getTimeZonesAt,
   getTimeZones,
   getTimeZoneAt,
+  getTimeZone,
   formatOffset2 as formatOffset,
   clearCache
 };
