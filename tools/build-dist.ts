@@ -66,9 +66,13 @@ export declare function getTimeZonesAt(timestamp: number): TimeZoneInfo[];
 /**
  * A single zone's DST-correct abbreviation and UTC offset at \`timestamp\`
  * (epoch ms) — the single-zone / many-timestamps counterpart to
- * getTimeZonesAt(). Unknown zone names resolve to a UTC sentinel. Not
- * memoized (each call is allocation-light), so it suits sweeping one zone
- * across many instants.
+ * getTimeZonesAt(). Not memoized (each call is allocation-light), so it suits
+ * sweeping one zone across many instants.
+ *
+ * Accepts any name the list contains, plus the fixed-offset ids ICU accepts
+ * but doesn't enumerate: \`UTC\`, \`Etc/UTC\`, and \`Etc/GMT+1\`..\`+12\` /
+ * \`Etc/GMT-1\`..\`-14\` (POSIX sign inversion — \`Etc/GMT+5\` is UTC-05:00).
+ * Any other unknown name resolves to a UTC sentinel.
  */
 export declare function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo;
 
@@ -87,9 +91,9 @@ export declare function getTimeZones(): TimeZoneInfo[];
  * to getTimeZones(), and the no-timestamp counterpart to getTimeZoneAt().
  * On the baked impls (07/10) it takes the same schedule-only route, so
  * importing only getTimeZone()/getTimeZones() lets a bundler tree-shake the
- * history tables out entirely. Unknown zone names resolve to a UTC sentinel.
- * Not memoized — the result is an interned instance, so each call allocates
- * nothing.
+ * history tables out entirely. Same name handling as getTimeZoneAt(),
+ * including the fixed-offset Etc ids. Not memoized — the result is an
+ * interned instance, so each call allocates nothing.
  */
 export declare function getTimeZone(name: string): TimeZoneInfo;
 

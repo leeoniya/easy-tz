@@ -299,6 +299,27 @@ function hourBucketMemo(compute) {
   };
 }
 
+// shared/etcZones.ts
+function buildFixedZones() {
+  const out = new Map([
+    ["UTC", makeInfo("UTC", "UTC", 0)],
+    ["Etc/UTC", makeInfo("Etc/UTC", "UTC", 0)]
+  ]);
+  const add = (name, offset) => out.set(name, makeInfo(name, gmtLabel(offset), offset));
+  for (let h = 1;h <= 14; h++) {
+    if (h <= 12)
+      add(`Etc/GMT+${h}`, -h * 60);
+    add(`Etc/GMT-${h}`, h * 60);
+  }
+  return out;
+}
+var fixedZones = null;
+function etcZoneInfo(name) {
+  if (name !== "UTC" && !name.startsWith("Etc/"))
+    return null;
+  return (fixedZones ??= buildFixedZones()).get(name) ?? null;
+}
+
 // shared/bakedSchedule.ts
 var classIdx = buildScheduleIndex(zones, scheduleClasses);
 var nameIdx = new Map;
@@ -328,7 +349,7 @@ function historyAbbr(cls, offMin) {
 }
 function scheduleZoneInfo(name, ci, timestamp, schedCache) {
   if (ci < 0)
-    return makeInfo(name, "UTC", 0);
+    return etcZoneInfo(name) ?? makeInfo(name, "UTC", 0);
   let st = schedCache != null ? schedCache[ci] : undefined;
   if (st == null) {
     st = resolveClass(scheduleClasses[ci], timestamp, YEAR_START, STEP_MS);

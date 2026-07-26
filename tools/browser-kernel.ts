@@ -265,6 +265,55 @@ export function installKernel(
     return { checked, mismatchCount, mismatches };
   };
 
+  // the fixed-offset ids (Etc/GMT±N, UTC, Etc/UTC) that Chrome's ICU accepts
+  // but doesn't enumerate, so they reach neither the zone list nor the tables.
+  // The baked impls derive them (shared/etcZones.ts); here they're checked
+  // against live Intl, which CAN format them — this is the runtime the
+  // derivation exists for, and the one the bun tests can't stand in for.
+  (globalThis as { __verifyFixedOffsets?: unknown }).__verifyFixedOffsets = (implId: string): Vs04 => {
+    const impl = find(implId);
+    const one = impl.getTimeZoneAt;
+    const baseOne = baseline.getTimeZoneAt;
+
+    let checked = 0;
+    let mismatchCount = 0;
+    const mismatches: string[] = [];
+
+    if (one == null || baseOne == null) return { checked, mismatchCount, mismatches };
+
+    const names = ['UTC', 'Etc/UTC'];
+
+    for (let n = 1; n <= 12; n++) names.push(`Etc/GMT+${n}`);
+    for (let n = 1; n <= 14; n++) names.push(`Etc/GMT-${n}`);
+
+    // present and a pre-bake-year instant: these ids are fixed for all time,
+    // so the historical route must answer identically
+    for (const ts of [Date.UTC(2026, 6, 15, 12), Date.UTC(1998, 5, 15, 12)]) {
+      for (const name of names) {
+        checked++;
+
+        const x = baseOne(name, ts);
+        const y = one(name, ts);
+
+        if (x.abbr !== y.abbr || x.offset !== y.offset) {
+          mismatchCount++;
+
+          if (mismatches.length < 10) {
+            mismatches.push(`${name} @ ${new Date(ts).toISOString()}: 04=${x.abbr} ${x.offset} vs ${implId}=${y.abbr} ${y.offset}`);
+          }
+        } else if (one(name, ts) !== y || !Object.isFrozen(y)) {
+          // interning: on Chrome these ids reach the derived fallback rather
+          // than a table class, and must still be pooled like any other zone
+          mismatchCount++;
+
+          if (mismatches.length < 10) mismatches.push(`${name}: not interned/frozen`);
+        }
+      }
+    }
+
+    return { checked, mismatchCount, mismatches };
+  };
+
   // the two current-instant APIs must agree zone for zone. Worth checking
   // HERE specifically: on a Temporal runtime impl 10 answers its
   // session-recovered zones live, and that branch is unreachable from the bun

@@ -62,7 +62,7 @@ difference with a generated offset→abbreviation lookup plus live Intl
 offsets. The implementations here further explore the full live-to-baked spectrum,
 ending in `07-baked-rules`: vs moment-timezone it cuts cold start ~40x
 (22.9ms → 0.6ms) and memory ~2.5x (22.6MB → 9.1MB) at ~3% of the bundle size
-(768KB → 23.8KB), while passing all 62 edge-case fixtures and improving
+(768KB → 24.1KB), while passing all 62 edge-case fixtures and improving
 abbreviation coverage for 159 zones where modern tzdata dropped letter
 abbreviations (Santiago CLT/CLST, Kathmandu NPT, Chatham CHAST/CHADT,
 Kiritimati LINT, Lord Howe LHST/LHDT, Istanbul TRT, …).
@@ -75,8 +75,8 @@ until `04-live-intl` ships no generated data at all.
 
 | impl | trust model | cold ms | miss ms | rss MB | bundle KB |
 |---|---|--:|--:|--:|--:|
-| `07-baked-rules` | trusts baked tables completely | 0.6 | <0.1 | 9.1 | 23.8 |
-| `10-audited-rules` | baked tables, Temporal-audited at first call; failing zones recovered live | 3.7 | <0.1 | 10.4 | 25.8 |
+| `07-baked-rules` | trusts baked tables completely | 0.6 | <0.1 | 9.1 | 24.1 |
+| `10-audited-rules` | baked tables, Temporal-audited at first call; failing zones recovered live | 3.7 | <0.1 | 10.4 | 26.1 |
 | `08-verified-sharing` | live Intl values; baked data only hints formatter sharing, Temporal-verified at first call | 24.7 | 0.7 | 20.2 | 11.7 |
 | `04-live-intl` | fully live — no generated data to trust | 44.5 | 1.4 | 27.0 | 7.4 |
 
@@ -119,10 +119,10 @@ shipped `dist/` (consumer bundle, minified):
 
 | import | `07` KB | `10` KB |
 |---|--:|--:|
-| `getTimeZonesAt` (history-capable) | 22.5 | 24.0 |
-| `getTimeZoneAt` (history-capable) | 22.3 | 23.8 |
-| `getTimeZones` (schedule-only) | 10.5 | 12.0 |
-| `getTimeZone` (schedule-only) | 10.4 | 11.9 |
+| `getTimeZonesAt` (history-capable) | 22.8 | 24.4 |
+| `getTimeZoneAt` (history-capable) | 22.6 | 24.2 |
+| `getTimeZones` (schedule-only) | 11.0 | 12.4 |
+| `getTimeZone` (schedule-only) | 10.9 | 12.2 |
 
 Roughly halved — the ~12KB of baked eras tree-shake away. Import
 `getTimeZonesAt`/`getTimeZoneAt` anywhere and the history comes back. On the
@@ -277,6 +277,13 @@ getTimeZones();
 // no full-list allocation. Unknown names resolve to a UTC sentinel.
 getTimeZoneAt('America/New_York', Date.now());
 // { name: 'America/New_York', abbr: 'EDT', offset: -240 }
+
+// the single-zone getters also accept the fixed-offset ids that ICU accepts
+// but doesn't enumerate (Chrome lists none of them), so they're absent from
+// the list above: UTC, Etc/UTC, and Etc/GMT+1..+12 / Etc/GMT-1..-14. Note the
+// POSIX sign inversion — Etc/GMT+5 is UTC-05:00, not +05:00.
+getTimeZoneAt('Etc/GMT+5', Date.now());
+// { name: 'Etc/GMT+5', abbr: 'GMT-5', offset: -300 }
 
 // same single zone at the CURRENT instant, no timestamp arg — schedule-only
 // like getTimeZones(), so a picker that only ever asks about "now" can import

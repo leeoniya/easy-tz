@@ -12,6 +12,7 @@ import { scheduleClasses, YEAR_START, STEP_MS } from './schedule.ts';
 import { resolveClass, buildScheduleIndex, type ScheduleClass, type ZoneState } from './rules.ts';
 import { gmtLabel } from './fmt.ts';
 import { makeInfo, zoneLinks } from './zoneLinks.ts';
+import { etcZoneInfo } from './etcZones.ts';
 
 // zones-list order -> schedule class index (bridging spelling variants, i.e.
 // tzdata backward links; -1 = not covered even after bridging). Resolved once.
@@ -51,16 +52,21 @@ export function historyAbbr(cls: ScheduleClass, offMin: number): string {
 
 // schedule-only resolution of ONE zone at `timestamp`: the bake-year-onward
 // answer, and the fallthrough for historical years whose history defers or is
-// absent. `ci` is the zone's schedule class index (-1 = uncovered -> UTC
-// sentinel). The optional cache resolves each class at most once across the
-// all-zones loop and reuses it (avg ~2.5 zones/class).
+// absent. `ci` is the zone's schedule class index (-1 = uncovered -> a
+// fixed-offset Etc id if the name is one, else the UTC sentinel). The optional
+// cache resolves each class at most once across the all-zones loop and reuses
+// it (avg ~2.5 zones/class).
+//
+// Every baked route to an uncovered name passes through here — both single-zone
+// APIs on impls 07 and 10 — so it's the one place the Etc/GMT±N fallback has to
+// be wired (see shared/etcZones.ts for why those need it).
 export function scheduleZoneInfo(
   name: string,
   ci: number,
   timestamp: number,
   schedCache?: (ZoneState | undefined)[],
 ): TimeZoneInfo {
-  if (ci < 0) return makeInfo(name, 'UTC', 0);
+  if (ci < 0) return etcZoneInfo(name) ?? makeInfo(name, 'UTC', 0);
 
   let st = schedCache != null ? schedCache[ci] : undefined;
 

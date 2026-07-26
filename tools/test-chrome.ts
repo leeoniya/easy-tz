@@ -38,6 +38,7 @@ try {
   const vs04 = new Map<string, Vs04>();
   const aliasPairs = new Map<string, Vs04>();
   const currentApis = new Map<string, Vs04>();
+  const fixedOffsets = new Map<string, Vs04>();
 
   for (const id of implIds) {
     const r = (await page.evaluate(`__validate(${JSON.stringify(id)})`)) as ValidateResult;
@@ -45,6 +46,7 @@ try {
 
     aliasPairs.set(id, (await page.evaluate(`__verifyAliasPairs(${JSON.stringify(id)})`)) as Vs04);
     currentApis.set(id, (await page.evaluate(`__verifyCurrentApis(${JSON.stringify(id)})`)) as Vs04);
+    fixedOffsets.set(id, (await page.evaluate(`__verifyFixedOffsets(${JSON.stringify(id)})`)) as Vs04);
   }
 
   for (const id of VS04_IDS) {
@@ -108,6 +110,13 @@ try {
   const curBad = [...currentApis.values()].reduce((n, c) => n + c.mismatchCount, 0);
 
   console.log(`current-instant APIs: ${curChecked - curBad}/${curChecked} getTimeZone() results match getTimeZones()`);
+
+  // fixed-offset ids Chrome accepts but never enumerates (Etc/GMT±N, UTC):
+  // derived arithmetically by the baked impls, checked against live Intl
+  const fixChecked = [...fixedOffsets.values()].reduce((n, c) => n + c.checked, 0);
+  const fixBad = [...fixedOffsets.values()].reduce((n, c) => n + c.mismatchCount, 0);
+
+  console.log(`fixed-offset ids: ${fixChecked - fixBad}/${fixChecked} Etc/GMT±N + UTC single-zone lookups match live 04`);
 
   if (init08) {
     console.log(
@@ -177,6 +186,15 @@ try {
       console.error(`\nFAIL ${label} current-instant APIs: ${c.mismatchCount}/${c.checked} mismatched (first ${c.mismatches.length}):`);
 
       for (const m of c.mismatches) console.error(`  ${m}`);
+    }
+  }
+
+  for (const [label, f] of fixedOffsets) {
+    if (f.mismatchCount > 0) {
+      failed = true;
+      console.error(`\nFAIL ${label} fixed-offset ids: ${f.mismatchCount}/${f.checked} mismatched (first ${f.mismatches.length}):`);
+
+      for (const m of f.mismatches) console.error(`  ${m}`);
     }
   }
 
