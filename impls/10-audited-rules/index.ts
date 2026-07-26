@@ -283,27 +283,27 @@ let curMemo: HourBucketMemo | null = null;
 let fullCanon: CanonicalView | null = null;
 let curCanon: CanonicalView | null = null;
 
-export function getTimeZonesAt(timestamp: number, withAliases?: boolean): TimeZoneInfo[] {
+export function getTimeZonesAt(timestamp: number, withAliases = true): TimeZoneInfo[] {
   const full = (fullMemo ??= hourBucketMemo(compute)).get(timestamp);
 
-  return withAliases === false ? (fullCanon ??= canonicalView())(full) : full;
+  return withAliases ? full : (fullCanon ??= canonicalView())(full);
 }
 
-export function getTimeZones(withAliases?: boolean): TimeZoneInfo[] {
+export function getTimeZones(withAliases = true): TimeZoneInfo[] {
   const full = (curMemo ??= hourBucketMemo(computeCurrent)).get(Date.now());
 
-  return withAliases === false ? (curCanon ??= canonicalView())(full) : full;
+  return withAliases ? full : (curCanon ??= canonicalView())(full);
 }
 
 // the canonical substitution happens out here rather than inside computeOne /
 // computeOneCurrent: both spellings share a schedule class and audit outcome,
 // so swapping the name up front changes only the label on the result
-export function getTimeZoneAt(name: string, timestamp: number, withAliases?: boolean): TimeZoneInfo {
-  return computeOne(withAliases === false ? canonicalZone(name) : name, timestamp);
+export function getTimeZoneAt(name: string, timestamp: number, withAliases = true): TimeZoneInfo {
+  return computeOne(withAliases ? name : canonicalZone(name), timestamp);
 }
 
-export function getTimeZone(name: string, withAliases?: boolean): TimeZoneInfo {
-  return computeOneCurrent(withAliases === false ? canonicalZone(name) : name, Date.now());
+export function getTimeZone(name: string, withAliases = true): TimeZoneInfo {
+  return computeOneCurrent(withAliases ? name : canonicalZone(name), Date.now());
 }
 
 export function clearCache(): void {

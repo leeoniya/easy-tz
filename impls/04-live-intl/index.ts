@@ -33,15 +33,15 @@ const memo = hourBucketMemo(compute);
 // serves both list getters here, since they share the one memo.
 let canon: CanonicalView | null = null;
 
-export function getTimeZonesAt(timestamp: number, withAliases?: boolean): TimeZoneInfo[] {
+export function getTimeZonesAt(timestamp: number, withAliases = true): TimeZoneInfo[] {
   const full = memo.get(timestamp);
 
-  return withAliases === false ? (canon ??= canonicalView())(full) : full;
+  return withAliases ? full : (canon ??= canonicalView())(full);
 }
 
 // current-instant convenience; 04 is fully live so there's nothing to shed —
 // it shares the same hour-bucket memo as getTimeZonesAt
-export const getTimeZones = (withAliases?: boolean): TimeZoneInfo[] => getTimeZonesAt(Date.now(), withAliases);
+export const getTimeZones = (withAliases = true): TimeZoneInfo[] => getTimeZonesAt(Date.now(), withAliases);
 
 export function clearCache(): void {
   memo.clear();
@@ -52,13 +52,13 @@ export { formatOffset } from '../../shared/offsetFormat.ts';
 
 // single-zone resolver (single-zone / many-timestamps use case): the same
 // per-zone live-Intl leaf getTimeZonesAt() loops, resolved directly for `name`.
-export function getTimeZoneAt(name: string, timestamp: number, withAliases?: boolean): TimeZoneInfo {
-  return liveZoneInfo(withAliases === false ? canonicalZone(name) : name, timestamp);
+export function getTimeZoneAt(name: string, timestamp: number, withAliases = true): TimeZoneInfo {
+  return liveZoneInfo(withAliases ? name : canonicalZone(name), timestamp);
 }
 
 // single zone at the current instant. 04 is fully live, so — like getTimeZones()
 // vs getTimeZonesAt() — there's no history path to shed: this is exactly
 // getTimeZoneAt(name, Date.now()).
-export function getTimeZone(name: string, withAliases?: boolean): TimeZoneInfo {
+export function getTimeZone(name: string, withAliases = true): TimeZoneInfo {
   return getTimeZoneAt(name, Date.now(), withAliases);
 }

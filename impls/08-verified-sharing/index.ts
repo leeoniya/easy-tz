@@ -144,15 +144,15 @@ const memo = hourBucketMemo(compute);
 // serves both list getters here, since they share the one memo.
 let canon: CanonicalView | null = null;
 
-export function getTimeZonesAt(timestamp: number, withAliases?: boolean): TimeZoneInfo[] {
+export function getTimeZonesAt(timestamp: number, withAliases = true): TimeZoneInfo[] {
   const full = memo.get(timestamp);
 
-  return withAliases === false ? (canon ??= canonicalView())(full) : full;
+  return withAliases ? full : (canon ??= canonicalView())(full);
 }
 
 // current-instant convenience; 08 is live (no baked history), so it shares the
 // same hour-bucket memo as getTimeZonesAt
-export const getTimeZones = (withAliases?: boolean): TimeZoneInfo[] => getTimeZonesAt(Date.now(), withAliases);
+export const getTimeZones = (withAliases = true): TimeZoneInfo[] => getTimeZonesAt(Date.now(), withAliases);
 
 export function clearCache(): void {
   memo.clear();
@@ -165,10 +165,10 @@ export { formatOffset } from '../../shared/offsetFormat.ts';
 // `name` via the same representative + override logic the all-zones loop uses.
 // The formatter-sharing cache is a per-call all-zones optimization, so it isn't
 // needed here — one zone formats once.
-export function getTimeZoneAt(name: string, timestamp: number, withAliases?: boolean): TimeZoneInfo {
+export function getTimeZoneAt(name: string, timestamp: number, withAliases = true): TimeZoneInfo {
   if (repOf === null) init();
 
-  const zone = withAliases === false ? canonicalZone(name) : name;
+  const zone = withAliases ? name : canonicalZone(name);
   const res = liveParts(formatZoneOf(zone), timestamp);
 
   return makeInfo(zone, zoneAbbrOverrides[zone] ?? res.abbr, res.offset);
@@ -176,6 +176,6 @@ export function getTimeZoneAt(name: string, timestamp: number, withAliases?: boo
 
 // single zone at the current instant. 08 is live (no baked history), so — like
 // getTimeZones() vs getTimeZonesAt() — there's nothing to shed here.
-export function getTimeZone(name: string, withAliases?: boolean): TimeZoneInfo {
+export function getTimeZone(name: string, withAliases = true): TimeZoneInfo {
   return getTimeZoneAt(name, Date.now(), withAliases);
 }

@@ -388,19 +388,19 @@ function compute(timestamp) {
 }
 var memo = hourBucketMemo(compute);
 var canon = null;
-function getTimeZonesAt(timestamp, withAliases) {
+function getTimeZonesAt(timestamp, withAliases = true) {
   const full = memo.get(timestamp);
-  return withAliases === false ? (canon ??= canonicalView())(full) : full;
+  return withAliases ? full : (canon ??= canonicalView())(full);
 }
-var getTimeZones = (withAliases) => getTimeZonesAt(Date.now(), withAliases);
+var getTimeZones = (withAliases = true) => getTimeZonesAt(Date.now(), withAliases);
 function clearCache() {
   memo.clear();
   canon = null;
 }
-function getTimeZoneAt(name, timestamp, withAliases) {
-  return liveZoneInfo(withAliases === false ? canonicalZone(name) : name, timestamp);
+function getTimeZoneAt(name, timestamp, withAliases = true) {
+  return liveZoneInfo(withAliases ? name : canonicalZone(name), timestamp);
 }
-function getTimeZone(name, withAliases) {
+function getTimeZone(name, withAliases = true) {
   return getTimeZoneAt(name, Date.now(), withAliases);
 }
 export {

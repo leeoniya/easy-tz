@@ -137,8 +137,27 @@ function segmentIndex(starts: readonly number[], ts: number, anchor: number, ste
   return i;
 }
 
+// Per-class derived state, memoized on the decoded class object. Both caches
+// memoize pure functions of the class, so they cannot go stale: the tables are
+// decoded once at module load and never mutated.
+//
+// kind 1: the year's two transition instants. Recomputing them per call meant
+// two ruleInstant() -> daysFromCivil() runs (several divisions each) for every
+// resolution, even though an all-zones response shares one instant and a
+// single-zone sweep hammers one year at a time. Single-slot per class keyed by
+// year, which fits both shapes; alternating years just recomputes.
+//
+// kind 2: the segment states. These were rebuilt fresh on every call, which
+// allocated on the hot path and left the result impossible to key on by
+// identity — interning them is what lets shared/bakedSchedule.ts cache
+// TimeZoneInfo per (zone, state).
+const transOf = new WeakMap<ScheduleClass, { year: number; t1: number; t2: number }>();
+const segStatesOf = new WeakMap<ScheduleClass, ZoneState[]>();
+
 // state of a class at `ts`. yearStart/stepMs anchor the irregular segments
 // (which are only valid for the generated year and clamp outside it).
+// The returned object is OWNED by the class and shared across calls — callers
+// must treat it as immutable (shared/bakedSchedule.ts keys a cache on it).
 export function resolveClass(cls: ScheduleClass, ts: number, yearStart: number, stepMs: number): ZoneState {
   if (cls.kind === 0) return cls.states[0];
 
@@ -146,12 +165,30 @@ export function resolveClass(cls: ScheduleClass, ts: number, yearStart: number, 
     const [r1, r2] = cls.rules; // emitted sorted by month
     const year = yearFromMs(ts);
 
-    return cls.states[ruleCycleIndex(cls.states[0].offMin, cls.states[1].offMin, r1, r2, year, ts)];
+    let tc = transOf.get(cls);
+
+    if (tc == null) transOf.set(cls, (tc = { year: NaN, t1: 0, t2: 0 })); // NaN never equals, so the first call misses
+
+    if (tc.year !== year) {
+      const off0 = cls.states[0].offMin;
+      const off1 = cls.states[1].offMin;
+
+      tc.year = year;
+      tc.t1 = ruleInstant(year, r1, r1.to === 0 ? off1 : off0);
+      tc.t2 = ruleInstant(year, r2, r2.to === 0 ? off1 : off0);
+    }
+
+    // same selection as ruleCycleIndex(), against the cached instants
+    return cls.states[ts < tc.t1 ? r2.to : ts < tc.t2 ? r1.to : r2.to];
   }
 
-  const i = segmentIndex(cls.starts, ts, yearStart, stepMs);
+  let segStates = segStatesOf.get(cls);
 
-  return { abbr: cls.abbrs[i]!, offMin: cls.offMins[i]! };
+  if (segStates == null) {
+    segStatesOf.set(cls, (segStates = cls.abbrs.map((abbr, s) => ({ abbr, offMin: cls.offMins[s]! }))));
+  }
+
+  return segStates[segmentIndex(cls.starts, ts, yearStart, stepMs)]!;
 }
 
 // ---- historical eras (sidecar tables/<variant>/history.ts) ----

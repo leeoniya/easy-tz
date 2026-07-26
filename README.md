@@ -62,7 +62,7 @@ difference with a generated offset→abbreviation lookup plus live Intl
 offsets. The implementations here further explore the full live-to-baked spectrum,
 ending in `07-baked-rules`: vs moment-timezone it cuts cold start ~40x
 (22.9ms → 0.6ms) and memory ~2.5x (22.6MB → 9.1MB) at ~3% of the bundle size
-(768KB → 24.3KB), while passing all 62 edge-case fixtures and improving
+(768KB → 24.8KB), while passing all 62 edge-case fixtures and improving
 abbreviation coverage for 159 zones where modern tzdata dropped letter
 abbreviations (Santiago CLT/CLST, Kathmandu NPT, Chatham CHAST/CHADT,
 Kiritimati LINT, Lord Howe LHST/LHDT, Istanbul TRT, …).
@@ -75,8 +75,8 @@ until `04-live-intl` ships no generated data at all.
 
 | impl | trust model | cold ms | miss ms | rss MB | bundle KB |
 |---|---|--:|--:|--:|--:|
-| `07-baked-rules` | trusts baked tables completely | 0.6 | <0.1 | 9.1 | 24.3 |
-| `10-audited-rules` | baked tables, Temporal-audited at first call; failing zones recovered live | 3.7 | <0.1 | 10.4 | 26.4 |
+| `07-baked-rules` | trusts baked tables completely | 0.6 | <0.1 | 9.1 | 24.8 |
+| `10-audited-rules` | baked tables, Temporal-audited at first call; failing zones recovered live | 3.7 | <0.1 | 10.4 | 26.9 |
 | `08-verified-sharing` | live Intl values; baked data only hints formatter sharing, Temporal-verified at first call | 24.7 | 0.7 | 20.2 | 12.0 |
 | `04-live-intl` | fully live — no generated data to trust | 44.5 | 1.4 | 27.0 | 7.6 |
 
@@ -84,7 +84,7 @@ Full-list `getTimeZonesAt()`, measured on chrome-headless-shell (the primary
 target) via `bun run bench`. `cold` is the first call; `miss` an hour-bucket
 recompute; `hit` (not shown) is ~0.01-0.03µs on cache repeats. `bundle` is
 minified, not gzipped (`07`/`10` carry the [1995+ history eras](#historical-coverage-1995);
-gzip roughly halves them: `07` ≈ 11.7KB).
+gzip roughly halves them: `07` ≈ 12.1KB).
 
 ### Single-zone lookups
 

@@ -48,31 +48,31 @@ let schedCanon: CanonicalView | null = null;
 
 // full response at `timestamp`: schedule for the bake year onward, baked
 // historical eras for earlier years.
-export function getTimeZonesAt(timestamp: number, withAliases?: boolean): TimeZoneInfo[] {
+export function getTimeZonesAt(timestamp: number, withAliases = true): TimeZoneInfo[] {
   const full = (histMemo ??= hourBucketMemo(computeBaked)).get(timestamp);
 
-  return withAliases === false ? (histCanon ??= canonicalView())(full) : full;
+  return withAliases ? full : (histCanon ??= canonicalView())(full);
 }
 
 // current-instant response, schedule-only — no history. Importing only this
 // lets shared/history.ts tree-shake away.
-export function getTimeZones(withAliases?: boolean): TimeZoneInfo[] {
+export function getTimeZones(withAliases = true): TimeZoneInfo[] {
   const full = (schedMemo ??= hourBucketMemo(computeSchedule)).get(Date.now());
 
-  return withAliases === false ? (schedCanon ??= canonicalView())(full) : full;
+  return withAliases ? full : (schedCanon ??= canonicalView())(full);
 }
 
 // single-zone / many-timestamps resolver (history-capable, same as getTimeZonesAt)
-export function getTimeZoneAt(name: string, timestamp: number, withAliases?: boolean): TimeZoneInfo {
-  return bakedGetTimeZoneAt(withAliases === false ? canonicalZone(name) : name, timestamp);
+export function getTimeZoneAt(name: string, timestamp: number, withAliases = true): TimeZoneInfo {
+  return bakedGetTimeZoneAt(withAliases ? name : canonicalZone(name), timestamp);
 }
 
 // single zone at the current instant, schedule-only — no history. The
 // single-zone counterpart to getTimeZones(); importing only the two of them
 // lets shared/history.ts tree-shake away. Nothing to memoize: the result is an
 // interned instance and the lookup is a map get plus the class's date math.
-export function getTimeZone(name: string, withAliases?: boolean): TimeZoneInfo {
-  return scheduleGetTimeZoneAt(withAliases === false ? canonicalZone(name) : name, Date.now());
+export function getTimeZone(name: string, withAliases = true): TimeZoneInfo {
+  return scheduleGetTimeZoneAt(withAliases ? name : canonicalZone(name), Date.now());
 }
 
 export function clearCache(): void {

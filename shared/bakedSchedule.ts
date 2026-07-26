@@ -50,12 +50,54 @@ export function historyAbbr(cls: ScheduleClass, offMin: number): string {
   return gmtLabel(offMin);
 }
 
+// Fast path in front of makeInfo() for the resolvers below. resolveClass()
+// returns a state object OWNED by the decoded schedule (interned for every
+// kind, see shared/rules.ts), so a zone's answer is fully determined by
+// (zone index, state identity) — while makeInfo() has to re-hash the name
+// string, the abbr and the offset through three chained Maps, which was the
+// single largest cost in a full-list miss.
+//
+// Two slots per zone, compared by identity: a zone has one state if it doesn't
+// observe DST and two if it does, so after at most two misses a zone never
+// misses again. (The four irregular Ramadan-rule zones have three; they just
+// fall through to makeInfo sometimes.) Two arrays of two slots cost ~15KB for
+// the whole list — a Map per zone would be an order of magnitude more, to hold
+// the same one or two entries.
+//
+// Misses delegate to makeInfo(), so the global pool remains the one source of
+// interned identity: a slot here always holds the same frozen instance
+// getTimeZoneAt() hands back for that zone and state.
+const stateA: (ZoneState | undefined)[] = new Array(zones.length);
+const infoA: (TimeZoneInfo | undefined)[] = new Array(zones.length);
+const stateB: (ZoneState | undefined)[] = new Array(zones.length);
+const infoB: (TimeZoneInfo | undefined)[] = new Array(zones.length);
+
+function zoneStateInfo(z: number, st: ZoneState): TimeZoneInfo {
+  if (stateA[z] === st) return infoA[z]!;
+  if (stateB[z] === st) return infoB[z]!;
+
+  const info = makeInfo(zones[z]!, st.abbr, st.offMin);
+
+  // keep the two most recent, so a DST zone's pair both stay resident
+  stateB[z] = stateA[z];
+  infoB[z] = infoA[z];
+  stateA[z] = st;
+  infoA[z] = info;
+
+  return info;
+}
+
 // schedule-only resolution of ONE zone at `timestamp`: the bake-year-onward
 // answer, and the fallthrough for historical years whose history defers or is
 // absent. `ci` is the zone's schedule class index (-1 = uncovered -> a
 // fixed-offset Etc id if the name is one, else the UTC sentinel). The optional
 // cache resolves each class at most once across the all-zones loop and reuses
 // it (avg ~2.5 zones/class).
+//
+// `z` is the caller's zones-list index, enabling the identity cache above; the
+// all-zones loops pass it, single-zone callers needn't. It is honored only when
+// `name` really is zones[z]: a single-zone lookup can arrive under a bridged
+// alias spelling, and that answer has to keep the caller's spelling.
 //
 // Every baked route to an uncovered name passes through here — both single-zone
 // APIs on impls 07 and 10 — so it's the one place the Etc/GMT±N fallback has to
@@ -65,6 +107,7 @@ export function scheduleZoneInfo(
   ci: number,
   timestamp: number,
   schedCache?: (ZoneState | undefined)[],
+  z = -1,
 ): TimeZoneInfo {
   if (ci < 0) return etcZoneInfo(name) ?? makeInfo(name, 'UTC', 0);
 
@@ -75,7 +118,7 @@ export function scheduleZoneInfo(
     if (schedCache != null) schedCache[ci] = st;
   }
 
-  return makeInfo(name, st.abbr, st.offMin);
+  return z >= 0 && zones[z] === name ? zoneStateInfo(z, st) : makeInfo(name, st.abbr, st.offMin);
 }
 
 // schedule-only single-zone resolver: the history-free counterpart to
@@ -87,7 +130,7 @@ export function scheduleZoneInfo(
 export function scheduleGetTimeZoneAt(name: string, timestamp: number): TimeZoneInfo {
   const z = zoneIndexOf(name);
 
-  return scheduleZoneInfo(name, z === -1 ? -1 : classIdx[z]!, timestamp);
+  return scheduleZoneInfo(name, z === -1 ? -1 : classIdx[z]!, timestamp, undefined, z);
 }
 
 // full schedule-only response at `timestamp` (no history). Importing only this
@@ -99,7 +142,7 @@ export function computeSchedule(timestamp: number): TimeZoneInfo[] {
   const out: TimeZoneInfo[] = new Array(zones.length);
 
   for (let z = 0; z < zones.length; z++) {
-    out[z] = scheduleZoneInfo(zones[z]!, classIdx[z]!, timestamp, schedCache);
+    out[z] = scheduleZoneInfo(zones[z]!, classIdx[z]!, timestamp, schedCache, z);
   }
 
   return out;

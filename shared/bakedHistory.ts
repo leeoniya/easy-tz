@@ -52,6 +52,10 @@ export const HISTORY_TO_MS = Date.UTC(HISTORY_TO, 0, 1);
 // history class at most once. undefined history entry = not yet computed (a
 // resolved history offset is number|null, so undefined is an unambiguous
 // "miss"). getTimeZoneAt() passes no caches and resolves directly.
+//
+// `z` is the zones-list index, forwarded to the schedule resolver's identity
+// cache (see shared/bakedSchedule.ts). Only the bake-year-onward answer can use
+// it; a historical offset isn't a schedule state, so it interns the long way.
 function bakedZoneInfo(
   name: string,
   ci: number,
@@ -60,6 +64,7 @@ function bakedZoneInfo(
   historical: boolean,
   schedCache?: (ZoneState | undefined)[],
   histCache?: (number | null | undefined)[],
+  z = -1,
 ): TimeZoneInfo {
   // historical era wins when the zone has one live at this instant (non-null)
   if (historical && hi !== -1) {
@@ -79,7 +84,7 @@ function bakedZoneInfo(
   }
 
   // bake year onward, or an earlier year whose history defers/absent
-  return scheduleZoneInfo(name, ci, timestamp, schedCache);
+  return scheduleZoneInfo(name, ci, timestamp, schedCache, z);
 }
 
 // Single-zone resolver for the single-zone / many-timestamps use case: resolves
@@ -92,7 +97,7 @@ export function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo {
   const ci = z === -1 ? -1 : classIdx[z]!;
   const hi = z === -1 ? -1 : histIdx[z]!;
 
-  return bakedZoneInfo(name, ci, hi, timestamp, timestamp < HISTORY_TO_MS);
+  return bakedZoneInfo(name, ci, hi, timestamp, timestamp < HISTORY_TO_MS, undefined, undefined, z);
 }
 
 // full baked response at `timestamp`: schedule for the bake year onward,
@@ -107,7 +112,7 @@ export function computeBaked(timestamp: number): TimeZoneInfo[] {
   const out: TimeZoneInfo[] = new Array(zones.length);
 
   for (let z = 0; z < zones.length; z++) {
-    out[z] = bakedZoneInfo(zones[z]!, classIdx[z]!, histIdx[z]!, timestamp, historical, schedCache, histCache);
+    out[z] = bakedZoneInfo(zones[z]!, classIdx[z]!, histIdx[z]!, timestamp, historical, schedCache, histCache, z);
   }
 
   return out;

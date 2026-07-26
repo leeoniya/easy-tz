@@ -250,16 +250,31 @@ function segmentIndex(starts, ts, anchor, stepMs) {
     i--;
   return i;
 }
+var transOf = new WeakMap;
+var segStatesOf = new WeakMap;
 function resolveClass(cls, ts, yearStart, stepMs) {
   if (cls.kind === 0)
     return cls.states[0];
   if (cls.kind === 1) {
     const [r1, r2] = cls.rules;
     const year = yearFromMs(ts);
-    return cls.states[ruleCycleIndex(cls.states[0].offMin, cls.states[1].offMin, r1, r2, year, ts)];
+    let tc = transOf.get(cls);
+    if (tc == null)
+      transOf.set(cls, tc = { year: NaN, t1: 0, t2: 0 });
+    if (tc.year !== year) {
+      const off0 = cls.states[0].offMin;
+      const off1 = cls.states[1].offMin;
+      tc.year = year;
+      tc.t1 = ruleInstant(year, r1, r1.to === 0 ? off1 : off0);
+      tc.t2 = ruleInstant(year, r2, r2.to === 0 ? off1 : off0);
+    }
+    return cls.states[ts < tc.t1 ? r2.to : ts < tc.t2 ? r1.to : r2.to];
   }
-  const i = segmentIndex(cls.starts, ts, yearStart, stepMs);
-  return { abbr: cls.abbrs[i], offMin: cls.offMins[i] };
+  let segStates = segStatesOf.get(cls);
+  if (segStates == null) {
+    segStatesOf.set(cls, segStates = cls.abbrs.map((abbr, s) => ({ abbr, offMin: cls.offMins[s] })));
+  }
+  return segStates[segmentIndex(cls.starts, ts, yearStart, stepMs)];
 }
 function resolveHistory(eras, ts, stepMs) {
   const year = yearFromMs(ts);
@@ -340,7 +355,23 @@ function historyAbbr(cls, offMin) {
   }
   return gmtLabel(offMin);
 }
-function scheduleZoneInfo(name, ci, timestamp, schedCache) {
+var stateA = new Array(zones.length);
+var infoA = new Array(zones.length);
+var stateB = new Array(zones.length);
+var infoB = new Array(zones.length);
+function zoneStateInfo(z, st) {
+  if (stateA[z] === st)
+    return infoA[z];
+  if (stateB[z] === st)
+    return infoB[z];
+  const info = makeInfo(zones[z], st.abbr, st.offMin);
+  stateB[z] = stateA[z];
+  infoB[z] = infoA[z];
+  stateA[z] = st;
+  infoA[z] = info;
+  return info;
+}
+function scheduleZoneInfo(name, ci, timestamp, schedCache, z = -1) {
   if (ci < 0)
     return etcZoneInfo(name) ?? makeInfo(name, "UTC", 0);
   let st = schedCache != null ? schedCache[ci] : undefined;
@@ -349,17 +380,17 @@ function scheduleZoneInfo(name, ci, timestamp, schedCache) {
     if (schedCache != null)
       schedCache[ci] = st;
   }
-  return makeInfo(name, st.abbr, st.offMin);
+  return z >= 0 && zones[z] === name ? zoneStateInfo(z, st) : makeInfo(name, st.abbr, st.offMin);
 }
 function scheduleGetTimeZoneAt(name, timestamp) {
   const z = zoneIndexOf(name);
-  return scheduleZoneInfo(name, z === -1 ? -1 : classIdx[z], timestamp);
+  return scheduleZoneInfo(name, z === -1 ? -1 : classIdx[z], timestamp, undefined, z);
 }
 function computeSchedule(timestamp) {
   const schedCache = new Array(scheduleClasses.length);
   const out = new Array(zones.length);
   for (let z = 0;z < zones.length; z++) {
-    out[z] = scheduleZoneInfo(zones[z], classIdx[z], timestamp, schedCache);
+    out[z] = scheduleZoneInfo(zones[z], classIdx[z], timestamp, schedCache, z);
   }
   return out;
 }
@@ -377,7 +408,7 @@ var historyClasses = /* @__PURE__ */ decodeHistory(Z, P2, T, E, H, HISTORY_FROM)
 // shared/bakedHistory.ts
 var histIdx = /* @__PURE__ */ buildScheduleIndex(zones, historyClasses);
 var HISTORY_TO_MS = Date.UTC(HISTORY_TO, 0, 1);
-function bakedZoneInfo(name, ci, hi, timestamp, historical, schedCache, histCache) {
+function bakedZoneInfo(name, ci, hi, timestamp, historical, schedCache, histCache, z = -1) {
   if (historical && hi !== -1) {
     let off = histCache != null ? histCache[hi] : undefined;
     if (off === undefined) {
@@ -390,13 +421,13 @@ function bakedZoneInfo(name, ci, hi, timestamp, historical, schedCache, histCach
       return makeInfo(name, abbr, off);
     }
   }
-  return scheduleZoneInfo(name, ci, timestamp, schedCache);
+  return scheduleZoneInfo(name, ci, timestamp, schedCache, z);
 }
 function getTimeZoneAt(name, timestamp) {
   const z = zoneIndexOf(name);
   const ci = z === -1 ? -1 : classIdx[z];
   const hi = z === -1 ? -1 : histIdx[z];
-  return bakedZoneInfo(name, ci, hi, timestamp, timestamp < HISTORY_TO_MS);
+  return bakedZoneInfo(name, ci, hi, timestamp, timestamp < HISTORY_TO_MS, undefined, undefined, z);
 }
 function computeBaked(timestamp) {
   const historical = timestamp < HISTORY_TO_MS;
@@ -404,7 +435,7 @@ function computeBaked(timestamp) {
   const histCache = historical ? new Array(historyClasses.length) : undefined;
   const out = new Array(zones.length);
   for (let z = 0;z < zones.length; z++) {
-    out[z] = bakedZoneInfo(zones[z], classIdx[z], histIdx[z], timestamp, historical, schedCache, histCache);
+    out[z] = bakedZoneInfo(zones[z], classIdx[z], histIdx[z], timestamp, historical, schedCache, histCache, z);
   }
   return out;
 }
@@ -488,19 +519,19 @@ var histMemo = null;
 var schedMemo = null;
 var histCanon = null;
 var schedCanon = null;
-function getTimeZonesAt(timestamp, withAliases) {
+function getTimeZonesAt(timestamp, withAliases = true) {
   const full = (histMemo ??= hourBucketMemo(computeBaked)).get(timestamp);
-  return withAliases === false ? (histCanon ??= canonicalView())(full) : full;
+  return withAliases ? full : (histCanon ??= canonicalView())(full);
 }
-function getTimeZones(withAliases) {
+function getTimeZones(withAliases = true) {
   const full = (schedMemo ??= hourBucketMemo(computeSchedule)).get(Date.now());
-  return withAliases === false ? (schedCanon ??= canonicalView())(full) : full;
+  return withAliases ? full : (schedCanon ??= canonicalView())(full);
 }
-function getTimeZoneAt2(name, timestamp, withAliases) {
-  return getTimeZoneAt(withAliases === false ? canonicalZone(name) : name, timestamp);
+function getTimeZoneAt2(name, timestamp, withAliases = true) {
+  return getTimeZoneAt(withAliases ? name : canonicalZone(name), timestamp);
 }
-function getTimeZone(name, withAliases) {
-  return scheduleGetTimeZoneAt(withAliases === false ? canonicalZone(name) : name, Date.now());
+function getTimeZone(name, withAliases = true) {
+  return scheduleGetTimeZoneAt(withAliases ? name : canonicalZone(name), Date.now());
 }
 function clearCache() {
   histMemo?.clear();

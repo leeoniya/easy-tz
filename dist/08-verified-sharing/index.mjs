@@ -466,23 +466,23 @@ function compute(timestamp) {
 }
 var memo = hourBucketMemo(compute);
 var canon = null;
-function getTimeZonesAt(timestamp, withAliases) {
+function getTimeZonesAt(timestamp, withAliases = true) {
   const full = memo.get(timestamp);
-  return withAliases === false ? (canon ??= canonicalView())(full) : full;
+  return withAliases ? full : (canon ??= canonicalView())(full);
 }
-var getTimeZones = (withAliases) => getTimeZonesAt(Date.now(), withAliases);
+var getTimeZones = (withAliases = true) => getTimeZonesAt(Date.now(), withAliases);
 function clearCache() {
   memo.clear();
   canon = null;
 }
-function getTimeZoneAt(name, timestamp, withAliases) {
+function getTimeZoneAt(name, timestamp, withAliases = true) {
   if (repOf === null)
     init();
-  const zone = withAliases === false ? canonicalZone(name) : name;
+  const zone = withAliases ? name : canonicalZone(name);
   const res = liveParts(formatZoneOf(zone), timestamp);
   return makeInfo(zone, zoneAbbrOverrides[zone] ?? res.abbr, res.offset);
 }
-function getTimeZone(name, withAliases) {
+function getTimeZone(name, withAliases = true) {
   return getTimeZoneAt(name, Date.now(), withAliases);
 }
 export {

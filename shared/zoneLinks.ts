@@ -52,12 +52,6 @@ for (const [canonical, alias] of zoneLinkPairs) {
   aliasOfZone.set(alias, canonical);
 }
 
-// NOTE for both helpers below: the public getters declare `withAliases?:
-// boolean` and test `=== false` rather than defaulting it to true. A default
-// VALUE makes JSC take its arity-mismatch path on the (overwhelmingly common)
-// calls that omit the argument — measurably so on the hour-bucket memo hit,
-// where there's no real work to hide behind it.
-
 // modern spelling of `name`, for the single-zone getters when the caller opted
 // out of alias-named results (withAliases = false). Canonical, unknown and
 // fixed-offset ids come back unchanged, so callers apply it unconditionally.
