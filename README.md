@@ -60,8 +60,8 @@ component. A small, fast replacement did not exist for this purpose (see
 My [first attempt](https://github.com/leeoniya/timezones) split the
 difference with a generated offset→abbreviation lookup plus live Intl
 offsets. The implementations here further explore the full live-to-baked spectrum,
-ending in `07-baked-rules`: vs moment-timezone it cuts cold start ~29x
-(23.4ms → 0.8ms) and memory ~3x (23.0MB → 7.4MB) at ~3% of the bundle size
+ending in `07-baked-rules`: vs moment-timezone it cuts cold start ~32x
+(22.2ms → 0.7ms) and memory ~2.8x (23.1MB → 8.2MB) at ~3% of the bundle size
 (768KB → 24.8KB), while passing all 62 edge-case fixtures and improving
 abbreviation coverage for 159 zones where modern tzdata dropped letter
 abbreviations (Santiago CLT/CLST, Kathmandu NPT, Chatham CHAST/CHADT,
@@ -75,10 +75,10 @@ until `04-live-intl` ships no generated data at all.
 
 | impl | trust model | cold ms | miss ms | rss MB | bundle KB |
 |---|---|--:|--:|--:|--:|
-| `07-baked-rules` | trusts baked tables completely | 0.8 | <0.1 | 7.4 | 24.8 |
-| `10-audited-rules` | baked tables, Temporal-audited at first call; failing zones recovered live | 6.2 | <0.1 | 11.0 | 26.9 |
-| `08-verified-sharing` | live Intl values; baked data only hints formatter sharing, Temporal-verified at first call | 25.8 | 0.7 | 19.9 | 12.0 |
-| `04-live-intl` | fully live — no generated data to trust | 44.3 | 1.4 | 26.9 | 7.6 |
+| `07-baked-rules` | trusts baked tables completely | 0.7 | <0.1 | 8.2 | 24.8 |
+| `10-audited-rules` | baked tables, Temporal-audited at first call; failing zones recovered live | 6.9 | <0.1 | 10.3 | 26.9 |
+| `08-verified-sharing` | live Intl values; baked data only hints formatter sharing, Temporal-verified at first call | 24.1 | 0.7 | 20.7 | 12.0 |
+| `04-live-intl` | fully live — no generated data to trust | 44.1 | 1.4 | 27.6 | 7.6 |
 
 Full-list `getTimeZonesAt()`, measured on chrome-headless-shell (the primary
 target) via `bun run bench`. `cold` is the first call; `miss` an hour-bucket
@@ -96,15 +96,15 @@ historical one:
 
 | impl | 10k cur ms | 10k hist ms | formatters |
 |---|--:|--:|--:|
-| `07-baked-rules` | 2.5 | 3.6 | 0 |
-| `10-audited-rules` | 2.7 | 17.4 | 0 |
-| `08-verified-sharing` | 34.9 | 33.4 | 1 |
-| `04-live-intl` | 39.0 | 35.0 | 1 |
+| `07-baked-rules` | 2.5 | 3.3 | 0 |
+| `10-audited-rules` | 2.7 | 17.0 | 0 |
+| `08-verified-sharing` | 34.1 | 32.1 | 1 |
+| `04-live-intl` | 35.1 | 33.4 | 1 |
 
 Baked history costs `07` little extra — a few ms for the whole 10k-instant
 sweep whether the instants are past or present. On a Temporal runtime `10`
 resolves the past live (Temporal is authoritative for history), hence its
-heavier historical sweep (17.4ms vs 2.7ms); the live impls build one formatter
+heavier historical sweep (17.0ms vs 2.7ms); the live impls build one formatter
 for the zone and reuse it across the whole sweep either way.
 
 ### Schedule-only route (`getTimeZones()` / `getTimeZone()`)
@@ -199,7 +199,7 @@ for curated-quality recovery labels.)
 `08-verified-sharing` applies the same verify-at-first-call idea but flips
 the trust model: values always come from live Intl, and the generated class
 table is demoted to a *hint* about which zones can share one formatter (180
-formatters instead of 433, cutting 04's cold start by ~40%). At
+formatters instead of 433, cutting 04's cold start by ~45%). At
 first call each group member's exact offset behavior for the year is
 compared against its representative's via Temporal's transition walk
 (`getTimeZoneTransition`, no formatters, ~4-5ms once), and diverged members
