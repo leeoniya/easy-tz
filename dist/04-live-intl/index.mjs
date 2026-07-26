@@ -28,6 +28,20 @@ for (const [canonical, alias] of zoneLinkPairs) {
   zoneLinks.set(alias, canonical);
   aliasOfZone.set(alias, canonical);
 }
+function canonicalZone(name) {
+  return aliasOfZone.get(name) ?? name;
+}
+function canonicalView() {
+  let lastFull = null;
+  let lastCanon = [];
+  return (full) => {
+    if (full !== lastFull) {
+      lastFull = full;
+      lastCanon = full.filter((z) => z.aliasOf == null);
+    }
+    return lastCanon;
+  };
+}
 var internPool = new Map;
 var POOL_NAME_CAP = 4096;
 function freezeInfo(name, abbr, offset) {
@@ -373,14 +387,21 @@ function compute(timestamp) {
   return out;
 }
 var memo = hourBucketMemo(compute);
-var getTimeZonesAt = memo.get;
-var getTimeZones = () => memo.get(Date.now());
-var clearCache = memo.clear;
-function getTimeZoneAt(name, timestamp) {
-  return liveZoneInfo(name, timestamp);
+var canon = null;
+function getTimeZonesAt(timestamp, withAliases) {
+  const full = memo.get(timestamp);
+  return withAliases === false ? (canon ??= canonicalView())(full) : full;
 }
-function getTimeZone(name) {
-  return liveZoneInfo(name, Date.now());
+var getTimeZones = (withAliases) => getTimeZonesAt(Date.now(), withAliases);
+function clearCache() {
+  memo.clear();
+  canon = null;
+}
+function getTimeZoneAt(name, timestamp, withAliases) {
+  return liveZoneInfo(withAliases === false ? canonicalZone(name) : name, timestamp);
+}
+function getTimeZone(name, withAliases) {
+  return getTimeZoneAt(name, Date.now(), withAliases);
 }
 export {
   getTimeZonesAt,

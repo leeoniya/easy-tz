@@ -31,6 +31,7 @@ import type { TimeZoneInfo } from '../../shared/types.ts';
 import { computeSchedule, scheduleGetTimeZoneAt } from '../../shared/bakedSchedule.ts';
 import { computeBaked, getTimeZoneAt as bakedGetTimeZoneAt } from '../../shared/bakedHistory.ts';
 import { hourBucketMemo, type HourBucketMemo } from '../../shared/hourCache.ts';
+import { canonicalZone, canonicalView, type CanonicalView } from '../../shared/zoneLinks.ts';
 
 // Two hour-bucket memos, created lazily on first use. The history-backed one
 // is referenced ONLY inside getTimeZonesAt/getTimeZoneAt below, and the
@@ -40,34 +41,45 @@ import { hourBucketMemo, type HourBucketMemo } from '../../shared/hourCache.ts';
 let histMemo: HourBucketMemo | null = null;
 let schedMemo: HourBucketMemo | null = null;
 
+// alias-free views of the two memos' outputs, built on first opt-out. One per
+// memo: a shared instance would thrash between the two responses.
+let histCanon: CanonicalView | null = null;
+let schedCanon: CanonicalView | null = null;
+
 // full response at `timestamp`: schedule for the bake year onward, baked
 // historical eras for earlier years.
-export function getTimeZonesAt(timestamp: number): TimeZoneInfo[] {
-  return (histMemo ??= hourBucketMemo(computeBaked)).get(timestamp);
+export function getTimeZonesAt(timestamp: number, withAliases?: boolean): TimeZoneInfo[] {
+  const full = (histMemo ??= hourBucketMemo(computeBaked)).get(timestamp);
+
+  return withAliases === false ? (histCanon ??= canonicalView())(full) : full;
 }
 
 // current-instant response, schedule-only — no history. Importing only this
 // lets shared/history.ts tree-shake away.
-export function getTimeZones(): TimeZoneInfo[] {
-  return (schedMemo ??= hourBucketMemo(computeSchedule)).get(Date.now());
+export function getTimeZones(withAliases?: boolean): TimeZoneInfo[] {
+  const full = (schedMemo ??= hourBucketMemo(computeSchedule)).get(Date.now());
+
+  return withAliases === false ? (schedCanon ??= canonicalView())(full) : full;
 }
 
 // single-zone / many-timestamps resolver (history-capable, same as getTimeZonesAt)
-export function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo {
-  return bakedGetTimeZoneAt(name, timestamp);
+export function getTimeZoneAt(name: string, timestamp: number, withAliases?: boolean): TimeZoneInfo {
+  return bakedGetTimeZoneAt(withAliases === false ? canonicalZone(name) : name, timestamp);
 }
 
 // single zone at the current instant, schedule-only — no history. The
 // single-zone counterpart to getTimeZones(); importing only the two of them
 // lets shared/history.ts tree-shake away. Nothing to memoize: the result is an
 // interned instance and the lookup is a map get plus the class's date math.
-export function getTimeZone(name: string): TimeZoneInfo {
-  return scheduleGetTimeZoneAt(name, Date.now());
+export function getTimeZone(name: string, withAliases?: boolean): TimeZoneInfo {
+  return scheduleGetTimeZoneAt(withAliases === false ? canonicalZone(name) : name, Date.now());
 }
 
 export function clearCache(): void {
   histMemo?.clear();
   schedMemo?.clear();
+  histCanon = null;
+  schedCanon = null;
 }
 
 export { formatOffset } from '../../shared/offsetFormatBaked.ts';

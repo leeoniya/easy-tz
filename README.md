@@ -5,10 +5,10 @@ historical offsets back to 1995 for the baked impls (`07`/`10`); results are
 independent of the host timezone (`TZ`). Pre-1995 accuracy is a non-goal.
 
 ```ts
-function getTimeZonesAt(timestamp: number): TimeZoneInfo[];
-function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo; // one zone, many timestamps
-function getTimeZones(): TimeZoneInfo[];           // all zones now; schedule-only, history tree-shakes out
-function getTimeZone(name: string): TimeZoneInfo;  // one zone now;   schedule-only, history tree-shakes out
+function getTimeZonesAt(timestamp: number, withAliases?: boolean): TimeZoneInfo[];
+function getTimeZoneAt(name: string, timestamp: number, withAliases?: boolean): TimeZoneInfo; // one zone, many timestamps
+function getTimeZones(withAliases?: boolean): TimeZoneInfo[];           // all zones now; schedule-only, history tree-shakes out
+function getTimeZone(name: string, withAliases?: boolean): TimeZoneInfo; // one zone now;  schedule-only, history tree-shakes out
 function formatOffset(minutes: number): string; // -300 -> "-05:00"
 
 interface TimeZoneInfo {
@@ -62,7 +62,7 @@ difference with a generated offset→abbreviation lookup plus live Intl
 offsets. The implementations here further explore the full live-to-baked spectrum,
 ending in `07-baked-rules`: vs moment-timezone it cuts cold start ~40x
 (22.9ms → 0.6ms) and memory ~2.5x (22.6MB → 9.1MB) at ~3% of the bundle size
-(768KB → 24.1KB), while passing all 62 edge-case fixtures and improving
+(768KB → 24.3KB), while passing all 62 edge-case fixtures and improving
 abbreviation coverage for 159 zones where modern tzdata dropped letter
 abbreviations (Santiago CLT/CLST, Kathmandu NPT, Chatham CHAST/CHADT,
 Kiritimati LINT, Lord Howe LHST/LHDT, Istanbul TRT, …).
@@ -75,10 +75,10 @@ until `04-live-intl` ships no generated data at all.
 
 | impl | trust model | cold ms | miss ms | rss MB | bundle KB |
 |---|---|--:|--:|--:|--:|
-| `07-baked-rules` | trusts baked tables completely | 0.6 | <0.1 | 9.1 | 24.1 |
-| `10-audited-rules` | baked tables, Temporal-audited at first call; failing zones recovered live | 3.7 | <0.1 | 10.4 | 26.1 |
-| `08-verified-sharing` | live Intl values; baked data only hints formatter sharing, Temporal-verified at first call | 24.7 | 0.7 | 20.2 | 11.7 |
-| `04-live-intl` | fully live — no generated data to trust | 44.5 | 1.4 | 27.0 | 7.4 |
+| `07-baked-rules` | trusts baked tables completely | 0.6 | <0.1 | 9.1 | 24.3 |
+| `10-audited-rules` | baked tables, Temporal-audited at first call; failing zones recovered live | 3.7 | <0.1 | 10.4 | 26.4 |
+| `08-verified-sharing` | live Intl values; baked data only hints formatter sharing, Temporal-verified at first call | 24.7 | 0.7 | 20.2 | 12.0 |
+| `04-live-intl` | fully live — no generated data to trust | 44.5 | 1.4 | 27.0 | 7.6 |
 
 Full-list `getTimeZonesAt()`, measured on chrome-headless-shell (the primary
 target) via `bun run bench`. `cold` is the first call; `miss` an hour-bucket
@@ -119,9 +119,9 @@ shipped `dist/` (consumer bundle, minified):
 
 | import | `07` KB | `10` KB |
 |---|--:|--:|
-| `getTimeZonesAt` (history-capable) | 22.8 | 24.4 |
-| `getTimeZoneAt` (history-capable) | 22.6 | 24.2 |
-| `getTimeZones` (schedule-only) | 11.0 | 12.4 |
+| `getTimeZonesAt` (history-capable) | 22.9 | 24.5 |
+| `getTimeZoneAt` (history-capable) | 22.7 | 24.2 |
+| `getTimeZones` (schedule-only) | 11.1 | 12.5 |
 | `getTimeZone` (schedule-only) | 10.9 | 12.2 |
 
 Roughly halved — the ~12KB of baked eras tree-shake away. Import
@@ -291,6 +291,11 @@ getTimeZoneAt('Etc/GMT+5', Date.now());
 getTimeZone('America/New_York');
 // { name: 'America/New_York', abbr: 'EDT', offset: -240 }
 
+// all four take a trailing `withAliases` (default true). Pass false to keep
+// legacy spellings out of the results entirely — see Aliases below.
+getTimeZones(false);                          // drops the 20 aliasOf entries
+getTimeZone('Asia/Calcutta', false);          // { name: 'Asia/Kolkata', abbr: 'IST', offset: 330 }
+
 formatOffset(-240); // "-04:00" — render offset minutes as an ISO-style string
 ```
 
@@ -312,3 +317,36 @@ calls, so resolving one zone allocates nothing. Every entry also exports
 `clearCache()`, which drops that memo so the next call recomputes (first-call
 init/verification work is not redone); it exists for test/bench harnesses and
 for recovering from accidental mutation of a returned array.
+
+### Aliases (`withAliases`)
+
+Twenty IANA ids are legacy spellings of another zone — `Asia/Calcutta` for
+`Asia/Kolkata`, `America/Buenos_Aires` for `America/Argentina/Buenos_Aires`,
+and so on. Runtimes disagree about which spelling they enumerate (Chrome lists
+several of the legacy ones, bun lists the modern ones), so the response always
+contains **both**, with the legacy entry tagged `aliasOf`. That keeps search
+matching on either spelling working, but it puts near-duplicates in a picker.
+
+Passing `withAliases: false` opts out of legacy-spelled results everywhere:
+
+```ts
+getTimeZonesAt(ts, false);  // 20 fewer entries — the aliasOf ones are dropped
+getTimeZones(false);        // same, at the current instant
+
+// the single-zone getters can't drop anything, so they substitute instead:
+// a legacy name resolves as its canonical zone
+getTimeZoneAt('Asia/Calcutta', ts, false);
+// { name: 'Asia/Kolkata', abbr: 'IST', offset: 330 }
+```
+
+No result ever carries an `aliasOf` when the flag is off. Note the asymmetry
+the substitution implies: the returned `name` is the canonical spelling, not
+the one you passed, so don't use it to key a map by the requested id.
+Canonical, unknown and fixed-offset names are unaffected.
+
+Both paths are cheap enough to use freely. Dropping entries doesn't break the
+by-reference contract — the filtered array is derived once per hour bucket
+alongside the full one and shares its `TimeZoneInfo` instances, so repeat calls
+return the same array. And because instances are interned by name,
+`getTimeZoneAt('Asia/Calcutta', ts, false)` returns the very same object as
+`getTimeZoneAt('Asia/Kolkata', ts)`.

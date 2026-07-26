@@ -18,24 +18,32 @@ export interface TimeZoneInfo {
   aliasOf?: string;
 }
 
-export type GetTimeZonesAt = (timestamp: number) => TimeZoneInfo[];
+// `withAliases` (default true) opts out of legacy-spelled results. The two
+// list getters DROP the 20 alias entries — their canonical counterparts are
+// always in the list — and the two single-zone getters SUBSTITUTE the
+// canonical zone when handed a legacy name, so getTimeZoneAt("Asia/Calcutta",
+// ts, false) answers as if "Asia/Kolkata" had been asked for. Either way no
+// returned TimeZoneInfo carries an `aliasOf`. Note the substitution means the
+// result's `name` can differ from the name passed in.
 
-// no-argument convenience over GetTimeZonesAt at the current instant
+export type GetTimeZonesAt = (timestamp: number, withAliases?: boolean) => TimeZoneInfo[];
+
+// no-timestamp convenience over GetTimeZonesAt at the current instant
 // (Date.now()). On the baked impls (07/10) this is the schedule-only route: it
 // never references the baked history eras, so importing only getTimeZones()
 // lets shared/history.ts tree-shake out of the consumer's bundle.
-export type GetTimeZones = () => TimeZoneInfo[];
+export type GetTimeZones = (withAliases?: boolean) => TimeZoneInfo[];
 
 // single-zone / many-timestamps counterpart to GetTimeZonesAt: resolves one
 // zone at one instant without building the full response. Exported by the
 // first-party impls (04, 07, 08, 10).
-export type GetTimeZoneAt = (name: string, timestamp: number) => TimeZoneInfo;
+export type GetTimeZoneAt = (name: string, timestamp: number, withAliases?: boolean) => TimeZoneInfo;
 
 // single-zone counterpart to GetTimeZones (and current-instant counterpart to
 // GetTimeZoneAt): one zone at Date.now(). Takes the same schedule-only route as
 // GetTimeZones on the baked impls, so a consumer importing only the
 // current-instant APIs tree-shakes shared/history.ts out.
-export type GetTimeZone = (name: string) => TimeZoneInfo;
+export type GetTimeZone = (name: string, withAliases?: boolean) => TimeZoneInfo;
 
 export interface Impl {
   id: string;

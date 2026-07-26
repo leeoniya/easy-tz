@@ -15,16 +15,21 @@
 // - the returned array is shared across calls in the same bucket: treat it
 //   as immutable. copying would forfeit most of the cache-hit win.
 
-import type { GetTimeZonesAt, TimeZoneInfo } from './types.ts';
+import type { TimeZoneInfo } from './types.ts';
 
 const HOUR_MS = 3_600_000;
 
+// deliberately NOT the public GetTimeZonesAt: that one carries the
+// `withAliases` opt-out, which is applied to the memo's OUTPUT (see
+// canonicalView in shared/zoneLinks.ts) and must never reach the memo key
+type ComputeAt = (timestamp: number) => TimeZoneInfo[];
+
 export interface HourBucketMemo {
-  get: GetTimeZonesAt;
+  get: ComputeAt;
   clear: () => void;
 }
 
-export function hourBucketMemo(compute: GetTimeZonesAt): HourBucketMemo {
+export function hourBucketMemo(compute: ComputeAt): HourBucketMemo {
   let lastBucket = NaN; // NaN never equals anything, so the first call misses
   let lastResult: TimeZoneInfo[] = [];
 

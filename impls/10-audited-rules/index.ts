@@ -39,7 +39,7 @@ import { scheduleClasses, YEAR_START, STEP_MS } from '../../shared/schedule.ts';
 import { resolveClass, ruleInstant, type ScheduleClass } from '../../shared/rules.ts';
 import { gmtLabel } from '../../shared/fmt.ts';
 import { hourBucketMemo, type HourBucketMemo } from '../../shared/hourCache.ts';
-import { makeInfo } from '../../shared/zoneLinks.ts';
+import { makeInfo, canonicalZone, canonicalView, type CanonicalView } from '../../shared/zoneLinks.ts';
 import { computeSchedule, scheduleZoneInfo, classIdx, historyAbbr, zoneIndexOf } from '../../shared/bakedSchedule.ts';
 import { computeBaked, getTimeZoneAt as bakedGetTimeZoneAt, HISTORY_TO_MS } from '../../shared/bakedHistory.ts';
 
@@ -278,21 +278,39 @@ function computeOneCurrent(name: string, timestamp: number): TimeZoneInfo {
 let fullMemo: HourBucketMemo | null = null;
 let curMemo: HourBucketMemo | null = null;
 
-export function getTimeZonesAt(timestamp: number): TimeZoneInfo[] {
-  return (fullMemo ??= hourBucketMemo(compute)).get(timestamp);
+// alias-free views of the two memos' outputs, built on first opt-out. One per
+// memo: a shared instance would thrash between the two responses.
+let fullCanon: CanonicalView | null = null;
+let curCanon: CanonicalView | null = null;
+
+export function getTimeZonesAt(timestamp: number, withAliases?: boolean): TimeZoneInfo[] {
+  const full = (fullMemo ??= hourBucketMemo(compute)).get(timestamp);
+
+  return withAliases === false ? (fullCanon ??= canonicalView())(full) : full;
 }
 
-export function getTimeZones(): TimeZoneInfo[] {
-  return (curMemo ??= hourBucketMemo(computeCurrent)).get(Date.now());
+export function getTimeZones(withAliases?: boolean): TimeZoneInfo[] {
+  const full = (curMemo ??= hourBucketMemo(computeCurrent)).get(Date.now());
+
+  return withAliases === false ? (curCanon ??= canonicalView())(full) : full;
 }
 
-export const getTimeZoneAt = computeOne;
+// the canonical substitution happens out here rather than inside computeOne /
+// computeOneCurrent: both spellings share a schedule class and audit outcome,
+// so swapping the name up front changes only the label on the result
+export function getTimeZoneAt(name: string, timestamp: number, withAliases?: boolean): TimeZoneInfo {
+  return computeOne(withAliases === false ? canonicalZone(name) : name, timestamp);
+}
 
-export const getTimeZone = (name: string): TimeZoneInfo => computeOneCurrent(name, Date.now());
+export function getTimeZone(name: string, withAliases?: boolean): TimeZoneInfo {
+  return computeOneCurrent(withAliases === false ? canonicalZone(name) : name, Date.now());
+}
 
 export function clearCache(): void {
   fullMemo?.clear();
   curMemo?.clear();
+  fullCanon = null;
+  curCanon = null;
 }
 
 export { formatOffset } from '../../shared/offsetFormatBaked.ts';

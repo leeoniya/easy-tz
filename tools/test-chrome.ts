@@ -39,6 +39,7 @@ try {
   const aliasPairs = new Map<string, Vs04>();
   const currentApis = new Map<string, Vs04>();
   const fixedOffsets = new Map<string, Vs04>();
+  const canonicalOnly = new Map<string, Vs04>();
 
   for (const id of implIds) {
     const r = (await page.evaluate(`__validate(${JSON.stringify(id)})`)) as ValidateResult;
@@ -47,6 +48,7 @@ try {
     aliasPairs.set(id, (await page.evaluate(`__verifyAliasPairs(${JSON.stringify(id)})`)) as Vs04);
     currentApis.set(id, (await page.evaluate(`__verifyCurrentApis(${JSON.stringify(id)})`)) as Vs04);
     fixedOffsets.set(id, (await page.evaluate(`__verifyFixedOffsets(${JSON.stringify(id)})`)) as Vs04);
+    canonicalOnly.set(id, (await page.evaluate(`__verifyCanonicalOnly(${JSON.stringify(id)})`)) as Vs04);
   }
 
   for (const id of VS04_IDS) {
@@ -117,6 +119,13 @@ try {
   const fixBad = [...fixedOffsets.values()].reduce((n, c) => n + c.mismatchCount, 0);
 
   console.log(`fixed-offset ids: ${fixChecked - fixBad}/${fixChecked} Etc/GMT±N + UTC single-zone lookups match live 04`);
+
+  // withAliases = false: here the canonical survivors are often the spelling
+  // Chrome's ICU never enumerated, so they exercise the zoneLinks bridge
+  const canChecked = [...canonicalOnly.values()].reduce((n, c) => n + c.checked, 0);
+  const canBad = [...canonicalOnly.values()].reduce((n, c) => n + c.mismatchCount, 0);
+
+  console.log(`canonical-only: ${canChecked - canBad}/${canChecked} withAliases=false list drops + substitutions correct`);
 
   if (init08) {
     console.log(
@@ -195,6 +204,15 @@ try {
       console.error(`\nFAIL ${label} fixed-offset ids: ${f.mismatchCount}/${f.checked} mismatched (first ${f.mismatches.length}):`);
 
       for (const m of f.mismatches) console.error(`  ${m}`);
+    }
+  }
+
+  for (const [label, c] of canonicalOnly) {
+    if (c.mismatchCount > 0) {
+      failed = true;
+      console.error(`\nFAIL ${label} canonical-only: ${c.mismatchCount}/${c.checked} mismatched (first ${c.mismatches.length}):`);
+
+      for (const m of c.mismatches) console.error(`  ${m}`);
     }
   }
 

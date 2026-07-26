@@ -52,6 +52,50 @@ for (const [canonical, alias] of zoneLinkPairs) {
   aliasOfZone.set(alias, canonical);
 }
 
+// NOTE for both helpers below: the public getters declare `withAliases?:
+// boolean` and test `=== false` rather than defaulting it to true. A default
+// VALUE makes JSC take its arity-mismatch path on the (overwhelmingly common)
+// calls that omit the argument — measurably so on the hour-bucket memo hit,
+// where there's no real work to hide behind it.
+
+// modern spelling of `name`, for the single-zone getters when the caller opted
+// out of alias-named results (withAliases = false). Canonical, unknown and
+// fixed-offset ids come back unchanged, so callers apply it unconditionally.
+// Substituting the name before the lookup is all that's needed: both spellings
+// are in `zones` and bridge to the same table class, so only the label on the
+// result changes — and because makeInfo pools by name, the answer is the very
+// same interned instance the canonical spelling would have produced.
+export function canonicalZone(name: string): string {
+  return aliasOfZone.get(name) ?? name;
+}
+
+// Alias-free view of a full getTimeZonesAt()/getTimeZones() response, for the
+// same withAliases = false opt-out. The 20 legacy entries are dropped rather
+// than rewritten: shared/zones.ts guarantees both spellings are listed, so
+// every dropped entry's canonical counterpart is already present.
+//
+// Keyed on the identity of the array it's given, which piggybacks exactly on
+// the single-slot hour-bucket memo upstream (shared/hourCache.ts): the same
+// bucket yields the same array, so the same filtered array comes back by
+// reference and the no-allocation-per-call contract still holds. The entries
+// are the interned instances from the full list, not copies. Each memo needs
+// its own view — impls 07/10 keep separate full and schedule-only memos.
+export type CanonicalView = (full: TimeZoneInfo[]) => TimeZoneInfo[];
+
+export function canonicalView(): CanonicalView {
+  let lastFull: TimeZoneInfo[] | null = null;
+  let lastCanon: TimeZoneInfo[] = [];
+
+  return (full) => {
+    if (full !== lastFull) {
+      lastFull = full;
+      lastCanon = full.filter((z) => z.aliasOf == null);
+    }
+
+    return lastCanon;
+  };
+}
+
 // Interned, frozen TimeZoneInfo pool. The set of distinct (name, abbr, offset)
 // triples a zone can produce is small and finite — its standard/DST states, a
 // handful of irregular-year segments, and the historical offset labels — so

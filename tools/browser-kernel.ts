@@ -314,6 +314,77 @@ export function installKernel(
     return { checked, mismatchCount, mismatches };
   };
 
+  // the withAliases = false opt-out. Worth checking HERE specifically because
+  // Chrome's ICU enumerates the LEGACY spelling for several link pairs
+  // (Asia/Calcutta, not Asia/Kolkata), so filtering to canonical-only KEEPS
+  // entries this runtime never listed — they're in the response only because
+  // shared/zones.ts adds them and the bridge resolves them. This pins that
+  // they carry the pair's real values rather than a UTC sentinel, and that the
+  // single-zone substitution lands on that same interned instance.
+  (globalThis as { __verifyCanonicalOnly?: unknown }).__verifyCanonicalOnly = (implId: string): Vs04 => {
+    const impl = find(implId);
+
+    let checked = 0;
+    let mismatchCount = 0;
+    const mismatches: string[] = [];
+
+    const ts = Date.UTC(2026, 6, 15, 12);
+    const full = impl.getTimeZonesAt(ts);
+    const canon = impl.getTimeZonesAt(ts, false);
+    const byName = new Map(canon.map((z) => [z.name, z]));
+
+    checked++;
+
+    const survivors = canon.filter((z) => z.aliasOf != null).length;
+
+    if (canon.length !== full.length - zoneLinkPairs.length || survivors > 0) {
+      mismatchCount++;
+      mismatches.push(`list: kept ${canon.length} of ${full.length}, expected ${full.length - zoneLinkPairs.length}; ${survivors} aliasOf survivors`);
+    }
+
+    // filtered lists honor the same by-reference memo contract
+    checked++;
+
+    if (impl.getTimeZonesAt(ts, false) !== canon) {
+      mismatchCount++;
+      mismatches.push('list: filtered array not returned by reference');
+    }
+
+    const one = impl.getTimeZoneAt;
+
+    for (const [canonical, alias] of zoneLinkPairs) {
+      checked++;
+
+      const kept = byName.get(canonical);
+      const dropped = full.find((z) => z.name === alias);
+
+      if (kept == null || dropped == null || kept.abbr !== dropped.abbr || kept.offset !== dropped.offset) {
+        mismatchCount++;
+
+        if (mismatches.length < 10) {
+          const show = (z: typeof kept) => (z == null ? 'missing' : `${z.abbr} ${z.offset}`);
+          mismatches.push(`${canonical}: ${show(kept)} vs dropped ${alias}=${show(dropped)}`);
+        }
+
+        continue;
+      }
+
+      if (one == null) continue;
+
+      const sub = one(alias, ts, false);
+
+      if (sub !== kept) {
+        mismatchCount++;
+
+        if (mismatches.length < 10) {
+          mismatches.push(`${alias} -> ${canonical}: substitution is ${sub.name} ${sub.abbr} ${sub.offset}, not the list instance`);
+        }
+      }
+    }
+
+    return { checked, mismatchCount, mismatches };
+  };
+
   // the two current-instant APIs must agree zone for zone. Worth checking
   // HERE specifically: on a Temporal runtime impl 10 answers its
   // session-recovered zones live, and that branch is unreachable from the bun

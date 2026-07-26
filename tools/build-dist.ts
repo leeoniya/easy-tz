@@ -60,8 +60,13 @@ const dtsSource = `export interface TimeZoneInfo {
  * DST-correct abbreviation and UTC offset at \`timestamp\` (epoch ms).
  * Results are memoized per UTC hour bucket and returned by reference —
  * treat them as immutable.
+ *
+ * \`withAliases: false\` omits the legacy-spelled entries (those with an
+ * \`aliasOf\`); their canonical counterparts are always in the list, so the
+ * result is the deduped canonical set. Filtered lists are memoized and
+ * returned by reference too, and share the same TimeZoneInfo instances.
  */
-export declare function getTimeZonesAt(timestamp: number): TimeZoneInfo[];
+export declare function getTimeZonesAt(timestamp: number, withAliases?: boolean): TimeZoneInfo[];
 
 /**
  * A single zone's DST-correct abbreviation and UTC offset at \`timestamp\`
@@ -73,29 +78,34 @@ export declare function getTimeZonesAt(timestamp: number): TimeZoneInfo[];
  * but doesn't enumerate: \`UTC\`, \`Etc/UTC\`, and \`Etc/GMT+1\`..\`+12\` /
  * \`Etc/GMT-1\`..\`-14\` (POSIX sign inversion — \`Etc/GMT+5\` is UTC-05:00).
  * Any other unknown name resolves to a UTC sentinel.
+ *
+ * \`withAliases: false\` resolves a legacy \`name\` as its canonical zone, so
+ * the result never carries an \`aliasOf\` — note that its \`name\` is then the
+ * canonical spelling, not the one passed in. Canonical, fixed-offset and
+ * unknown names are unaffected.
  */
-export declare function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo;
+export declare function getTimeZoneAt(name: string, timestamp: number, withAliases?: boolean): TimeZoneInfo;
 
 /**
- * All zones at the current instant (Date.now()) — a no-argument convenience
+ * All zones at the current instant (Date.now()) — a no-timestamp convenience
  * over getTimeZonesAt(). On the baked impls (07/10) this is the schedule-only
  * route: it never touches the baked historical eras, so importing ONLY
  * getTimeZones() lets a bundler tree-shake the history tables out entirely
  * (the current instant is always the bake year or later). Same hour-bucket
- * memoization as getTimeZonesAt().
+ * memoization and \`withAliases\` behavior as getTimeZonesAt().
  */
-export declare function getTimeZones(): TimeZoneInfo[];
+export declare function getTimeZones(withAliases?: boolean): TimeZoneInfo[];
 
 /**
  * One zone at the current instant (Date.now()) — the single-zone counterpart
  * to getTimeZones(), and the no-timestamp counterpart to getTimeZoneAt().
  * On the baked impls (07/10) it takes the same schedule-only route, so
  * importing only getTimeZone()/getTimeZones() lets a bundler tree-shake the
- * history tables out entirely. Same name handling as getTimeZoneAt(),
- * including the fixed-offset Etc ids. Not memoized — the result is an
- * interned instance, so each call allocates nothing.
+ * history tables out entirely. Same name and \`withAliases\` handling as
+ * getTimeZoneAt(), including the fixed-offset Etc ids. Not memoized — the
+ * result is an interned instance, so each call allocates nothing.
  */
-export declare function getTimeZone(name: string): TimeZoneInfo;
+export declare function getTimeZone(name: string, withAliases?: boolean): TimeZoneInfo;
 
 /**
  * Drops the hour-bucket memo so the next call recomputes (first-call

@@ -28,6 +28,20 @@ for (const [canonical, alias] of zoneLinkPairs) {
   zoneLinks.set(alias, canonical);
   aliasOfZone.set(alias, canonical);
 }
+function canonicalZone(name) {
+  return aliasOfZone.get(name) ?? name;
+}
+function canonicalView() {
+  let lastFull = null;
+  let lastCanon = [];
+  return (full) => {
+    if (full !== lastFull) {
+      lastFull = full;
+      lastCanon = full.filter((z) => z.aliasOf == null);
+    }
+    return lastCanon;
+  };
+}
 var internPool = new Map;
 var POOL_NAME_CAP = 4096;
 function freezeInfo(name, abbr, offset) {
@@ -472,21 +486,27 @@ function formatOffset(minutes) {
 // impls/07-baked-rules/index.ts
 var histMemo = null;
 var schedMemo = null;
-function getTimeZonesAt(timestamp) {
-  return (histMemo ??= hourBucketMemo(computeBaked)).get(timestamp);
+var histCanon = null;
+var schedCanon = null;
+function getTimeZonesAt(timestamp, withAliases) {
+  const full = (histMemo ??= hourBucketMemo(computeBaked)).get(timestamp);
+  return withAliases === false ? (histCanon ??= canonicalView())(full) : full;
 }
-function getTimeZones() {
-  return (schedMemo ??= hourBucketMemo(computeSchedule)).get(Date.now());
+function getTimeZones(withAliases) {
+  const full = (schedMemo ??= hourBucketMemo(computeSchedule)).get(Date.now());
+  return withAliases === false ? (schedCanon ??= canonicalView())(full) : full;
 }
-function getTimeZoneAt2(name, timestamp) {
-  return getTimeZoneAt(name, timestamp);
+function getTimeZoneAt2(name, timestamp, withAliases) {
+  return getTimeZoneAt(withAliases === false ? canonicalZone(name) : name, timestamp);
 }
-function getTimeZone(name) {
-  return scheduleGetTimeZoneAt(name, Date.now());
+function getTimeZone(name, withAliases) {
+  return scheduleGetTimeZoneAt(withAliases === false ? canonicalZone(name) : name, Date.now());
 }
 function clearCache() {
   histMemo?.clear();
   schedMemo?.clear();
+  histCanon = null;
+  schedCanon = null;
 }
 export {
   getTimeZonesAt,

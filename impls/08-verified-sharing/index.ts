@@ -24,7 +24,7 @@ import { zoneAliases, zoneAbbrOverrides } from '../../shared/abbrs.ts';
 import { classGroups } from '../../shared/classes.ts';
 import { hourBucketMemo } from '../../shared/hourCache.ts';
 import { liveParts } from '../../shared/live.ts';
-import { makeInfo } from '../../shared/zoneLinks.ts';
+import { makeInfo, canonicalZone, canonicalView, type CanonicalView } from '../../shared/zoneLinks.ts';
 
 export interface InitInfo {
   temporal: boolean;
@@ -140,27 +140,42 @@ function compute(timestamp: number): TimeZoneInfo[] {
 
 const memo = hourBucketMemo(compute);
 
-export const getTimeZonesAt = memo.get;
+// alias-free view of the memo's output, built on first opt-out. One instance
+// serves both list getters here, since they share the one memo.
+let canon: CanonicalView | null = null;
+
+export function getTimeZonesAt(timestamp: number, withAliases?: boolean): TimeZoneInfo[] {
+  const full = memo.get(timestamp);
+
+  return withAliases === false ? (canon ??= canonicalView())(full) : full;
+}
+
 // current-instant convenience; 08 is live (no baked history), so it shares the
 // same hour-bucket memo as getTimeZonesAt
-export const getTimeZones = (): TimeZoneInfo[] => memo.get(Date.now());
-export const clearCache = memo.clear;
+export const getTimeZones = (withAliases?: boolean): TimeZoneInfo[] => getTimeZonesAt(Date.now(), withAliases);
+
+export function clearCache(): void {
+  memo.clear();
+  canon = null;
+}
+
 export { formatOffset } from '../../shared/offsetFormat.ts';
 
 // single-zone resolver (single-zone / many-timestamps use case): resolves just
 // `name` via the same representative + override logic the all-zones loop uses.
 // The formatter-sharing cache is a per-call all-zones optimization, so it isn't
 // needed here — one zone formats once.
-export function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo {
+export function getTimeZoneAt(name: string, timestamp: number, withAliases?: boolean): TimeZoneInfo {
   if (repOf === null) init();
 
-  const res = liveParts(formatZoneOf(name), timestamp);
+  const zone = withAliases === false ? canonicalZone(name) : name;
+  const res = liveParts(formatZoneOf(zone), timestamp);
 
-  return makeInfo(name, zoneAbbrOverrides[name] ?? res.abbr, res.offset);
+  return makeInfo(zone, zoneAbbrOverrides[zone] ?? res.abbr, res.offset);
 }
 
 // single zone at the current instant. 08 is live (no baked history), so — like
 // getTimeZones() vs getTimeZonesAt() — there's nothing to shed here.
-export function getTimeZone(name: string): TimeZoneInfo {
-  return getTimeZoneAt(name, Date.now());
+export function getTimeZone(name: string, withAliases?: boolean): TimeZoneInfo {
+  return getTimeZoneAt(name, Date.now(), withAliases);
 }
