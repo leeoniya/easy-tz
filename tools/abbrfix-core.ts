@@ -1,0 +1,388 @@
+// Audits an ALREADY-GENERATED table set's historical ABBREVIATIONS against the
+// runtime's live Intl and emits the spans where they disagree.
+//
+// The history table stores offsets only, so below the bake year a label is a
+// pure function of the resolved offset (shared/bakedSchedule.ts historyAbbr).
+// That means the baked impls serve exactly ONE abbreviation per run of constant
+// offset. When a zone's historical identity differs from the one its modern
+// schedule class describes, that single label is wrong for part or all of the
+// run — America/Ciudad_Juarez sat on Central in 1998, but -360 matches its
+// modern Mountain class's MDT state, so MDT comes back with full confidence.
+//
+// Two flavours of disagreement, kept separate because they cost very different
+// numbers of bytes to correct (see the `includeVague` switch):
+//   - the offset matches no state of the modern class, so historyAbbr falls
+//     back to GMT±N: vague, but not a lie
+//   - the offset matches a state whose abbreviation belongs to another
+//     identity: a confident lie
+//
+// Browser-safe (no node imports): the chrome variant is audited inside
+// chrome-headless-shell, against THAT runtime's ICU.
+
+import { liveParts } from '../shared/live.ts';
+import { zoneAliases, zoneAbbrOverrides } from '../shared/abbrs.ts';
+import { resolveHistory, resolveClass, buildScheduleIndex, type ScheduleClass, type HistoryClass } from '../shared/rules.ts';
+import { gmtLabel } from '../shared/fmt.ts';
+import { historyAbbr } from '../shared/bakedSchedule.ts';
+
+// probe stride for the boundary scan, in 15-min steps. 6d, the same bound
+// tools/tz-transition-gap.ts holds gen-core to: below tzdata's tightest
+// consecutive-transition gap (6.92d, America/Cambridge_Bay 2000), so a window
+// can never hide a whole segment. The bisection below resolves any number of
+// changes inside one window.
+const STRIDE = 6 * 96;
+
+export interface FixSpan {
+  from: number; // 15-min steps since Jan 1 of fromYear
+  to: number; // exclusive
+  abbr: string; // what live Intl says, and what the baked path should serve
+  vague: boolean; // baked currently says GMT±N here rather than a wrong label
+  defer: boolean; // the era defers to the schedule class (no historical offset)
+}
+
+// The stored form. The WRONG label is already a pure function of the resolved
+// offset (bakedSchedule.ts historyAbbr), so a correction only has to say "in
+// these years, this offset means X" — which drops every timestamp. America/Cancun
+// went from 17 near-identical summer spans to one record this way.
+export interface FixRange {
+  fromYear: number;
+  toYear: number; // inclusive
+  offMin: number;
+  abbr: string;
+}
+
+export interface FixClass {
+  zones: string[];
+  ranges: FixRange[];
+  // years where one offset carries two different identities can't be described
+  // by a range, so they keep explicit spans
+  spans: FixSpan[];
+}
+
+export interface AbbrFixResult {
+  classes: FixClass[];
+  stats: {
+    zones: number;
+    spans: number;
+    lieSpans: number;
+    vagueSpans: number;
+    deferSpans: number;
+    lieZoneYears: number;
+    vagueZoneYears: number;
+    ranges: number;
+    fallbackSpans: number;
+    auditMs: number;
+  };
+}
+
+export function auditAbbrFix(
+  zoneList: readonly string[],
+  scheduleClasses: ScheduleClass[],
+  historyClasses: HistoryClass[],
+  fromYear: number,
+  toYear: number,
+  yearStart: number,
+  stepMs: number,
+  includeVague: boolean
+): AbbrFixResult {
+  const t0 = Date.now();
+
+  const classIdx = buildScheduleIndex(zoneList, scheduleClasses);
+  const histIdx = buildScheduleIndex(zoneList, historyClasses);
+  const epoch = Date.UTC(fromYear, 0, 1);
+  const lastStep = (Date.UTC(toYear, 0, 1) - epoch) / stepMs;
+
+  const liveAbbr = (zone: string, ts: number): string =>
+    zoneAbbrOverrides[zone] ?? liveParts(zoneAliases[zone] ?? zone, ts).abbr;
+
+  // exactly what shared/bakedHistory.ts bakedZoneInfo() serves at `ts`, minus
+  // the correction being generated here
+  const bakedAt = (z: number, ts: number): { abbr: string; vague: boolean; defer: boolean } => {
+    const ci = classIdx[z]!;
+    const hi = histIdx[z]!;
+    const off = hi === -1 ? null : resolveHistory(historyClasses[hi]!.eras, ts, stepMs);
+
+    if (off === null) {
+      // no era, or an era that defers: the schedule class answers
+      const st = resolveClass(scheduleClasses[ci]!, ts, yearStart, stepMs);
+
+      return { abbr: st.abbr, vague: false, defer: true };
+    }
+
+    const abbr = ci < 0 ? gmtLabel(off) : historyAbbr(scheduleClasses[ci]!, off);
+
+    return { abbr, vague: abbr.startsWith('GMT'), defer: false };
+  };
+
+  // Irregular (kind 2) zones are skipped for the same reason gen-core skips
+  // them in history: Morocco and Palestine suspend DST for Ramadan, a
+  // non-Gregorian rule that isn't expressible in ANY year, so their history
+  // would be raw per-year segments end to end. history.ts stores no eras for
+  // them and the schedule class answers every historical instant with the
+  // current year's shape — which is knowingly wrong for both offset AND label.
+  // Correcting only the label there would dress a deliberately-approximate
+  // offset in an authoritative name, and these four zones alone were 15-19% of
+  // the payload. See tools/gen-core.ts "the irregular-class zones are excluded".
+  const irregular = new Set<string>();
+
+  for (const c of scheduleClasses) {
+    if (c.kind === 2) for (const z of c.zones) irregular.add(z);
+  }
+
+  const byPayload = new Map<string, { zones: string[]; spans: FixSpan[] }>();
+  let lieSpans = 0, vagueSpans = 0, deferSpans = 0, lieSteps = 0, vagueSteps = 0, zoneCount = 0;
+
+  for (let z = 0; z < zoneList.length; z++) {
+    const zone = zoneList[z]!;
+
+    // Etc/* and anything the schedule doesn't index can't be corrected here;
+    // they never reach the historical branch either
+    if (classIdx[z] === -1 || irregular.has(zone)) continue;
+
+    const spans: FixSpan[] = [];
+    let open: FixSpan | null = null;
+
+    // walk the year's segments: a boundary is any change in the live label OR
+    // the offset (which is what moves the baked label)
+    const key = (ts: number) => {
+      const p = liveParts(zoneAliases[zone] ?? zone, ts);
+
+      return `${zoneAbbrOverrides[zone] ?? p.abbr}|${p.offset}`;
+    };
+
+    const emit = (fromStep: number, toStep: number) => {
+      const ts = epoch + fromStep * stepMs;
+      const want = liveAbbr(zone, ts);
+      const got = bakedAt(z, ts);
+
+      if (want === got.abbr) { open = null; return; }
+      if (got.vague && !includeVague) { open = null; return; }
+
+      if (open != null && open.to === fromStep && open.abbr === want && open.vague === got.vague && open.defer === got.defer) {
+        open.to = toStep;
+      } else {
+        open = { from: fromStep, to: toStep, abbr: want, vague: got.vague, defer: got.defer };
+        spans.push(open);
+      }
+    };
+
+    let prevKey = key(epoch);
+    let prevStep = 0;
+
+    for (let s = STRIDE; ; s = Math.min(s + STRIDE, lastStep)) {
+      const cur = key(epoch + s * stepMs);
+
+      while (cur !== prevKey) {
+        let lo = prevStep, hi = s;
+
+        while (hi - lo > 1) {
+          const mid = (lo + hi) >> 1;
+
+          if (key(epoch + mid * stepMs) === prevKey) lo = mid;
+          else hi = mid;
+        }
+
+        emit(prevStep, hi);
+        prevKey = hi === s ? cur : key(epoch + hi * stepMs);
+        prevStep = hi;
+      }
+
+      if (s >= lastStep) break;
+    }
+
+    emit(prevStep, lastStep);
+
+    if (spans.length === 0) continue;
+
+    zoneCount++;
+
+    for (const sp of spans) {
+      if (sp.defer) deferSpans++;
+      if (sp.vague) { vagueSpans++; vagueSteps += sp.to - sp.from; }
+      else { lieSpans++; lieSteps += sp.to - sp.from; }
+    }
+
+    // zones with identical correction lists share one payload, exactly as the
+    // history table shares era payloads (Argentina's 13 zones collapse to one)
+    const sig = spans.map((sp) => `${sp.from},${sp.to},${sp.abbr}`).join(';');
+    let g = byPayload.get(sig);
+
+    if (g == null) byPayload.set(sig, (g = { zones: [], spans }));
+
+    g.zones.push(zone);
+  }
+
+  const perYear = (steps: number) => (steps * stepMs) / 86_400_000 / 365;
+
+  // ---- span list -> (year range, offset) records ---------------------------
+  //
+  // The offset key must be the SAME one shared/bakedHistory.ts has in hand at
+  // the two call sites: the historical era's offset where one is live, else the
+  // schedule class's. Anything else and the runtime would miss the record.
+  const keyOff = (z: number, ts: number): number => {
+    const hi = histIdx[z]!;
+    const off = hi === -1 ? null : resolveHistory(historyClasses[hi]!.eras, ts, stepMs);
+
+    return off ?? resolveClass(scheduleClasses[classIdx[z]!]!, ts, yearStart, stepMs).offMin;
+  };
+
+  const spanAbbrAt = (spans: FixSpan[], step: number): string => {
+    for (const sp of spans) if (step >= sp.from && step < sp.to) return sp.abbr;
+
+    return '';
+  };
+
+  const DAY_STEPS = 86_400_000 / stepMs;
+  const yearStep = (y: number) => (Date.UTC(y, 0, 1) - epoch) / stepMs;
+
+  // sample points for year `y`: a daily walk plus both edges of every span that
+  // touches the year, so a span shorter than the stride can't slip through
+  const samples = (y: number, spans: FixSpan[]): number[] => {
+    const lo = yearStep(y);
+    const hi = Math.min(yearStep(y + 1), lastStep);
+    const pts: number[] = [];
+
+    for (let s = lo; s < hi; s += DAY_STEPS) pts.push(s);
+    for (const sp of spans) {
+      for (const s of [sp.from, sp.to - 1]) if (s >= lo && s < hi) pts.push(s);
+    }
+
+    return pts;
+  };
+
+  let rangeCount = 0;
+  let fallbackCount = 0;
+
+  const toRangeForm = (zone: string, spans: FixSpan[]): { ranges: FixRange[]; spans: FixSpan[] } => {
+    const z = zoneList.indexOf(zone);
+
+    // per year: offset -> required label ('' = leave the offset-keyed answer
+    // alone), or null when one offset needs two different labels that year
+    const maps: (Map<number, string> | null)[] = [];
+
+    for (let y = fromYear; y < toYear; y++) {
+      const m = new Map<number, string>();
+      let ok = true;
+
+      for (const s of samples(y, spans)) {
+        const off = keyOff(z, epoch + s * stepMs);
+        const want = spanAbbrAt(spans, s);
+        const prev = m.get(off);
+
+        if (prev == null) m.set(off, want);
+        else if (prev !== want) { ok = false; break; }
+      }
+
+      maps.push(ok ? m : null);
+    }
+
+    const sig = (m: Map<number, string> | null) =>
+      m == null
+        ? '\u0000'
+        : [...m].filter(([, v]) => v !== '').sort((a, b) => a[0] - b[0]).map(([k, v]) => `${k}:${v}`).join(',');
+
+    const ranges: FixRange[] = [];
+    const keep: FixSpan[] = [];
+
+    for (let i = 0; i < maps.length; ) {
+      const s = sig(maps[i]!);
+      let end = i;
+
+      while (end + 1 < maps.length && sig(maps[end + 1]!) === s) end++;
+
+      if (s === '\u0000') {
+        // undescribable years fall back to spans — any span OVERLAPPING the run,
+        // not merely starting in it, or a span straddling Jan 1 would vanish
+        const lo = yearStep(fromYear + i);
+        const hi = Math.min(yearStep(fromYear + end + 1), lastStep);
+
+        for (const sp of spans) if (sp.from < hi && sp.to > lo && !keep.includes(sp)) keep.push(sp);
+      } else if (s !== '') {
+        for (const [offMin, abbr] of maps[i]!) {
+          if (abbr !== '') ranges.push({ fromYear: fromYear + i, toYear: fromYear + end, offMin, abbr });
+        }
+      }
+
+      i = end + 1;
+    }
+
+    ranges.sort((a, b) => a.fromYear - b.fromYear || a.offMin - b.offMin);
+    keep.sort((a, b) => a.from - b.from);
+
+    rangeCount += ranges.length;
+    fallbackCount += keep.length;
+
+    return { ranges, spans: keep };
+  };
+
+  // ---- self-check: the stored form must answer exactly like the span list ---
+  //
+  // Cheap insurance against a sampling hole in the conversion above: replay both
+  // forms daily across the covered range, plus a 15-min sweep around every span
+  // edge where a discrepancy would actually hide.
+  const verify = (zone: string, spans: FixSpan[], form: { ranges: FixRange[]; spans: FixSpan[] }) => {
+    const z = zoneList.indexOf(zone);
+
+    const lookup = (step: number): string => {
+      for (const sp of form.spans) if (step >= sp.from && step < sp.to) return sp.abbr;
+
+      const ts = epoch + step * stepMs;
+      const y = new Date(ts).getUTCFullYear();
+      const off = keyOff(z, ts);
+
+      for (const r of form.ranges) {
+        if (y >= r.fromYear && y <= r.toYear && r.offMin === off) return r.abbr;
+      }
+
+      return '';
+    };
+
+    const check = (step: number) => {
+      const want = spanAbbrAt(spans, step);
+      const got = lookup(step);
+
+      if (want !== got) {
+        throw new Error(
+          `abbrfix range form disagrees for ${zone} at step ${step} ` +
+            `(${new Date(epoch + step * stepMs).toISOString()}): spans say "${want}", ranges say "${got}"`
+        );
+      }
+    };
+
+    for (let s = 0; s < lastStep; s += DAY_STEPS) check(s);
+    for (const sp of spans) {
+      for (let d = -2; d <= 2; d++) {
+        for (const edge of [sp.from, sp.to]) {
+          const s = edge + d;
+
+          if (s >= 0 && s < lastStep) check(s);
+        }
+      }
+    }
+  };
+
+  const classes: FixClass[] = [];
+
+  for (const g of byPayload.values()) {
+    const form = toRangeForm(g.zones[0]!, g.spans);
+
+    verify(g.zones[0]!, g.spans, form);
+    classes.push({ zones: g.zones, ranges: form.ranges, spans: form.spans });
+  }
+
+  return {
+    classes,
+    stats: {
+      zones: zoneCount,
+      spans: lieSpans + vagueSpans,
+      lieSpans,
+      vagueSpans,
+      deferSpans,
+      lieZoneYears: Math.round(perYear(lieSteps)),
+      vagueZoneYears: Math.round(perYear(vagueSteps)),
+      ranges: rangeCount,
+      fallbackSpans: fallbackCount,
+      auditMs: Date.now() - t0,
+    },
+  };
+}

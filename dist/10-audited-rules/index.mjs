@@ -180,6 +180,49 @@ function decodeHistory(zoneList, pairsPacked, tuplesPacked, erasPacked, classesP
     return { zones: zones2, eras };
   });
 }
+var ABBRFIX_OFF_BIAS = 48;
+function decodeAbbrFix(zoneList, dictPacked, classesPacked, fromYearBase, stepMs) {
+  if (classesPacked === "")
+    return [];
+  const dict = dictPacked.split(",");
+  const base = Date.UTC(fromYearBase, 0, 1);
+  return classesPacked.split("|").map((c) => {
+    const [zs, rangesPacked, spansPacked] = c.split("~");
+    const zones2 = [];
+    for (let i = 0;i < zs.length; i += 2) {
+      zones2.push(zoneList[parseInt(zs.slice(i, i + 2), 36)]);
+    }
+    const fromYear = [];
+    const toYear = [];
+    const offs = [];
+    const abbrs = [];
+    if (rangesPacked !== "") {
+      for (const r of rangesPacked.split(";")) {
+        const f = r.split(",");
+        const y = fromYearBase + parseInt(f[0], 36);
+        fromYear.push(y);
+        toYear.push(y + parseInt(f[1], 36));
+        offs.push((parseInt(f[2], 36) - ABBRFIX_OFF_BIAS) * 15);
+        abbrs.push(dict[parseInt(f[3], 36)]);
+      }
+    }
+    const spanFrom = [];
+    const spanTo = [];
+    const spanAbbrs = [];
+    let step = 0;
+    if (spansPacked !== "") {
+      for (const s of spansPacked.split(";")) {
+        const f = s.split(",");
+        step += parseInt(f[0], 36);
+        spanFrom.push(base + step * stepMs);
+        step += parseInt(f[1], 36);
+        spanTo.push(base + step * stepMs);
+        spanAbbrs.push(dict[parseInt(f[2], 36)]);
+      }
+    }
+    return { zones: zones2, fromYear, toYear, offs, abbrs, spanFrom, spanTo, spanAbbrs };
+  });
+}
 
 // shared/tables/chrome/schedule.ts
 var YEAR_START = 1767225600000;
@@ -294,6 +337,19 @@ function resolveHistory(eras, ts, stepMs) {
     return e.offs[ruleCycleIndex(e.offs[0], e.offs[1], r1, r2, year, ts)];
   }
   return e.offs[segmentIndex(e.steps, ts, Date.UTC(e.fromYear, 0, 1), stepMs)];
+}
+function resolveAbbrFix(c, ts, year, offMin) {
+  const sf = c.spanFrom;
+  for (let i = 0;i < sf.length; i++) {
+    if (ts >= sf[i] && ts < c.spanTo[i])
+      return c.spanAbbrs[i];
+  }
+  const fy = c.fromYear;
+  for (let i = 0;i < fy.length; i++) {
+    if (year >= fy[i] && year <= c.toYear[i] && c.offs[i] === offMin)
+      return c.abbrs[i];
+  }
+  return null;
 }
 
 // shared/fmt.ts
@@ -422,9 +478,23 @@ var E = "r000001|r000002|r000003|r000004|r000005|r000006|w0008,8t412,gfo8,ins12,
 var H = "80~000401500901a00b02c03d04e05f06g07j08k07s09t0au09|8182838485868788898a8b8c8d8e8f8g8h8i8j8k8l8m8n8o8p8q8r8s8t8u8v8w8x~00b109|17~00950c60dq0er09|18~00950c60dm0fn09|0c~009n0go0hp09|1h~00910i20j309h0ki0lj09|0r~009a0mb0ne09|1d~00on09|8y~00pc09|8z90929394~00qc09|26~00r10s20t30u40v50w60x70y80z909h10i11j09|2e2f2m~009912a09c13d14e09|2g2o~009c13d14e09|2h~009915a09c13d14e09|2i~009915a09c13d16e17f09|2j~009918a09c13d19e1af09|2k~00991ba09c13d14e09|2q~01c11d21c31e71f91ga1hf1ii1ju09|27~01k10s20t30u40v50w60x70y80z909g1lh1mi09|2r~01n11o61p71of1qg1rs09|34~00941s51t609|9598999a~01oc09|2l2n~009c13d19e1af09|96~01o41u51v61w71oc09|35~01x11y21z32042152262372481x925a1xb24c22d1xh26i1xk26l1xn24o27p09|3a~02811r22932a41r62b71rk2cl09|3f~009c2dd2el2fm09|9b9f9h~01rc09|2t~00911r32g41o61p71or2hs09|97~02811r32g41o61p71of09r2is09|3h~01h11722j32k42l51h617b1hc17d2je2mf2lg2nh2oi2pj2ok09l2qm2ro2sp1fr2ss1ft2su09|36~01x11y21z32042152262372482t92ua1xb24c22d1xh26i1xk26l1xn24o27p09|0d~02v12w209|3l3r~02xc2yp2zq09|9n9x9y9za1~030c09|3s3t~009d31e32i33j09|3n~02xc2yk34l09|29~009435536637711809|a2a4a6a7~038c09|a8~02v13943a73bc3ad39f3ai39l3ao39q3bs3ct09|a3~03dc3eg3fh09|9o~030c09k3gl32n3ho09|2w~009b3ic09|aa~03j13k23j33l53m93na32b3oc3pd3qe3pg3rh3si09|3o~00911o409|9c9d~03tb3uc09|9p9r9u~03tb30c09|9q9s~03tb3uc3vd09|9t~03tb3uc3wd09|9v~03043x53y630c09|9w~01r53y630c09|abad~02xc09|2a~00r13z209435536637711809|2x~03t240309a41b42c09|9e~02811r62b71rf09|3p~00911o61p71os09|2p~009943a09c13d14e09|2y2z30~00911r62b71rs09|91~044k45l09n46o47p09|ae~048c09|a5~03dc09|3y~009949a4ab4bk4cl09|3z~00944d54e64f74g809|9g~01oc4hf4ig09|9i~01o84j91rc09|9j~02811r32g41o61p71of4hr4ks09|a0~04l33ta4mc3th09l3tm09|3i3j~01h11722j32k42l51h617b1hc17d2je2mf2lg2nh2oi2pj2ok09l2qm09|9k~01r53y64n71rc09|2b~00943554o637711809|9l~01r53y64n71rb4pc4qd09|2c~032d4re09|af~01h11722j32k42l51h617b1hc17d2je2mf2lg2nh2oi2pj2ok4sl2qm2ro2sp09r2ss09t2su09|1z~00954t609|2d~01k10s20t30u40v50w60x70y81k94ua1kb0yc0wd1kh4vi1kk4vl1kn0yo11p09|a9~04w14xt4yu09|ag~04zc50g51h09|33~009b52c09|ac~02xf09|9m~053b1rc09|41~009e54f55g56h57i09l58m59n5ao5bp5cq5ds5et09|43~009e5ff5gg5hh5ii09|ah~05j55k65jb09c5jd09f59g09|45~05le5mf09|alam~05nc5od09|an~05pa09|48~05qs5rt09|4f~05s15ta5lt5uu09|4m~05v45w55x75y85z960a61b62g63h64i65j62l63m62r66s09|4o4p~067168f69g6ah09|4g4j~06b16c96da09|4h~06e16fa09|4i~06e16f46g56c96da09|4a~06h16i26j36k46l56h66m76i86j96la6nb6hc6md09|4r~00916o26pl09|4w~06q15tg6rh09j6sk5ll6tm09|ao~06u409|51~06v16w26xa6yb09|55~06z170g71h72j73k74l75m09|54~00917625lb77c09|4n~07817927a37b47c57867d77987e97ca7fb7gc7hd7ie7jf7kh7jr7ls09|58~009e7mf09|59~07457n609|ap~06u37o409l7pm7qn09|5e~07r40967s77tc09k7um09|5f~07v17wg7xh7yj7zk09|b0~080181282383484585686787888989a8ab8bc8cd8be8df8eg8fh8gi8hj09o8hp09t8hu09|5k~00978i809d8je8kf09|56~06z17088l98mg8nh72j8ok09|4x~08p18qg8rh74j8sk09|5q~08t18ug6ah8vj8wk72l8xm09|aq~06u37o409|4y~08p18qf8yg6rh09|4z~05s15tg6rh09j6sk5ll8zm09|5v~05s15tg6rh5qj6sk09|5w~009k90l91n92o09|4k~06e16f993a5lt5uu09|4l~06e16f993a5ln94o09|5r~08t18u29538mg96h09j97k72l98m09|5s~08t18ug6ah8vj99k09|63~09a19b29c39d99ea9fb09|64~09g19h29i39j49k59l69m79n89i99oa9pb09d9qe9jf9kg9ph9ri9nj9ik9jl9sm9gn9mo9np9tq9kr9ps09|50~08p18q79u85tg6rh09j6sk5ll9vm09|67~09w40969x79yc09k9zm09|69~08t18uga0h59j97k09|6a~0a118mg96h59j97k09|57~06z170g71h72j8ok09|6b~06e16fga2h5lja3k09|6c~0a410926ch09|b1~04w109|b2b3b4~0a5109|6f~0a61a72a66a8g09|b6~0a9baaca9d09|b7~0ab1a9baaca9d09|6j~009baccadeaef09|ai~05j55k65jb09c5jd09|b8~0af1ag5ah6agbaicagd09|aj~0aj55k6ajbakcajd09|42~009balcameanf09|ak~0ao1aj55k6ajbakcajd09|6k6n~0ap1aqg9fh09jark0dlasm09|aratav~0at109|asb9ax~06u1au209|babbbcbdbe~0av109|6o~0aw1axcaygazhayjazkb0l7pm09|1i~0b11b2gb3h0djb4k09|au~0b11b5209|6p6r~0ap1aqg9fhb6jark09|b5~00b1b7209|6q~0b11b2gb3h09|aw~0b1209507609|6l~06b16cfb8g9fh09|6m~0ap1aqg9fh09jark0dlb9m09|6s~0ap1ba2bb3ayjbck09|ay~0b11b23b5409507709|az~0b11b23bd4be507809|6t~0ap1aqg9fhb6jark09nbfob6pbgq09|6u~0bh109|70~009dbiebjf09|72~0bkfblgbmhbnqbor09|73~072jbpk09|bf~0bqcbrd09|bg~0bs2bt3bu4bv5bsdbtebsfbvgbwhbxk3tlbyo09rbzs09|76~0bkgc0h09|77~0093c14c25c3609ec4fc5gc6hc7ic8jc9kcancboccpcdqcer09|7g~08v3cf409|bh~0cgkchl59ocip09|7o~0091cj2ck309|7q~0cl3cm409|7w~0094cn5co6cp7cq809lcrmcsn09";
 var historyClasses = /* @__PURE__ */ decodeHistory(Z, P2, T, E, H, HISTORY_FROM);
 
+// shared/tables/chrome/abbrfix.ts
+var ABBRFIX_FROM = 1995;
+var Z2 = /* @__PURE__ */ scheduleClasses.flatMap((c) => c.zones);
+var A = "CEST,GMT+2,AST,WAST,PYST,MDT,CST,CDT,MPDT,PDT,WGST,EST,PST,EGST,ANAT,MST,WKT,GMT+5,GMT+7,GMT+6,EET,NOVT,NST,KST,SAKT,SST,GMT+11,GST,FIST,MSK,CET,EEST,FET,NMIT";
+var F = "1h~~1p18,djw,0;bmw8,fk0,0|1d~0,l,1k,1~gag4,fjw,1;bes,3ro,1|2e2f2g2h2j2k2l2m2n2o2p~~3klo,b9c,2|2i~d,0,10,3~3klo,b9c,3;6gys,avw,3|2q~0,s,10,4~llsg,cyk,4;eis,nw,4|2r~1,d,o,5~|96~5,0,o,6~3mow,beo,6;g2c,awg,6|3a~1,0,s,7;4,f,s,7~1p7k,f18,7;kqk,684,7|2t~4,m,o,8~2g6c,f18,8;hm5g,fjw,8|97~0,2,o,6;4,m,o,8~248s,bxk,6;0,f18,8;hklg,h3w,8;0,2ag,6|3l3r~0,o,k,9~ixd4,hmc,9|3n~0,j,k,9~|a8~0,s,14,a~l7s4,r40,a|9o~k,2,w,2~f60s,29eo,2|9c9d~0,a,s,b~0,8ge4,b|9q9s~~8ge4,fk0,7;9us,hmk,7|9t~~8ge4,fk0,7|9v~~3y3k,fjw,7|9w~0,4,s,7~3y3k,fjw,7|91~0,k,g,c~hx2g,5pc,c|9g~0,e,o,5~bf7o,hmk,5|9i~0,7,o,5~67ic,f18,5|9j~4,m,o,5~2g6c,f18,5;hklg,h3w,5|9k~~4dng,bes,b|9l~~4dng,bes,b;46vw,9us,b|a9~0,s,18,d~lnus,beo,d|4o~0,e,2o,e~b4s8,beo,e;0,g2s,f|4g~0,8,1w,2;a,i,1w,g~6xx4,g2o,2;0,ej0w,g|4h~0,8,1w,2;a,i,1w,g~6mic,beo,2;g2o,ej10,g|4i~0,8,1w,h;a,i,1w,g~6xx4,g2o,h;0,ej0w,g|4w~0,j,24,i~|51~0,9,20,j~7ovq,a7m,j|ap~~gelg,aw0,k|5o~0,3,28,f~0,3qcg,f|4y~g,2,24,l~bg7g,g2s,m;aw0,2oyk,l|4z~0,f,24,m;g,3,24,l~|4j~0,8,1w,h;a,i,1w,g~6xx4,g2o,h;0,ej0w,g|4k~0,9,1w,h~|4l~0,9,1w,n;n,5,1w,g~i0i0,3wio,g|5r~0,1,2k,o;3,c,2k,p;g,3,2k,o~1d8c,beo,o;0,fk4,p;duao,2ao,q|5s~j,1,2k,q~ew48,14g8,q|63~~74ng,9cg,r|50~0,j,24,i~|6c~~67w,dhc,2|6f~0,e,10,s~b17c,gl8,s|6k6m6n~0,f,1s,f;g,3,1s,t~|b5~0,0,1g,u~jpg,e00,u|6q~0,f,1o,v;g,2,1o,w~c76o,2p14,w|6l~~bg7s,g2s,p|6s~3,f,1o,v~1oo4,fk0,v|az~~2fms,fk0,0;beo,g2o,0|7c~0,4,2g,r~0,4ho8,r|7d~0,4,2g,x~0,4ho8,x";
+var abbrFixClasses = /* @__PURE__ */ decodeAbbrFix(Z2, A, F, ABBRFIX_FROM, STEP_MS);
+
 // shared/bakedHistory.ts
 var histIdx = /* @__PURE__ */ buildScheduleIndex(zones, historyClasses);
+var fixIdx = /* @__PURE__ */ buildScheduleIndex(zones, abbrFixClasses);
 var HISTORY_TO_MS = Date.UTC(HISTORY_TO, 0, 1);
+function fixedAbbr(z, timestamp, offMin) {
+  if (z === -1)
+    return null;
+  const fi = fixIdx[z];
+  return fi === -1 ? null : resolveAbbrFix(abbrFixClasses[fi], timestamp, yearFromMs(timestamp), offMin);
+}
 function bakedZoneInfo(name, ci, hi, timestamp, historical, schedCache, histCache, z = -1) {
   if (historical && hi !== -1) {
     let off = histCache != null ? histCache[hi] : undefined;
@@ -434,11 +504,17 @@ function bakedZoneInfo(name, ci, hi, timestamp, historical, schedCache, histCach
         histCache[hi] = off;
     }
     if (off !== null) {
-      const abbr = ci < 0 ? gmtLabel(off) : historyAbbr(scheduleClasses[ci], off);
+      const abbr = fixedAbbr(z, timestamp, off) ?? (ci < 0 ? gmtLabel(off) : historyAbbr(scheduleClasses[ci], off));
       return makeInfo(name, abbr, off);
     }
   }
-  return scheduleZoneInfo(name, ci, timestamp, schedCache, z);
+  const info = scheduleZoneInfo(name, ci, timestamp, schedCache, z);
+  if (historical) {
+    const fix = fixedAbbr(z, timestamp, info.offset);
+    if (fix !== null && fix !== info.abbr)
+      return makeInfo(name, fix, info.offset);
+  }
+  return info;
 }
 function getTimeZoneAt(name, timestamp) {
   const z = zoneIndexOf(name);

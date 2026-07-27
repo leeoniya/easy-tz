@@ -3,6 +3,7 @@ import { getTimeZonesAt as baked07, getTimeZoneAt as bakedAt07, clearCache as cl
 import { getTimeZonesAt as audited10, getTimeZoneAt as auditedAt10, clearCache as clear10 } from '../impls/10-audited-rules/index.ts';
 import { getTimeZonesAt as baseline04, getTimeZoneAt as baselineAt04, clearCache as clear04 } from '../impls/04-live-intl/index.ts';
 import { scheduleClasses, genMeta, YEAR_START, STEP_MS } from '../shared/schedule.ts';
+import { abbrFixClasses, ABBRFIX_FROM } from '../shared/abbrfix.ts';
 import { resolveClass, buildScheduleIndex } from '../shared/rules.ts';
 import { zones } from '../shared/zones.ts';
 import { SCHEDULE_STRIDE_DAYS, HISTORY_STRIDE_DAYS } from '../tools/gen-core.ts';
@@ -179,43 +180,29 @@ describe('the tightest transition pair in tzdata (America/Cambridge_Bay, 2000)',
   });
 });
 
-// KNOWN GAP — the history table stores offsets only, so it cannot represent a
-// transition that changes only the CLDR name. Below the bake year, abbrs come
-// from historyAbbr(), which keys off the resolved offset alone:
+// The history table stores offsets only, so below the bake year an abbreviation
+// is a pure function of the resolved offset (bakedSchedule.ts historyAbbr):
 //
 //   const abbr = ci < 0 ? gmtLabel(off) : historyAbbr(scheduleClasses[ci]!, off);
 //
-// That makes the label a pure function of the offset, so the baked impls emit
-// exactly ONE abbr per run of constant offset. A name-only flip splits such a
-// run into two differently-named halves, and no offset-keyed lookup can serve
-// both — at least one half is always wrong.
+// One label per run of constant offset, in other words. That is wrong two ways.
+// A name-only transition splits such a run into differently-named halves, and
+// more commonly, a zone whose historical identity differs from the one its
+// modern schedule class describes gets that class's label for years at a time.
 //
-// This is a table-format limit, not a probing one: the generator's scan
-// resolves these flips exactly (that's what the Cambridge_Bay block above
-// walks), then probeOffSegs() drops the names and merges the equal-offset
-// segments before anything reaches shared/history.ts.
+// shared/abbrfix.ts corrects the spans where the offset-keyed answer is a
+// confident LIE — where it names an identity the zone has since left. Spans
+// where the historical offset matches no modern state, and the fallback is a
+// vague GMT±N, are deliberately left uncorrected (see the block after this one).
 //
-// There are 102 such flips across 1995-2028 in this ICU; the eight below cover
-// the distinct shapes. Two fail on both sides, three only after the flip and
-// three only before, depending on which half the surviving label happens to
-// describe. historyAbbr() falls back to GMT±N only when the historical offset
-// matches no state of the modern class (Cambridge_Bay); the rest match a state
-// belonging to an identity the zone has since left, so the wrong answer comes
-// back with full confidence (Ciudad_Juarez was on Central in 1998, but -360
-// matches its modern Mountain class's MDT state).
-//
-// The 2026+ schedule path is unaffected — it stores per-state and per-segment
-// abbrs, and the scan finds no name-only flips inside the bake window.
+// These two tables are the regression fixtures for that overlay. Offsets must
+// come through untouched: the correction replaces the label only.
 const nameOnly: { label: string; zone: string; ts: number; before: string; after: string; offset: number }[] = [
-  // the Nunavut experiment again: -300 matches neither MST (-420) nor MDT
-  // (-360), so this one at least degrades to an honest GMT label
-  { label: 'America/Cambridge_Bay CDT -> EST (2000 Nunavut experiment)', zone: CB, ts: CB_NAME_FLIP, before: 'CDT', after: 'EST', offset: -300 },
   // Ciudad_Juarez sat on Central in 1998; its modern class is Mountain, and
   // -360 collides with that class's DST state
   { label: 'America/Ciudad_Juarez CST -> MPDT (1998)', zone: 'America/Ciudad_Juarez', ts: Date.UTC(1998, 3, 5, 9), before: 'CST', after: 'MPDT', offset: -360 },
-  // the longest stale window of the 102: Argentina held -180 across this flip
-  // and the one back to ART in Mar 2000, so no offset change re-derives the
-  // label for over a year
+  // Argentina held -180 across this flip and the one back to ART in Mar 2000,
+  // so no offset change re-derives the label for over a year
   { label: 'America/Argentina/Buenos_Aires ART -> AST (1999)', zone: 'America/Argentina/Buenos_Aires', ts: Date.UTC(1999, 9, 3, 3), before: 'ART', after: 'AST', offset: -180 },
   // Libya left CEST for a permanent EET without moving off +120
   { label: 'Africa/Tripoli CEST -> EET (1997)', zone: 'Africa/Tripoli', ts: Date.UTC(1997, 9, 3, 22), before: 'CEST', after: 'EET', offset: 120 },
@@ -228,10 +215,31 @@ const nameOnly: { label: string; zone: string; ts: number; before: string; after
   { label: 'America/Dawson PDT -> MST (2020 permanent DST)', zone: 'America/Dawson', ts: Date.UTC(2020, 10, 1, 7), before: 'PDT', after: 'MST', offset: -420 },
 ];
 
-describe('name-only transitions are invisible to the offset-only history table', () => {
-  // fixture integrity, kept OUT of the .failing cases below so that a CLDR
-  // rename can't quietly satisfy them by breaking the premise instead
-  testIfAligned('each fixture really is a name-only flip in live ICU', () => {
+// Long identity-drift spans, which are the bulk of what the overlay fixes and
+// which the name-only fixtures above badly under-represent: most mislabelled
+// spans begin at an ordinary offset change, not at a name-only flip. Instants
+// are mid-span on purpose — the edges are already covered above.
+const identityDrift: { label: string; zone: string; ts: number; abbr: string }[] = [
+  // 20.8 years, the longest single correction in the table: Metlakatla ran on
+  // Pacific time until 2015 while its modern class is Alaska
+  { label: 'America/Metlakatla on Pacific time (2005)', zone: 'America/Metlakatla', ts: Date.UTC(2005, 5, 15, 12), abbr: 'PST' },
+  // Knox was Eastern until 2006, then moved to Central (its modern class)
+  { label: 'America/Indiana/Knox before the 2006 move to Central', zone: 'America/Indiana/Knox', ts: Date.UTC(2000, 5, 15, 12), abbr: 'EST' },
+  // FET is retired — no current schedule class can supply this label, which is
+  // why pointing at another class instead of storing the string wouldn't work
+  { label: 'Europe/Minsk during Further-eastern European Time (2013)', zone: 'Europe/Minsk', ts: Date.UTC(2013, 0, 15, 12), abbr: 'FET' },
+  // DEFER spans: no historical offset is stored at all, the schedule class
+  // reproduces these years exactly and only the label is wrong. 185 of the
+  // corrections are like this, so they exercise the schedule fallback path
+  // rather than the historical-offset branch.
+  { label: 'Asia/Macau before the 1999 handover (defer)', zone: 'Asia/Macau', ts: Date.UTC(1997, 5, 15, 12), abbr: 'MST' },
+  { label: 'Pacific/Saipan on NMIT before the 2000 rename (defer)', zone: 'Pacific/Saipan', ts: Date.UTC(1997, 5, 15, 12), abbr: 'NMIT' },
+];
+
+describe('historical labels are corrected where the offset-keyed answer would lie', () => {
+  // fixture integrity, kept in its own test so that a CLDR rename can't quietly
+  // satisfy the cases below by breaking their premise instead
+  testIfAligned('each name-only fixture really is a name-only flip in live ICU', () => {
     for (const { label, zone, ts, before, after, offset } of nameOnly) {
       const b = icu(zone, ts - STEP_MS);
       const a = icu(zone, ts);
@@ -243,15 +251,197 @@ describe('name-only transitions are invisible to the offset-only history table',
   });
 
   for (const { label, zone, ts, before, after } of nameOnly) {
-    testFailingIfAligned(label, () => {
-      // impl 10 shares historyAbbr() below the bake year, so it inherits this
-      expect(audited(zone, ts - STEP_MS).abbr).toBe(baked(zone, ts - STEP_MS).abbr);
-      expect(audited(zone, ts).abbr).toBe(baked(zone, ts).abbr);
+    testIfAligned(label, () => {
+      for (const [at, want] of [[ts - STEP_MS, before], [ts, after]] as const) {
+        const b = baked(zone, at);
 
-      expect(baked(zone, ts - STEP_MS).abbr).toBe(before);
-      expect(baked(zone, ts).abbr).toBe(after);
+        expect(b.abbr).toBe(want);
+        // the overlay must not disturb the offset the history eras resolved
+        expect(b.offset).toBe(icu(zone, at).offset);
+        // impl 10 shares the same path below the bake year
+        expect(audited(zone, at)).toEqual(b);
+      }
     });
   }
+
+  for (const { label, zone, ts, abbr } of identityDrift) {
+    testIfAligned(label, () => {
+      const b = baked(zone, ts);
+
+      expect(b.abbr).toBe(abbr);
+      expect(b.abbr).toBe(icu(zone, ts).abbr);
+      expect(b.offset).toBe(icu(zone, ts).offset);
+      expect(audited(zone, ts)).toEqual(b);
+    });
+  }
+});
+
+// KNOWN GAP (option B+) — where the historical offset matches NO state of the
+// zone's modern class, historyAbbr() gives up and returns GMT±N. That is vague
+// but not a lie, so the correction table skips those spans: covering them too
+// costs roughly 3x the bytes to replace labels nobody is currently misled by.
+//
+// Cambridge_Bay's Nunavut experiment is the case in point. It ran on Eastern
+// (-300) while its modern class is Mountain (-420/-360), so -300 matches
+// neither state and both sides of the Oct 29 name-only flip come back GMT-5.
+describe('labels stay vague where the offset matches no modern state', () => {
+  testIfAligned('America/Cambridge_Bay reports GMT-5 across the 2000 experiment', () => {
+    for (const ts of [CB_NAME_FLIP - STEP_MS, CB_NAME_FLIP]) {
+      expect(baked(CB, ts).abbr).toBe('GMT-5');
+      expect(baked(CB, ts).offset).toBe(-300);
+    }
+  });
+
+  testFailingIfAligned('America/Cambridge_Bay CDT -> EST (2000 Nunavut experiment)', () => {
+    expect(baked(CB, CB_NAME_FLIP - STEP_MS).abbr).toBe('CDT');
+    expect(baked(CB, CB_NAME_FLIP).abbr).toBe('EST');
+  });
+});
+
+// The four irregular-class zones are deliberately absent from history: Morocco
+// and Palestine suspend DST for Ramadan, which follows the lunar calendar, so
+// their behavior isn't expressible as a Gregorian rule in ANY year and baking
+// them would cost raw per-year segments end to end (tools/gen-core.ts: "the
+// irregular-class zones are excluded"). Historical instants therefore fall
+// through to the schedule class, which answers with the bake year's shape and
+// is knowingly wrong — Africa/Casablanca ran on WET until 2008, so it's off by
+// an hour in 244 of 372 monthly samples.
+//
+// The correction table has to honor the same exclusion. Labeling these spans
+// would put an authoritative name on an offset we already know is approximate,
+// which reads as MORE trustworthy than the GMT±N it replaced, and these four
+// zones alone were 15-19% of the payload. This block pins both halves so
+// re-including them anywhere has to be a deliberate act.
+const irregularZones = ['Africa/Casablanca', 'Africa/El_Aaiun', 'Asia/Gaza', 'Asia/Hebron'];
+
+describe('irregular Ramadan-rule zones stay out of the historical layer', () => {
+  test('the schedule table still classes exactly these four as irregular', () => {
+    const irregular = scheduleClasses.filter((c) => c.kind === 2).flatMap((c) => c.zones);
+    expect(irregular.toSorted()).toEqual(irregularZones.toSorted());
+  });
+
+  test('no correction table entry touches them', () => {
+    const corrected = new Set(abbrFixClasses.flatMap((c) => c.zones));
+    expect(irregularZones.filter((z) => corrected.has(z))).toEqual([]);
+  });
+
+  for (const zone of irregularZones) {
+    test(`${zone} answers historical instants from the schedule projection`, () => {
+      const ts = Date.UTC(2000, 5, 15, 12);
+      // no history era, so the historical answer IS the year-independent one
+      expect(baked(zone, ts).offset).toBe(legacyOffset(zone, ts));
+    });
+  }
+});
+
+// A corrected label reaches makeInfo() the same way any other does, so it must
+// intern the same way: pooled on (name, offset, abbr), lazily, one frozen
+// instance per distinct triple. The interesting part is that a correction can
+// make two answers differ ONLY in abbr — same zone, same offset — which is
+// exactly the case a pool keyed too coarsely would collapse.
+describe('corrected labels intern like any other TimeZoneInfo', () => {
+  // Cambridge_Bay at -360 twice over: 1999 is inside a correction record (CST),
+  // 2001 is past it and keeps the offset-keyed answer (MDT)
+  const CB_FIXED = Date.UTC(1999, 11, 15, 12);
+  const CB_PLAIN = Date.UTC(2001, 3, 15, 12);
+
+  test('a corrected and an uncorrected answer at one offset stay distinct', () => {
+    const fixed = bakedAt07(CB, CB_FIXED);
+    const plain = bakedAt07(CB, CB_PLAIN);
+
+    expect(fixed.abbr).toBe('CST');
+    expect(plain.abbr).toBe('MDT');
+    expect(fixed.offset).toBe(plain.offset); // only the label separates them
+    expect(fixed).not.toBe(plain);
+    expect(Object.isFrozen(fixed)).toBe(true);
+  });
+
+  test('two instants inside one correction record reuse the instance', () => {
+    // different record hits, same (name, offset, abbr) -> same pooled object
+    expect(bakedAt07(CB, CB_FIXED)).toBe(bakedAt07(CB, Date.UTC(2000, 1, 3, 6)));
+  });
+
+  test('resolving a corrected instant repeatedly allocates nothing', () => {
+    const seen = new Set<unknown>();
+
+    for (let i = 0; i < 2000; i++) {
+      seen.add(bakedAt07(CB, CB_FIXED));
+      seen.add(bakedAt07(CB, CB_PLAIN));
+    }
+
+    expect(seen.size).toBe(2);
+  });
+
+  test('impl 10 shares the pool with impl 07', () => {
+    expect(auditedAt10(CB, CB_FIXED)).toBe(bakedAt07(CB, CB_FIXED));
+  });
+});
+
+// getTimeZonesAt() resolves each schedule / history CLASS once and reuses the
+// result for every zone on it, while corrections are per zone. histCache holds
+// only the offset and the correction is applied after, so the two can't mix —
+// these pin that, since a cache keyed one level too coarse would hand a zone
+// its sibling's label and no offset assertion would notice.
+describe('per-class caches do not leak corrected labels between zones', () => {
+  const sameOffsetDifferentLabel: { label: string; ts: number; pairs: [string, string][] }[] = [
+    {
+      label: 'schedule class, corrected zone beside an uncorrected one',
+      ts: Date.UTC(2000, 5, 15, 12),
+      pairs: [['America/Indiana/Knox', 'EST'], ['America/Chicago', 'CDT']],
+    },
+    {
+      label: 'schedule class, two zones on different correction payloads',
+      ts: Date.UTC(1999, 10, 15, 12),
+      pairs: [['America/Argentina/Buenos_Aires', 'AST'], ['America/Argentina/San_Luis', 'WAST']],
+    },
+    {
+      label: 'history class, two zones on different correction payloads',
+      ts: Date.UTC(1999, 10, 15, 12),
+      pairs: [['Asia/Anadyr', 'ANAT'], ['Asia/Kamchatka', 'PETT']],
+    },
+  ];
+
+  for (const { label, ts, pairs } of sameOffsetDifferentLabel) {
+    test(label, () => {
+      clear07();
+
+      const all = new Map(baked07(ts).map((i) => [i.name, i]));
+
+      for (const [zone, abbr] of pairs) expect(all.get(zone)!.abbr).toBe(abbr);
+
+      // the premise: identical offset, so only the label distinguishes them
+      const offsets = new Set(pairs.map(([zone]) => all.get(zone)!.offset));
+
+      expect(offsets.size).toBe(1);
+    });
+  }
+
+  test('the cached all-zones path matches the uncached single-zone path', () => {
+    const corrected = [...new Set(abbrFixClasses.flatMap((c) => c.zones))].toSorted();
+    const disagree: string[] = [];
+
+    expect(corrected.length).toBeGreaterThan(50);
+
+    for (let y = ABBRFIX_FROM; y < 2026; y++) {
+      // February and July straddle the DST flip in both hemispheres
+      for (const month of [1, 6]) {
+        const ts = Date.UTC(y, month, 15, 12);
+
+        clear07();
+
+        const all = new Map(baked07(ts).map((i) => [i.name, i]));
+
+        for (const zone of corrected) {
+          // identity, not equality: both paths must land on the pooled instance
+          if (bakedAt07(zone, ts) !== all.get(zone)) {
+            disagree.push(`${zone} @ ${new Date(ts).toISOString().slice(0, 10)}`);
+          }
+        }
+      }
+    }
+
+    expect(disagree).toEqual([]);
+  });
 });
 
 describe('era boundaries switch regimes at the right year', () => {

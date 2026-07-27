@@ -21,12 +21,20 @@
 // common "same abbreviations, different DST dates" case, e.g. US EST/EDT
 // before the 2007 rule change) and otherwise falls back to a generic
 // GMT-style label. The offset is always exact.
+//
+// That offset-keyed label is wrong wherever a zone's historical identity
+// differs from the one its modern schedule class describes, so a sparse
+// correction table (shared/abbrfix.ts) overrides it on the spans where it
+// would otherwise confidently report another identity's abbreviation. Spans
+// where the offset matches no modern state — where the fallback is a vague
+// GMT±N rather than a wrong name — are left alone; see tools/abbrfix-core.ts.
 
 import type { TimeZoneInfo } from './types.ts';
 import { zones } from './zones.ts';
 import { scheduleClasses, STEP_MS } from './schedule.ts';
 import { historyClasses, HISTORY_TO } from './history.ts';
-import { resolveHistory, buildScheduleIndex, type ZoneState } from './rules.ts';
+import { abbrFixClasses } from './abbrfix.ts';
+import { resolveHistory, resolveAbbrFix, buildScheduleIndex, yearFromMs, type ZoneState } from './rules.ts';
 import { gmtLabel } from './fmt.ts';
 import { makeInfo } from './zoneLinks.ts';
 import { classIdx, zoneIndexOf, historyAbbr, scheduleZoneInfo } from './bakedSchedule.ts';
@@ -35,6 +43,11 @@ import { classIdx, zoneIndexOf, historyAbbr, scheduleZoneInfo } from './bakedSch
 // not covered). Resolved once. /*@__PURE__*/ so that if nothing references it
 // (schedule-only bundles), it — and the historyClasses it reads — tree-shake.
 export const histIdx = /*@__PURE__*/ buildScheduleIndex(zones, historyClasses);
+
+// zones-list order -> abbreviation-correction class index (-1 = this zone's
+// historical labels are already right, which is 392 of 464 zones). Same
+// /*@__PURE__*/ reasoning as histIdx above.
+export const fixIdx = /*@__PURE__*/ buildScheduleIndex(zones, abbrFixClasses);
 
 // UTC start of the bake year: `ts < HISTORY_TO_MS` is exactly `year < HISTORY_TO`
 // (the timestamp falls before Jan 1 of the bake year) but with no Date
@@ -56,6 +69,20 @@ export const HISTORY_TO_MS = Date.UTC(HISTORY_TO, 0, 1);
 // `z` is the zones-list index, forwarded to the schedule resolver's identity
 // cache (see shared/bakedSchedule.ts). Only the bake-year-onward answer can use
 // it; a historical offset isn't a schedule state, so it interns the long way.
+// corrected historical label for zones-list index `z`, or null when this
+// instant needs no correction (the overwhelmingly common case: one array read
+// and a compare for the 392 zones that have no corrections at all)
+// `offMin` is the offset about to be labelled — the generator keyed the
+// corrections on it, so passing anything else silently misses. yearFromMs is
+// only paid by the 68 zones that have corrections at all.
+function fixedAbbr(z: number, timestamp: number, offMin: number): string | null {
+  if (z === -1) return null;
+
+  const fi = fixIdx[z]!;
+
+  return fi === -1 ? null : resolveAbbrFix(abbrFixClasses[fi]!, timestamp, yearFromMs(timestamp), offMin);
+}
+
 function bakedZoneInfo(
   name: string,
   ci: number,
@@ -78,13 +105,23 @@ function bakedZoneInfo(
     }
 
     if (off !== null) {
-      const abbr = ci < 0 ? gmtLabel(off) : historyAbbr(scheduleClasses[ci]!, off);
+      const abbr = fixedAbbr(z, timestamp, off) ?? (ci < 0 ? gmtLabel(off) : historyAbbr(scheduleClasses[ci]!, off));
       return makeInfo(name, abbr, off);
     }
   }
 
   // bake year onward, or an earlier year whose history defers/absent
-  return scheduleZoneInfo(name, ci, timestamp, schedCache, z);
+  const info = scheduleZoneInfo(name, ci, timestamp, schedCache, z);
+
+  // a deferring era still reaches this path, and the schedule class labels it
+  // with today's identity — so corrections apply here too (185 of the spans)
+  if (historical) {
+    const fix = fixedAbbr(z, timestamp, info.offset);
+
+    if (fix !== null && fix !== info.abbr) return makeInfo(name, fix, info.offset);
+  }
+
+  return info;
 }
 
 // Single-zone resolver for the single-zone / many-timestamps use case: resolves

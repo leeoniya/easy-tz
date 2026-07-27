@@ -8,7 +8,7 @@
 import { writeFileSync, existsSync } from 'node:fs';
 
 export function selectTables(variant: 'bun' | 'chrome'): void {
-  for (const file of ['classes', 'schedule', 'history', 'offsets']) {
+  for (const file of ['classes', 'schedule', 'history', 'abbrfix', 'offsets']) {
     const target = new URL(`../shared/tables/${variant}/${file}.ts`, import.meta.url);
 
     if (!existsSync(target)) {
@@ -32,5 +32,5 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   }
 
   selectTables(variant);
-  console.log(`shared/{classes,schedule,history,offsets}.ts now re-export shared/tables/${variant}/`);
+  console.log(`shared/{classes,schedule,history,abbrfix,offsets}.ts now re-export shared/tables/${variant}/`);
 }

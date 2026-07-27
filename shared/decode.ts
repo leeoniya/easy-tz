@@ -9,7 +9,7 @@
 // between zones, ',' between values. None occur in IANA zone names or
 // abbreviations.
 
-import type { ScheduleClass, Rule, ZoneState, HistoryClass, HistoryEra } from './rules.ts';
+import type { ScheduleClass, Rule, ZoneState, HistoryClass, HistoryEra, AbbrFixClass } from './rules.ts';
 
 // "<base36 prefix idx><leaf>" -> full zone name
 function decodeZone(prefixes: string[], z: string): string {
@@ -180,5 +180,74 @@ export function decodeHistory(
     }
 
     return { zones, eras };
+  });
+}
+
+// Offsets are packed as quarter-hours biased past zero so the field is never
+// negative: -12:00 -> 0, +14:00 -> 104. Shared with tools/emitters.ts.
+export const ABBRFIX_OFF_BIAS = 48;
+
+// Historical abbreviation corrections (see AbbrFixClass). Each group is
+// "<zone idxs>~<ranges>~<spans>", either section possibly empty:
+//   range — "<year off fromYearBase>,<years spanned>,<biased quarter-hours>,<abbr idx>"
+//   span  — "<gap>,<len>,<abbr idx>", delta-coded off the previous span's END in
+//           15-min steps, and converted to epoch ms here so the resolver can
+//           compare timestamps directly
+export function decodeAbbrFix(
+  zoneList: readonly string[],
+  dictPacked: string,
+  classesPacked: string,
+  fromYearBase: number,
+  stepMs: number
+): AbbrFixClass[] {
+  if (classesPacked === '') return [];
+
+  const dict = dictPacked.split(',');
+  const base = Date.UTC(fromYearBase, 0, 1);
+
+  return classesPacked.split('|').map((c) => {
+    const [zs, rangesPacked, spansPacked] = c.split('~') as [string, string, string];
+
+    const zones: string[] = [];
+
+    for (let i = 0; i < zs.length; i += 2) {
+      zones.push(zoneList[parseInt(zs.slice(i, i + 2), 36)]!);
+    }
+
+    const fromYear: number[] = [];
+    const toYear: number[] = [];
+    const offs: number[] = [];
+    const abbrs: string[] = [];
+
+    if (rangesPacked !== '') {
+      for (const r of rangesPacked.split(';')) {
+        const f = r.split(',');
+        const y = fromYearBase + parseInt(f[0]!, 36);
+
+        fromYear.push(y);
+        toYear.push(y + parseInt(f[1]!, 36));
+        offs.push((parseInt(f[2]!, 36) - ABBRFIX_OFF_BIAS) * 15);
+        abbrs.push(dict[parseInt(f[3]!, 36)]!);
+      }
+    }
+
+    const spanFrom: number[] = [];
+    const spanTo: number[] = [];
+    const spanAbbrs: string[] = [];
+    let step = 0;
+
+    if (spansPacked !== '') {
+      for (const s of spansPacked.split(';')) {
+        const f = s.split(',');
+
+        step += parseInt(f[0]!, 36);
+        spanFrom.push(base + step * stepMs);
+        step += parseInt(f[1]!, 36);
+        spanTo.push(base + step * stepMs);
+        spanAbbrs.push(dict[parseInt(f[2]!, 36)]!);
+      }
+    }
+
+    return { zones, fromYear, toYear, offs, abbrs, spanFrom, spanTo, spanAbbrs };
   });
 }

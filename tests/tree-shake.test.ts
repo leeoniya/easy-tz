@@ -14,20 +14,31 @@ import { activeVariant } from '../tools/table-files.ts';
 
 const variant = activeVariant();
 
-// the long packed strings the history table is made of. Read from the table
-// source rather than hardcoded, so this survives `bun run gen`; string
+// the long packed strings the history-side tables are made of. Read from the
+// table sources rather than hardcoded, so this survives `bun run gen`; string
 // literals pass through minification intact, which makes them exact markers.
-function historyMarkers(): string[] {
-  const src = readFileSync(new URL(`../shared/tables/${variant}/history.ts`, import.meta.url), 'utf8');
-  const out: string[] = [];
+//
+// abbrfix.ts is included because it hangs off the same path: only
+// shared/bakedHistory.ts imports it, so it must vanish wherever history does.
+// It is a separate table with its own decode, so the history markers alone
+// would not notice it staying behind.
+function historyMarkers(): { table: string; marker: string }[] {
+  const out: { table: string; marker: string }[] = [];
 
-  for (const name of ['T', 'H']) {
-    const m = new RegExp(`^const ${name} = '([^']{200,})'`, 'm').exec(src);
+  for (const [file, names] of [
+    ['history', ['T', 'H']],
+    ['abbrfix', ['F']],
+  ] as const) {
+    const src = readFileSync(new URL(`../shared/tables/${variant}/${file}.ts`, import.meta.url), 'utf8');
 
-    expect(m).not.toBeNull();
-    // a middle slice: long enough to be unique, short enough to survive any
-    // future chunking of the literal
-    out.push(m![1]!.slice(100, 180));
+    for (const name of names) {
+      const m = new RegExp(`^const ${name} = '([^']{200,})'`, 'm').exec(src);
+
+      expect(m).not.toBeNull();
+      // a middle slice: long enough to be unique, short enough to survive any
+      // future chunking of the literal
+      out.push({ table: `${file}.${name}`, marker: m![1]!.slice(100, 180) });
+    }
   }
 
   return out;
@@ -52,22 +63,26 @@ describe('the baked impls ship history only when a history-capable API is import
     test(`${impl} (${variant} tables)`, async () => {
       const markers = historyMarkers();
 
-      // compared as short labels rather than with toContain, so a failure
-      // reports the offending export instead of dumping a 24KB bundle
-      const shipsHistory = async (exportName: string) => {
+      // reported as the list of tables found, rather than with toContain, so a
+      // failure names the offending export AND table instead of dumping a 24KB
+      // bundle — and so that a table going missing from the history-capable
+      // bundle is as loud as one surviving in the schedule-only bundle
+      const tablesIn = async (exportName: string) => {
         const out = await bundle(impl, exportName);
 
-        return `${exportName}: ${markers.some((m) => out.includes(m)) ? 'ships history' : 'history-free'}`;
+        return `${exportName}: ${markers.filter((m) => out.includes(m.marker)).map((m) => m.table).join(', ') || 'none'}`;
       };
 
-      // sanity: the markers must actually identify the history table, or the
-      // absence assertions below would pass vacuously forever
-      expect(await shipsHistory('getTimeZonesAt')).toBe('getTimeZonesAt: ships history');
-      expect(await shipsHistory('getTimeZoneAt')).toBe('getTimeZoneAt: ships history');
+      const all = markers.map((m) => m.table).join(', ');
 
-      // ...and the two schedule-only entry points must not drag it in
-      expect(await shipsHistory('getTimeZones')).toBe('getTimeZones: history-free');
-      expect(await shipsHistory('getTimeZone')).toBe('getTimeZone: history-free');
+      // sanity: the markers must actually identify the tables, or the absence
+      // assertions below would pass vacuously forever
+      expect(await tablesIn('getTimeZonesAt')).toBe(`getTimeZonesAt: ${all}`);
+      expect(await tablesIn('getTimeZoneAt')).toBe(`getTimeZoneAt: ${all}`);
+
+      // ...and the two schedule-only entry points must not drag any of them in
+      expect(await tablesIn('getTimeZones')).toBe('getTimeZones: none');
+      expect(await tablesIn('getTimeZone')).toBe('getTimeZone: none');
     });
   }
 });
