@@ -11,6 +11,7 @@
 // self-verification (the SAME resolver is verified and shipped).
 
 import { zoneLinks } from './zoneLinks.ts';
+import { gmtLabel } from './fmt.ts';
 
 export interface ZoneState {
   abbr: string;
@@ -249,10 +250,29 @@ export function resolveHistory(eras: HistoryEra[], ts: number, stepMs: number): 
   return e.offs[segmentIndex(e.steps!, ts, Date.UTC(e.fromYear, 0, 1), stepMs)]!;
 }
 
+// label for an offset given a schedule class: the class's abbr for that offset
+// when it has one, else a generic GMT label. History-independent (reads only
+// the class it is handed), so the historical labelers share it.
+//
+// Deliberately kept here rather than beside the baked resolvers: the generator
+// (tools/abbrfix-core.ts) needs it too, and importing it from a table module
+// would compile a previous generation's tables into the generator's own bundle.
+export function historyAbbr(cls: ScheduleClass, offMin: number): string {
+  if (cls.kind === 0) {
+    if (cls.states[0].offMin === offMin) return cls.states[0].abbr;
+  } else if (cls.kind === 1) {
+    for (const st of cls.states) if (st.offMin === offMin) return st.abbr;
+  } else {
+    for (let i = 0; i < cls.offMins.length; i++) if (cls.offMins[i] === offMin) return cls.abbrs[i]!;
+  }
+
+  return gmtLabel(offMin);
+}
+
 // Historical LABEL corrections, layered over the offsets above.
 //
 // The eras store offsets only, so below the bake year an abbreviation is a pure
-// function of the resolved offset (bakedSchedule.ts historyAbbr) — one label per
+// function of the resolved offset (historyAbbr above) — one label per
 // run of constant offset. That is wrong wherever a zone's historical identity
 // differs from the one its modern schedule class describes: America/Ciudad_Juarez
 // was on Central in 1998, but -360 matches its modern Mountain class's MDT state,

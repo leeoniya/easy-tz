@@ -116,14 +116,15 @@ export function decodeHistory(
   const pairs = pairsPacked.split('|').map((p) => p.split(',').map((v) => +v * 15));
   const dict = erasPacked.split('|');
 
-  // fixed 5-char tuples, no delimiters: [m][n][d][at 2ch]
+  // fixed 6-char tuples, no delimiters: [m][n][d][at 3ch]. at is wall MINUTES,
+  // not quarter-hours — some zones transition at 00:01 local (see emitters.ts)
   const tupleRule = (i: number, to: 0 | 1): Rule => {
-    const o = i * 5;
+    const o = i * 6;
     return {
       month: parseInt(tuplesPacked[o]!, 36),
       nth: parseInt(tuplesPacked[o + 1]!, 36),
       dow: parseInt(tuplesPacked[o + 2]!, 36),
-      atMin: parseInt(tuplesPacked.slice(o + 3, o + 5), 36) * 15,
+      atMin: parseInt(tuplesPacked.slice(o + 3, o + 6), 36),
       to,
     };
   };

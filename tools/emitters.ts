@@ -158,10 +158,11 @@ export function emitHistoryTs(h: GeneratedHistory, t: GeneratedTables, meta: Gen
   const tuples: string[] = [];
   const tupleIdx = new Map<string, number>();
 
-  // offsets and wall minutes ship in quarter-hour units (all real values
-  // 1995+ are multiples of 15 min; the resolver works in minutes)
+  // OFFSETS ship in quarter-hour units — every real UTC offset is a multiple of
+  // 15 min, including the :45 ones (Kathmandu +05:45, Chatham +12:45). Rule wall
+  // times are NOT: see tupleRef.
   const q = (min: number): number => {
-    if (min % 15 !== 0) throw new Error(`sub-quarter-hour value in history: ${min}`);
+    if (min % 15 !== 0) throw new Error(`sub-quarter-hour offset in history: ${min}`);
     return min / 15;
   };
 
@@ -181,16 +182,21 @@ export function emitHistoryTs(h: GeneratedHistory, t: GeneratedTables, meta: Gen
   };
 
   // rule (month, nth, dow, at) tuples get their own dictionary too, as fixed
-  // 5-char records (no delimiters): the same tuple recurs across many offset
-  // pairs (the US and EU shapes especially). at (quarter-hours, 0..96) is the
-  // only 2-char field.
+  // 6-char records (no delimiters): the same tuple recurs across many offset
+  // pairs (the US and EU shapes especially). at is WALL MINUTES (0..1439) in 3
+  // chars, not quarter-hours: Atlantic Canada switched at 00:01 local until
+  // 2011 and Antarctica/Casey in 2020-22, so rounding here would put the
+  // transition 14 minutes late. Only the ~200 dictionary records pay the extra
+  // char; the 2-char references that actually recur are unchanged.
   const tupleRef = (r: Rule): string => {
-    const key = `${r.month},${r.nth},${r.dow},${q(r.atMin)}`;
+    if (r.atMin < 0 || r.atMin > 1439) throw new Error(`rule wall minute out of range: ${r.atMin}`);
+
+    const key = `${r.month},${r.nth},${r.dow},${r.atMin}`;
     let i = tupleIdx.get(key);
 
     if (i == null) {
       i = tuples.length;
-      tuples.push(`${b36(r.month, 1)}${b36(r.nth, 1)}${b36(r.dow, 1)}${b36(q(r.atMin), 2)}`);
+      tuples.push(`${b36(r.month, 1)}${b36(r.nth, 1)}${b36(r.dow, 1)}${b36(r.atMin, 3)}`);
       tupleIdx.set(key, i);
     }
 
@@ -234,8 +240,8 @@ export function emitHistoryTs(h: GeneratedHistory, t: GeneratedTables, meta: Gen
   if (dict.length > 1296) throw new Error(`era dictionary overflow: ${dict.length} > 1296`);
   if (pairs.length > 1296) throw new Error(`offset-pair dictionary overflow: ${pairs.length} > 1296`);
   if (tuples.length > 1296) throw new Error(`rule tuple dictionary overflow: ${tuples.length} > 1296`);
-  // fixed 5-char tuple records assume single-char month/nth/dow and 2-char at
-  if (tuples.some((rec) => rec.length !== 5)) throw new Error('rule tuple field out of single-char range');
+  // fixed 6-char tuple records assume single-char month/nth/dow and 3-char at
+  if (tuples.some((rec) => rec.length !== 6)) throw new Error('rule tuple field out of single-char range');
 
   const s = h.stats;
   const what = `Historical offset eras (${h.fromYear}-${h.toYear - 1}; the main schedule covers ${h.toYear}+):

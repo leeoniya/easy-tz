@@ -9,8 +9,7 @@
 import type { TimeZoneInfo } from './types.ts';
 import { zones } from './zones.ts';
 import { scheduleClasses, YEAR_START, STEP_MS } from './schedule.ts';
-import { resolveClass, buildScheduleIndex, type ScheduleClass, type ZoneState } from './rules.ts';
-import { gmtLabel } from './fmt.ts';
+import { resolveClass, buildScheduleIndex, type ZoneState } from './rules.ts';
 import { makeInfo, zoneLinks } from './zoneLinks.ts';
 import { etcZoneInfo } from './etcZones.ts';
 
@@ -33,21 +32,6 @@ export function zoneIndexOf(name: string): number {
   const bridged = zoneLinks.get(name);
 
   return bridged != null ? nameIdx.get(bridged) ?? -1 : -1;
-}
-
-// label for an offset given a schedule class: the class's abbr for that offset
-// when it has one, else a generic GMT label. History-independent (reads only
-// the schedule class), so the historical labelers below share it.
-export function historyAbbr(cls: ScheduleClass, offMin: number): string {
-  if (cls.kind === 0) {
-    if (cls.states[0].offMin === offMin) return cls.states[0].abbr;
-  } else if (cls.kind === 1) {
-    for (const st of cls.states) if (st.offMin === offMin) return st.abbr;
-  } else {
-    for (let i = 0; i < cls.offMins.length; i++) if (cls.offMins[i] === offMin) return cls.abbrs[i]!;
-  }
-
-  return gmtLabel(offMin);
 }
 
 // Fast path in front of makeInfo() for the resolvers below. resolveClass()

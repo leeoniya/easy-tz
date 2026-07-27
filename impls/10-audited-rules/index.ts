@@ -36,11 +36,11 @@
 import type { TimeZoneInfo } from '../../shared/types.ts';
 import { zones } from '../../shared/zones.ts';
 import { scheduleClasses, YEAR_START, STEP_MS } from '../../shared/schedule.ts';
-import { resolveClass, ruleInstant, type ScheduleClass } from '../../shared/rules.ts';
+import { resolveClass, ruleInstant, historyAbbr, type ScheduleClass } from '../../shared/rules.ts';
 import { gmtLabel } from '../../shared/fmt.ts';
 import { hourBucketMemo, type HourBucketMemo } from '../../shared/hourCache.ts';
 import { makeInfo, canonicalZone, canonicalView, type CanonicalView } from '../../shared/zoneLinks.ts';
-import { computeSchedule, scheduleZoneInfo, classIdx, historyAbbr, zoneIndexOf } from '../../shared/bakedSchedule.ts';
+import { computeSchedule, scheduleZoneInfo, classIdx, zoneIndexOf } from '../../shared/bakedSchedule.ts';
 import { computeBaked, getTimeZoneAt as bakedGetTimeZoneAt, HISTORY_TO_MS } from '../../shared/bakedHistory.ts';
 
 const hasTemporal = typeof Temporal !== 'undefined';

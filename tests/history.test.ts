@@ -4,6 +4,7 @@ import { getTimeZonesAt as audited10, getTimeZoneAt as auditedAt10, clearCache a
 import { getTimeZonesAt as baseline04, getTimeZoneAt as baselineAt04, clearCache as clear04 } from '../impls/04-live-intl/index.ts';
 import { scheduleClasses, genMeta, YEAR_START, STEP_MS } from '../shared/schedule.ts';
 import { abbrFixClasses, ABBRFIX_FROM } from '../shared/abbrfix.ts';
+import { historyClasses } from '../shared/history.ts';
 import { resolveClass, buildScheduleIndex } from '../shared/rules.ts';
 import { zones } from '../shared/zones.ts';
 import { SCHEDULE_STRIDE_DAYS, HISTORY_STRIDE_DAYS } from '../tools/gen-core.ts';
@@ -180,8 +181,107 @@ describe('the tightest transition pair in tzdata (America/Cambridge_Bay, 2000)',
   });
 });
 
+// The Atlantic Canada zones switched DST at 00:01 local wall time — not the
+// usual 02:00 — until 2011, and Antarctica/Casey did the same in 2020-22. That
+// is the one real shape that misses the generator's 15-minute step grid, and it
+// used to be rounded UP: the fitted rule said 00:15, so for the first 14 minutes
+// of the new offset the baked impls kept serving the old one. 93 transitions in
+// the table's window, and invisible to the generator's own verification, which
+// only rechecks the (already rounded) edges it recorded — it reported "0
+// mismatches" the whole time this was broken.
+//
+// TWO independent mechanisms keep these exact, so both are pinned below —
+// reverting either one alone re-breaks these instants:
+//   - scanAt() times every change to the minute (gen-core refineToMinute)
+//   - history rule tuples carry wall MINUTES, not quarter-hours (emitters.ts
+//     tupleRef / decode.ts tupleRule); quarter-hours cannot encode atMin = 1
+//
+// tools/tz-transition-gap.ts reports the whole population in its "off-grid"
+// column. The census test is what notices a NEW zone joining the club.
+const MINUTE_MS = 60_000;
+
+const OFF_GRID_ZONES = ['America/Goose_Bay', 'America/Moncton', 'America/St_Johns', 'Antarctica/Casey'];
+
+const offGrid: { zone: string; ts: number; before: number; after: number }[] = [
+  // first spring/fall pair of the era, and the last one before the 2011 switch
+  { zone: 'America/Goose_Bay', ts: Date.UTC(1995, 3, 2, 4, 1), before: -240, after: -180 },
+  { zone: 'America/Goose_Bay', ts: Date.UTC(1995, 9, 29, 3, 1), before: -180, after: -240 },
+  { zone: 'America/Goose_Bay', ts: Date.UTC(2011, 2, 13, 4, 1), before: -240, after: -180 },
+  { zone: 'America/Moncton', ts: Date.UTC(1995, 3, 2, 4, 1), before: -240, after: -180 },
+  { zone: 'America/Moncton', ts: Date.UTC(2006, 9, 29, 3, 1), before: -180, after: -240 },
+  // Newfoundland's half-hour offsets ride on top of the :01 transition, so the
+  // instant is off BOTH the hour and the quarter-hour
+  { zone: 'America/St_Johns', ts: Date.UTC(1995, 3, 2, 3, 31), before: -210, after: -150 },
+  { zone: 'America/St_Johns', ts: Date.UTC(2011, 2, 13, 3, 31), before: -210, after: -150 },
+  // and a modern case, long after the Atlantic zones moved to 02:00
+  { zone: 'Antarctica/Casey', ts: Date.UTC(2020, 9, 3, 16, 1), before: 480, after: 660 },
+  { zone: 'Antarctica/Casey', ts: Date.UTC(2022, 9, 1, 16, 1), before: 480, after: 660 },
+];
+
+describe('DST transitions at 00:01 local, off the 15-minute step grid', () => {
+  for (const { zone, ts, before, after } of offGrid) {
+    const label = `${zone} ${new Date(ts).toISOString().slice(0, 16)}Z`;
+
+    // ungated: these assert the SHIPPED tables' precision, so they hold whatever
+    // ICU the host has (the live-Intl comparison below is the gated one)
+    test(`${label} flips on the exact minute`, () => {
+      expect(ts % STEP_MS).not.toBe(0); // else the case has stopped being off-grid
+
+      for (const off of [bakedOff, auditedOff]) {
+        expect(off(zone, ts - MINUTE_MS)).toBe(before);
+        expect(off(zone, ts)).toBe(after);
+      }
+    });
+
+    // the 14 minutes the grid used to round away — the regression itself
+    testIfAligned(`${label} agrees with live ICU through the rounded-away minutes`, () => {
+      for (let m = 0; m < 15; m++) {
+        const t = ts + m * MINUTE_MS;
+
+        expect(icuOff(zone, t)).toBe(after);
+        expect(bakedOff(zone, t)).toBe(after);
+        expect(auditedOff(zone, t)).toBe(after);
+      }
+    });
+  }
+
+  // Pins the tuple encoding independently of the instants above: quarter-hour
+  // packing simply cannot represent atMin = 1, so a revert there fails here even
+  // if refineToMinute is untouched.
+  //
+  // Doubles as a census. If a tzdata/ICU update gives another zone an off-grid
+  // rule, this fails on the zone list — add a fixture to `offGrid` for it rather
+  // than just widening the expectation.
+  test('history rule eras carry wall minutes, not quarter-hours', () => {
+    const oddZones = new Set<string>();
+    const oddMins = new Set<number>();
+
+    for (const c of historyClasses) {
+      for (const e of c.eras) {
+        if (e.kind !== 1 || e.rules === null) continue;
+
+        for (const r of e.rules) {
+          // a wall-clock minute-of-day, which is what the 3-char base-36 field holds
+          expect(r.atMin).toBeGreaterThanOrEqual(0);
+          expect(r.atMin).toBeLessThan(1440);
+
+          if (r.atMin % 15 !== 0) {
+            oddMins.add(r.atMin);
+            for (const z of c.zones) oddZones.add(z);
+          }
+        }
+      }
+    }
+
+    expect([...oddZones].sort()).toEqual(OFF_GRID_ZONES);
+
+    // every off-grid rule in the table today is the same 00:01 shape
+    expect([...oddMins]).toEqual([1]);
+  });
+});
+
 // The history table stores offsets only, so below the bake year an abbreviation
-// is a pure function of the resolved offset (bakedSchedule.ts historyAbbr):
+// is a pure function of the resolved offset (rules.ts historyAbbr):
 //
 //   const abbr = ci < 0 ? gmtLabel(off) : historyAbbr(scheduleClasses[ci]!, off);
 //

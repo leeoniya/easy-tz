@@ -34,10 +34,10 @@ import { zones } from './zones.ts';
 import { scheduleClasses, STEP_MS } from './schedule.ts';
 import { historyClasses, HISTORY_TO } from './history.ts';
 import { abbrFixClasses } from './abbrfix.ts';
-import { resolveHistory, resolveAbbrFix, buildScheduleIndex, yearFromMs, type ZoneState } from './rules.ts';
+import { resolveHistory, resolveAbbrFix, buildScheduleIndex, historyAbbr, yearFromMs, type ZoneState } from './rules.ts';
 import { gmtLabel } from './fmt.ts';
 import { makeInfo } from './zoneLinks.ts';
-import { classIdx, zoneIndexOf, historyAbbr, scheduleZoneInfo } from './bakedSchedule.ts';
+import { classIdx, zoneIndexOf, scheduleZoneInfo } from './bakedSchedule.ts';
 
 // zones-list order -> history class index (bridging spelling variants; -1 =
 // not covered). Resolved once. /*@__PURE__*/ so that if nothing references it

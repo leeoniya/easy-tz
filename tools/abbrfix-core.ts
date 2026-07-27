@@ -2,7 +2,7 @@
 // runtime's live Intl and emits the spans where they disagree.
 //
 // The history table stores offsets only, so below the bake year a label is a
-// pure function of the resolved offset (shared/bakedSchedule.ts historyAbbr).
+// pure function of the resolved offset (shared/rules.ts historyAbbr).
 // That means the baked impls serve exactly ONE abbreviation per run of constant
 // offset. When a zone's historical identity differs from the one its modern
 // schedule class describes, that single label is wrong for part or all of the
@@ -21,15 +21,14 @@
 
 import { liveParts } from '../shared/live.ts';
 import { zoneAliases, zoneAbbrOverrides } from '../shared/abbrs.ts';
-import { resolveHistory, resolveClass, buildScheduleIndex, type ScheduleClass, type HistoryClass } from '../shared/rules.ts';
+import { resolveHistory, resolveClass, buildScheduleIndex, historyAbbr, type ScheduleClass, type HistoryClass } from '../shared/rules.ts';
 import { gmtLabel } from '../shared/fmt.ts';
-import { historyAbbr } from '../shared/bakedSchedule.ts';
 
 // probe stride for the boundary scan, in 15-min steps. 6d, the same bound
-// tools/tz-transition-gap.ts holds gen-core to: below tzdata's tightest
-// consecutive-transition gap (6.92d, America/Cambridge_Bay 2000), so a window
-// can never hide a whole segment. The bisection below resolves any number of
-// changes inside one window.
+// tools/tz-transition-gap.ts holds gen-core to: below the tightest window in
+// which the runtime's own data changes and returns to where it started (6.96d,
+// America/Boa_Vista 2000), so a window can never hide a whole segment. The
+// bisection below resolves any number of changes inside one window.
 const STRIDE = 6 * 96;
 
 // Option B: correct only the spans where the offset-keyed label is a confident
@@ -49,7 +48,7 @@ export interface FixSpan {
 }
 
 // The stored form. The WRONG label is already a pure function of the resolved
-// offset (bakedSchedule.ts historyAbbr), so a correction only has to say "in
+// offset (rules.ts historyAbbr), so a correction only has to say "in
 // these years, this offset means X" — which drops every timestamp. America/Cancun
 // went from 17 near-identical summer spans to one record this way.
 export interface FixRange {

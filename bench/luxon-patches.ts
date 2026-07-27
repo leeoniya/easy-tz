@@ -848,11 +848,11 @@ function zoneScanner(zoneName) {
 // needs no Intl call at all.
 //
 // The interval is exact, not a heuristic. Probes are spaced 2 days apart, and
-// the tightest gap between two consecutive transitions anywhere in tzdata is
-// 6.92 days (America/Cambridge_Bay, Oct-Nov 2000; measured over all 219232
-// transitions moment-timezone ships). A window shorter than that gap holds at
-// most one transition, one transition necessarily changes the offset, so two
-// probes that agree prove the span between them is transition-free.
+// the shortest window in which any zone's offset changes and returns to where
+// it started is 6.96 days (America/Boa_Vista, Oct 2000; measured over all 68214
+// transitions the runtime's own ICU reports, via tools/tz-transition-gap.ts).
+// Departing and returning inside a probe pair is the only way two agreeing
+// probes could be wrong, so a shorter window proves the span transition-free.
 //
 // How far to fan out is decided by what the previous interval actually
 // returned, which keeps the cache from betting on workloads it isn't getting:
@@ -867,7 +867,7 @@ const offsetInterval: Patch = {
       replace: `const scanCache = new Map();
 const intervalCache = new Map();
 
-// half the 6.92d tightest gap in tzdata, leaving room for the data to tighten
+// well under the 6.96d change-and-return bound, leaving room for it to tighten
 const PROBE_MS = 2 * 86400000;
 const MAX_REACH = 256;
 const MAX_TS = 8.64e15;

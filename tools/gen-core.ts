@@ -16,8 +16,9 @@
 // Method: per zone/year, linear samples a fixed stride apart; each detected
 // change is refined to a 15-minute boundary by binary search (covers
 // half-hour-offset zones like Lord Howe), repeatedly where a window holds more
-// than one. Assumes only that a window never returns to the value it started
-// on — see SCHEDULE_STRIDE_DAYS.
+// than one, then timed to the exact minute (refineToMinute) for the rule fits.
+// Assumes only that a window never returns to the value it started on — see
+// SCHEDULE_STRIDE_DAYS.
 
 // probe the raw runtime enumeration, NOT the augmented public list: tables
 // must reflect exactly what this runtime's ICU enumerates, and the canonical
@@ -112,6 +113,7 @@ function probe(zone: string, ts: number): string {
 
 interface Seg {
   step: number; // 15-min steps since the year's Jan 1 00:00 UTC
+  atMs: number; // the transition instant itself, to the minute (see refineToMinute)
   longName: string;
   offsetMin: number;
 }
@@ -140,17 +142,62 @@ export const PROBE_STRATEGY: 'temporal' | 'stride' = temporal !== null ? 'tempor
 // Fallback strides. scanAt() resolves any number of changes between two
 // samples, so a stride does NOT have to be narrow enough to isolate them —
 // only narrow enough that a window never changes and RETURNS to the same
-// value, which no sampling can see. For offsets that's bounded by the tightest
-// gap between consecutive transitions anywhere in tzdata (6.92d today,
-// asserted by tools/tz-transition-gap.ts); CLDR names have no published bound,
-// but no zone in 1995-2028 changes name and reverts inside six days.
+// value, which no sampling can see. tools/tz-transition-gap.ts measures
+// exactly that window, over this runtime's own data rather than a bundled
+// tzdata copy: 6.96d for signatures across 1995-2028 (America/Boa_Vista's
+// one-week DST blip in Oct 2000, which is also the offset-only bound), so six
+// days clears it by 1.2x. Note the margin is thin by construction — a shorter
+// DST experiment anywhere would tighten it, which is why the tool asserts.
 export const SCHEDULE_STRIDE_DAYS = 6;
 export const HISTORY_STRIDE_DAYS = 6;
 
-const toSeg = (step: number, key: string): Seg => {
+const toSeg = (step: number, atMs: number, key: string): Seg => {
   const cut = key.lastIndexOf('|');
-  return { step, longName: key.slice(0, cut), offsetMin: +key.slice(cut + 1) };
+  return { step, atMs, longName: key.slice(0, cut), offsetMin: +key.slice(cut + 1) };
 };
+
+const MINUTE_MS = 60_000;
+
+// Narrows a change already bracketed to one 15-minute window down to the exact
+// minute: `lo` still holds `from` and `hi` does not, so the transition is the
+// first minute-aligned instant in (lo, hi] that differs.
+//
+// The step grid stays 15 minutes because that is what the raw/irregular
+// encodings store, but a RULE's atMin is a minutes field, so rounding a
+// transition up to the grid is a straight loss — America/Goose_Bay,
+// America/Moncton and America/St_Johns switched at 00:01 local until 2011 (as
+// did Antarctica/Casey in 2020-22) and were being fitted as 00:15, leaving the
+// baked answer 14 minutes stale twice a year. Costs ~4 probes per change.
+//
+// Assumes the window holds ONE change, the same assumption scanAt already makes
+// at step granularity. tools/tz-transition-gap.ts measures the headroom: the
+// tightest gap between consecutive signature changes is 1h (Asia/Chita 2014),
+// well clear of 15 minutes.
+function refineToMinute(zone: string, from: string, lo: number, hi: number): number {
+  // Fast path. Virtually every transition lands ON the step boundary —
+  // tz-transition-gap counts only 96 that miss it across the whole window — so
+  // the change is almost always inside the window's final minute. One probe
+  // settles that, where the bisection below costs four; a miss still narrows the
+  // window by a minute, so it is never wasted.
+  if (hi - lo > MINUTE_MS) {
+    const last = hi - MINUTE_MS;
+
+    if (probe(zone, last) === from) return hi;
+
+    hi = last;
+  }
+
+  while (hi - lo > MINUTE_MS) {
+    const mid = lo + Math.floor((hi - lo) / 2 / MINUTE_MS) * MINUTE_MS;
+
+    if (mid <= lo) break;
+
+    if (probe(zone, mid) === from) lo = mid;
+    else hi = mid;
+  }
+
+  return hi;
+}
 
 // stride samples, plus the year's final step — a transition in the last hours
 // of Dec 31 (e.g. Kosrae's +12 -> +11 at local midnight 1999-01-01, mid-day
@@ -214,7 +261,7 @@ function scanAt(zone: string, start: number, checkpoints: number[]): Seg[] {
   let prev = probe(zone, start);
   let prevStep = 0; // last resolved step; probe(prevStep) === prev
 
-  segs.push(toSeg(0, prev));
+  segs.push(toSeg(0, start, prev));
 
   for (const s of checkpoints) {
     if (s <= prevStep) continue; // strategies may propose duplicates
@@ -231,8 +278,12 @@ function scanAt(zone: string, start: number, checkpoints: number[]): Seg[] {
         else hi = mid;
       }
 
+      // the loop above always closes to hi - lo === 1, so the change sits in
+      // the single step ending at `hi` — narrow enough to time to the minute
+      const atMs = refineToMinute(zone, prev, start + (hi - 1) * STEP_MS, start + hi * STEP_MS);
+
       prev = hi === s ? cur : probe(zone, start + hi * STEP_MS); // `cur` already holds step s
-      segs.push(toSeg(hi, prev));
+      segs.push(toSeg(hi, atMs, prev));
       prevStep = hi; // strictly advances, so this terminates
     }
 
@@ -336,11 +387,221 @@ export function compareProbeStrategies(
   };
 }
 
+// ---- transition spacing (tools/tz-transition-gap.ts) ----
+//
+// How close together do two consecutive changes ever get? A sampling window
+// narrower than the tightest gap holds at most one change, and one change
+// necessarily changes the value — which is what lets a probe pair prove the
+// span between it is quiet. Two different quantities are measured because two
+// consumers ask different questions of the same data:
+//
+// - OFFSET transitions bound bench/luxon-patches.ts (offsetInterval), which
+//   caches luxon's numeric offset across a span two agreeing probes prove
+//   transition-free.
+// - SIGNATURE changes — the (CLDR long name, offset) pair scanAt() actually
+//   tracks — bound the fallback stride above. This is the stricter of the two
+//   and the one the stride genuinely needs: CLDR renames zones without moving
+//   their offset, so a name-only change is invisible to an offset-only bound.
+//
+// Both come off the runtime being measured rather than a bundled tzdata copy,
+// which is the point: the stride has to be safe against the ICU the tables are
+// generated from, and only that runtime knows where its own CLDR names move.
+//
+// Needs Temporal to enumerate offset transitions, so this is a Chrome-hosted
+// measurement. The signature scan inherits scanAt's one assumption — a span
+// that changes and RETURNS to its starting value is invisible to any sampling
+// — so what it reports is the tightest gap between VISIBLE changes.
+
+export interface GapEra {
+  label: string;
+  changes: number;
+  gapMs: number; // tightest gap between consecutive changes
+  gapWhere: string;
+  returnMs: number; // tightest window that changes and RETURNS to its opening value
+  returnWhere: string;
+  offGrid: number; // changes not landing on a STEP_MS boundary
+}
+
+export interface GapMeasurement {
+  available: boolean; // false without Temporal: offset transitions unavailable
+  zones: number;
+  fromYear: number;
+  toYear: number;
+  offsetEras: GapEra[];
+  signature: GapEra;
+  offsetMs: number;
+  signatureMs: number;
+}
+
+// tzdata's earliest entries are 19th-century LMT departures and its latest are
+// projected rules that just repeat, so no transition falls outside this span
+const GAP_FROM = Date.UTC(1700, 0, 1);
+const GAP_TO = Date.UTC(2200, 0, 1);
+
+const GAP_ERAS: [label: string, from: number][] = [
+  ['since 1700', GAP_FROM],
+  ['since 1900', Date.UTC(1900, 0, 1)],
+  ['since 1970', Date.UTC(1970, 0, 1)],
+  ['since 2000', Date.UTC(2000, 0, 1)],
+];
+
+const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+// A zone as a run of constant-value segments: starts[i] is when segment i
+// begins and vals[i] is what it holds. Index 0 is the opening state at the
+// window start, not a change — every later index is one.
+interface Segments {
+  starts: number[];
+  vals: string[];
+}
+
+// offset segments, from Temporal's exact transition instants
+function offsetSegments(api: TemporalApi, zone: string): Segments {
+  let zdt = api.Instant.fromEpochMilliseconds(GAP_FROM).toZonedDateTimeISO(zone);
+  const starts = [GAP_FROM];
+  const vals = [zdt.offset];
+
+  for (;;) {
+    const next = zdt.getTimeZoneTransition('next');
+
+    if (next === null || next.epochMilliseconds >= GAP_TO) break;
+
+    starts.push(next.epochMilliseconds);
+    vals.push(next.offset);
+    zdt = next;
+  }
+
+  return { starts, vals };
+}
+
+// (long name, offset) segments over [fromYear, toYear]. signature() re-reports
+// each year's opening state as its first segment, so that one is folded into
+// the previous year unless it actually differs — which is how a transition
+// landing exactly on Jan 1 00:00 UTC gets counted exactly once.
+function signatureSegments(zone: string, fromYear: number, toYear: number): Segments {
+  const starts: number[] = [];
+  const vals: string[] = [];
+
+  for (let y = fromYear; y <= toYear; y++) {
+    const start = Date.UTC(y, 0, 1);
+
+    for (const s of signature(zone, start, Date.UTC(y + 1, 0, 1), SCHEDULE_STRIDE_DAYS)) {
+      const key = `${s.longName}|${s.offsetMin}`;
+
+      if (key === vals[vals.length - 1]) continue;
+
+      starts.push(s.atMs);
+      vals.push(key);
+    }
+  }
+
+  return { starts, vals };
+}
+
+// Restricts `seg` to instants at or after `from`, carrying the value in force
+// at `from` as the new opening segment.
+function clip({ starts, vals }: Segments, from: number): Segments {
+  if (from <= starts[0]!) return { starts, vals };
+
+  let i = 0;
+  while (i < starts.length && starts[i]! < from) i++;
+
+  return { starts: [from, ...starts.slice(i)], vals: [vals[i - 1]!, ...vals.slice(i)] };
+}
+
+// The two spacing bounds, over every zone.
+//
+// `gapMs` is the tightest gap between consecutive changes — the conservative,
+// easy-to-state number, and a valid (if pessimistic) bound since departing and
+// returning takes at least two changes.
+//
+// `returnMs` is what the samplers actually need: the shortest window that
+// changes and comes back to the value it started on, which is the only pattern
+// no sampling can detect. A window [a,b] is unsafe exactly when a and b sit in
+// two same-valued segments p < q with something different between, and the
+// shortest such window shrinks to starts[q] - starts[p+1]. So for each segment
+// q, the binding partner is the NEAREST earlier segment holding the same value,
+// at least two back — tracked in `seen`, which is only allowed to know about
+// indices up to q-2.
+function eraGap(byZone: [zone: string, seg: Segments][], label: string, from: number): GapEra {
+  let gapMs = Infinity;
+  let gapWhere = '';
+  let returnMs = Infinity;
+  let returnWhere = '';
+  let changes = 0;
+  let offGrid = 0;
+
+  for (const [zone, full] of byZone) {
+    const { starts, vals } = clip(full, from);
+    const seen = new Map<string, number>();
+
+    for (let q = 1; q < starts.length; q++) {
+      changes++;
+      if (starts[q]! % STEP_MS !== 0) offGrid++;
+
+      if (starts[q]! - starts[q - 1]! < gapMs) {
+        gapMs = starts[q]! - starts[q - 1]!;
+        gapWhere = `${zone} ${isoDay(starts[q - 1]!)} -> ${isoDay(starts[q]!)}`;
+      }
+
+      if (q < 2) continue;
+
+      seen.set(vals[q - 2]!, q - 2);
+
+      const p = seen.get(vals[q]!);
+
+      if (p != null && starts[q]! - starts[p + 1]! < returnMs) {
+        returnMs = starts[q]! - starts[p + 1]!;
+        returnWhere = `${zone} ${isoDay(starts[p + 1]!)} -> ${isoDay(starts[q]!)} (${vals[q]})`;
+      }
+    }
+  }
+
+  return { label, changes, gapMs, gapWhere, returnMs, returnWhere, offGrid };
+}
+
+export function measureTransitionGaps(fromYear: number, toYear: number): GapMeasurement {
+  if (temporal === null) {
+    return {
+      available: false,
+      zones: zones.length,
+      fromYear,
+      toYear,
+      offsetEras: [],
+      signature: { label: '', changes: 0, gapMs: Infinity, gapWhere: '', returnMs: Infinity, returnWhere: '', offGrid: 0 },
+      offsetMs: 0,
+      signatureMs: 0,
+    };
+  }
+
+  const api = temporal;
+
+  const t0 = Date.now();
+  const byOffset = zones.map((z): [string, Segments] => [z, offsetSegments(api, z)]);
+  const offsetMs = Date.now() - t0;
+
+  const t1 = Date.now();
+  const bySignature = zones.map((z): [string, Segments] => [z, signatureSegments(z, fromYear, toYear)]);
+  const signatureMs = Date.now() - t1;
+
+  return {
+    available: true,
+    zones: zones.length,
+    fromYear,
+    toYear,
+    offsetEras: GAP_ERAS.map(([label, from]) => eraGap(byOffset, label, from)),
+    signature: eraGap(bySignature, `${fromYear}-${toYear}`, -Infinity),
+    offsetMs,
+    signatureMs,
+  };
+}
+
 const resolveAbbr = (longName: string): string =>
   abbrOverrides[longName] ?? initialsAbbr(longName) ?? compactGmt(longName);
 
 interface EffSeg {
   step: number;
+  atMs: number;
   abbr: string;
   offMin: number;
 }
@@ -356,7 +617,7 @@ function effectiveSegs(rawByZone: Map<string, Seg[]>, zone: string): EffSeg[] {
     const last = out[out.length - 1];
 
     if (last == null || last.abbr !== abbr || last.offMin !== s.offsetMin) {
-      out.push({ step: s.step, abbr, offMin: s.offsetMin });
+      out.push({ step: s.step, atMs: s.atMs, abbr, offMin: s.offsetMin });
     }
   }
 
@@ -386,8 +647,7 @@ function fitRule(perYear: EffSeg[][], years: number[], ti: number, to: 0 | 1): R
   for (let yi = 0; yi < years.length; yi++) {
     const seg = perYear[yi]![ti]!;
     const before = perYear[yi]![ti - 1]!;
-    const instant = Date.UTC(years[yi]!, 0, 1) + seg.step * STEP_MS;
-    const wall = new Date(instant + before.offMin * 60_000);
+    const wall = new Date(seg.atMs + before.offMin * 60_000);
     const m = wall.getUTCMonth() + 1;
     const d = wall.getUTCDay();
     const at = wall.getUTCHours() * 60 + wall.getUTCMinutes();
@@ -554,8 +814,9 @@ export function generateTables(): GeneratedTables {
 // years that fit no Gregorian rule. Rule years reproduce their observed
 // transition instants exactly by construction (month/dow/atMin come from
 // the probed instant; the nth candidate set maps back to the same day), so
-// the result matches this runtime's ICU at 15-min resolution everywhere.
-// The end-to-end check is tools/sweep-validity.ts.
+// the result matches this runtime's ICU to the minute. Raw years keep 15-min
+// steps, which is the one place an off-grid transition (Asia/Gaza 2010-11)
+// still rounds. The end-to-end check is tools/sweep-validity.ts.
 
 export const HISTORY_FROM = 1995; // matches the sweep's default range
 
@@ -600,6 +861,7 @@ interface YearFit {
 
 export interface OffSeg {
   step: number;
+  atMs: number;
   off: number;
 }
 
@@ -608,7 +870,9 @@ function toOffSegs(segs: Seg[]): OffSeg[] {
   const out: OffSeg[] = [];
 
   for (const s of segs) {
-    if (out.length === 0 || out[out.length - 1]!.off !== s.offsetMin) out.push({ step: s.step, off: s.offsetMin });
+    if (out.length === 0 || out[out.length - 1]!.off !== s.offsetMin) {
+      out.push({ step: s.step, atMs: s.atMs, off: s.offsetMin });
+    }
   }
 
   return out;
@@ -626,9 +890,11 @@ const encodeSig = (segs: Seg[]): string =>
     })
     .join(';');
 
-// does the zone's SCHEDULE class reproduce this observed year exactly
-// (same offsets, transitions at the same 15-min instants)? Such years need
-// no history storage — a defer era points the resolver at the schedule.
+// does the zone's SCHEDULE class reproduce this observed year exactly (same
+// offsets, transitions at the same instants)? Such years need no history
+// storage — a defer era points the resolver at the schedule. Compared against
+// the observed atMs, so a rule whose atMin came off a grid-snapped step could
+// not pass this by matching its own rounding.
 function matchesSchedule(cls: ScheduleClass, year: number, segs: OffSeg[]): boolean {
   if (cls.kind === 0) return segs.length === 1 && segs[0]!.off === cls.states[0].offMin;
 
@@ -639,26 +905,22 @@ function matchesSchedule(cls: ScheduleClass, year: number, segs: OffSeg[]): bool
   const [r1, r2] = cls.rules;
   const before = cls.states[r2.to].offMin; // state outside the two transitions
   const mid = cls.states[r1.to].offMin;
-  const y0 = Date.UTC(year, 0, 1);
 
   return (
     segs[0]!.off === before &&
     segs[1]!.off === mid &&
     segs[2]!.off === before &&
-    ruleInstant(year, r1, cls.states[1 - r1.to]!.offMin) === y0 + segs[1]!.step * STEP_MS &&
-    ruleInstant(year, r2, cls.states[1 - r2.to]!.offMin) === y0 + segs[2]!.step * STEP_MS
+    ruleInstant(year, r1, cls.states[1 - r1.to]!.offMin) === segs[1]!.atMs &&
+    ruleInstant(year, r2, cls.states[1 - r2.to]!.offMin) === segs[2]!.atMs
   );
 }
 
 function fitYearOffsets(year: number, segs: OffSeg[]): YearFit {
-  const start = Date.UTC(year, 0, 1);
-
   if (segs.length === 1) return { year, kind: 0, offs: [segs[0]!.off], trans: null, steps: null };
 
   if (segs.length === 3 && segs[0]!.off === segs[2]!.off) {
     const fit = (si: 1 | 2): TransFit => {
-      const instant = start + segs[si]!.step * STEP_MS;
-      const wall = new Date(instant + segs[si - 1]!.off * 60_000);
+      const wall = new Date(segs[si]!.atMs + segs[si - 1]!.off * 60_000);
       const month = wall.getUTCMonth() + 1;
 
       return {

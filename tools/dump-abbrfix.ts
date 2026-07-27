@@ -19,8 +19,7 @@
 //   bun tools/dump-abbrfix.ts > abbrfix.md
 
 import { readFileSync } from 'node:fs';
-import { resolveHistory, resolveClass, buildScheduleIndex, type ScheduleClass, type HistoryClass, type AbbrFixClass } from '../shared/rules.ts';
-import { historyAbbr } from '../shared/bakedSchedule.ts';
+import { resolveHistory, resolveClass, buildScheduleIndex, historyAbbr, type ScheduleClass, type HistoryClass, type AbbrFixClass } from '../shared/rules.ts';
 import { gmtLabel } from '../shared/fmt.ts';
 import { zones } from '../shared/zones.ts';
 
