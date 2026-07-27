@@ -13,10 +13,10 @@
 // against live Intl at semi-monthly instants and every transition edge of
 // every probed year.
 //
-// Method: per zone/year, daily samples; each detected change is refined to a
-// 15-minute boundary by binary search (covers half-hour-offset zones like
-// Lord Howe). Assumes at most one transition per 24h window, which holds for
-// all real zones.
+// Method: per zone/year, linear samples a fixed stride apart; each detected
+// change is refined to a 15-minute boundary by binary search (covers
+// half-hour-offset zones like Lord Howe). Assumes at most one transition per
+// stride window — see SCHEDULE_STRIDE_DAYS for why that holds.
 
 // probe the raw runtime enumeration, NOT the augmented public list: tables
 // must reflect exactly what this runtime's ICU enumerates, and the canonical
@@ -116,15 +116,23 @@ interface Seg {
   offsetMin: number;
 }
 
-// linear-scan stride for the schedule probe (generateTables). Transitions in
-// the bake window (current + 2 years) are months apart, so a coarse stride
-// finds the identical set as daily — verified equivalent up to 14d across all
-// zones — while binary search still refines each edge to the exact 15-min
-// step. History probing keeps the daily default (its 1995+ years aren't in
-// that equivalence check, and it's cached anyway). verifyTables() gates it.
-const SCHEDULE_STRIDE_DAYS = 7;
+// linear-scan strides. A stride window can hold at most one transition as
+// long as the stride stays under the tightest gap between two consecutive
+// transitions anywhere in tzdata — 6.92d today, asserted by
+// tools/tz-transition-gap.ts. That bound is what makes a coarse stride safe:
+// one transition per window means the binary search below always converges on
+// the single real edge. A wider stride fails silently — a pair inside one
+// window makes the search find the FIRST edge while recording the LAST
+// offset, and a pair that returns to the same offset isn't detected at all.
+//
+// The schedule probe can afford the coarser end of that range: transitions in
+// the bake window (current + 2 years) are months apart. History keeps the
+// daily stride — its 1995+ years hold the tightest real gaps, and it's cached
+// anyway.
+export const SCHEDULE_STRIDE_DAYS = 6;
+export const HISTORY_STRIDE_DAYS = 1;
 
-function signature(zone: string, start: number, end: number, strideDays = 1): Seg[] {
+function signature(zone: string, start: number, end: number, strideDays: number): Seg[] {
   const toSeg = (step: number, key: string): Seg => {
     const cut = key.lastIndexOf('|');
     return { step, longName: key.slice(0, cut), offsetMin: +key.slice(cut + 1) };
@@ -463,7 +471,7 @@ export interface OffSeg {
 function probeOffSegs(zone: string, year: number): OffSeg[] {
   const segs: OffSeg[] = [];
 
-  for (const s of signature(zone, Date.UTC(year, 0, 1), Date.UTC(year + 1, 0, 1))) {
+  for (const s of signature(zone, Date.UTC(year, 0, 1), Date.UTC(year + 1, 0, 1), HISTORY_STRIDE_DAYS)) {
     if (segs.length === 0 || segs[segs.length - 1]!.off !== s.offsetMin) {
       segs.push({ step: s.step, off: s.offsetMin });
     }

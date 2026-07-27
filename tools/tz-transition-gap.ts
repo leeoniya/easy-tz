@@ -1,19 +1,25 @@
 // How close together do two consecutive offset transitions ever get?
 //
-// This number is load-bearing for the offsetInterval patch in
-// bench/luxon-patches.ts, which caches the offset across a span proven
-// transition-free by two probes that agree. That proof only holds while the
-// probe spacing is shorter than the tightest real gap: a window narrower than
-// the gap can hold at most one transition, one transition necessarily changes
-// the offset, so agreeing probes mean no transition at all.
+// This number is load-bearing in two places, for the same reason: a window
+// narrower than the tightest gap holds at most one transition, and one
+// transition necessarily changes the offset.
 //
-// Run this after a tzdata bump. If the tightest gap ever drops near the 2-day
-// probe spacing, that patch needs a smaller spacing or needs dropping.
+// - bench/luxon-patches.ts (offsetInterval) caches the offset across a span
+//   two agreeing probes prove transition-free — valid only while the probe
+//   spacing is shorter than the gap.
+// - tools/gen-core.ts scans zone-years at a fixed stride and binary-searches
+//   each detected change to its exact edge — valid only while the stride is
+//   shorter than the gap. A wider stride mislabels or drops a pair silently.
+//
+// Run this after a tzdata bump. Both spacings are asserted below; if the
+// tightest gap ever drops to meet one, that consumer needs a tighter spacing
+// or needs dropping.
 //
 //   bun tools/tz-transition-gap.ts
 
 import moment from 'moment-timezone';
 import { printTable } from './print-table.ts';
+import { SCHEDULE_STRIDE_DAYS, HISTORY_STRIDE_DAYS } from './gen-core.ts';
 
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
@@ -85,13 +91,30 @@ console.log(`tzdata ${moment.tz.dataVersion}, ${moment.tz.names().length} zones\
 printTable(['era', 'transitions', 'tightest gap', 'UTC hour-aligned', 'where'], rows);
 
 const { gap } = scan(-Infinity);
-const PROBE_DAYS = 2;
+const gapDays = gap / DAY;
 
-console.log(
-  `\noffsetInterval probes ${PROBE_DAYS}d apart, ${(gap / DAY / PROBE_DAYS).toFixed(1)}× inside the tightest gap.`
+const spacings: [string, number][] = [
+  ['offsetInterval probe spacing', 2],
+  ['gen-core schedule stride', SCHEDULE_STRIDE_DAYS],
+  ['gen-core history stride', HISTORY_STRIDE_DAYS],
+];
+
+console.log('');
+printTable(
+  ['consumer', 'spacing', 'margin', 'ok'],
+  spacings.map(([label, days]) => [
+    label,
+    `${days}d`,
+    `${(gapDays / days).toFixed(1)}×`,
+    gapDays > days ? 'yes' : 'NO',
+  ])
 );
 
-if (gap / DAY <= PROBE_DAYS) {
-  console.error('\nFAIL: probe spacing is no longer shorter than the tightest gap');
+const failed = spacings.filter(([, days]) => gapDays <= days);
+
+if (failed.length > 0) {
+  console.error(
+    `\nFAIL: tightest gap ${gapDays.toFixed(2)}d no longer exceeds: ${failed.map(([l]) => l).join(', ')}`
+  );
   process.exit(1);
 }

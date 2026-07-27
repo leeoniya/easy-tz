@@ -1,10 +1,11 @@
 import { describe, test, expect } from 'bun:test';
-import { getTimeZonesAt as baked07, clearCache as clear07 } from '../impls/07-baked-rules/index.ts';
-import { getTimeZonesAt as audited10, clearCache as clear10 } from '../impls/10-audited-rules/index.ts';
-import { getTimeZonesAt as baseline04, clearCache as clear04 } from '../impls/04-live-intl/index.ts';
+import { getTimeZonesAt as baked07, getTimeZoneAt as bakedAt07, clearCache as clear07 } from '../impls/07-baked-rules/index.ts';
+import { getTimeZonesAt as audited10, getTimeZoneAt as auditedAt10, clearCache as clear10 } from '../impls/10-audited-rules/index.ts';
+import { getTimeZonesAt as baseline04, getTimeZoneAt as baselineAt04, clearCache as clear04 } from '../impls/04-live-intl/index.ts';
 import { scheduleClasses, genMeta, YEAR_START, STEP_MS } from '../shared/schedule.ts';
 import { resolveClass, buildScheduleIndex } from '../shared/rules.ts';
 import { zones } from '../shared/zones.ts';
+import { SCHEDULE_STRIDE_DAYS, HISTORY_STRIDE_DAYS } from '../tools/gen-core.ts';
 
 // Coverage for the historical eras (shared/history.ts) integrated into the
 // rule-baking impls (07, 10). Each "tricky" instant is a case the 0.1.1
@@ -44,6 +45,13 @@ const icu = (zone: string, ts: number) => rec(baseline04, clear04, zone, ts);
 const baked = (zone: string, ts: number) => rec(baked07, clear07, zone, ts);
 const audited = (zone: string, ts: number) => rec(audited10, clear10, zone, ts);
 
+// the single-zone getters resolve through the same cores without building or
+// memoizing the whole response, so they're the ones to use when walking many
+// instants (single-zone.test.ts pins them to the list getters)
+const icuOff = (zone: string, ts: number) => baselineAt04(zone, ts).offset;
+const bakedOff = (zone: string, ts: number) => bakedAt07(zone, ts).offset;
+const auditedOff = (zone: string, ts: number) => auditedAt10(zone, ts).offset;
+
 // instants where 0.1.1's backward projection produced the WRONG offset
 const tricky: { label: string; zone: string; ts: number }[] = [
   // US pre-2007 DST: spring-forward was the 1st Sunday of April (Apr 3, 2005),
@@ -64,6 +72,11 @@ const tricky: { label: string; zone: string; ts: number }[] = [
   // the 1990s; the late-Dec year-end transition also stressed the generator's
   // per-year signature probe.
   { label: 'Pacific/Kosrae in its pre-1999 +12 era', zone: 'Pacific/Kosrae', ts: Date.UTC(1998, 5, 15, 12) },
+  // Cambridge_Bay spent the 2000 Nunavut experiment on Eastern time (-300)
+  // while its modern class is Mountain (-420/-360), so 0.1.1 projected -360
+  // for this week. See the dedicated block below for why this week in
+  // particular is the one that pins the generator's scan stride.
+  { label: 'America/Cambridge_Bay during the 2000 Nunavut experiment (EST)', zone: 'America/Cambridge_Bay', ts: Date.UTC(2000, 10, 1, 12) },
 ];
 
 // ordinary historical instants: the projection was already right here
@@ -108,6 +121,60 @@ describe('ordinary historical instants stay correct (history defers to schedule)
       expect(legacyOffset(zone, ts)).toBe(truth.offset);
     });
   }
+});
+
+// America/Cambridge_Bay's 2000 Nunavut experiment holds the tightest pair of
+// consecutive transitions anywhere in tzdata: a name-only CDT -> EST flip on
+// Oct 29 (the offset stays at -300) followed 6.92 days later by the real
+// fall-back to CST. That 6.92d gap is the floor the generator's linear scan
+// stride has to stay under — tools/tz-transition-gap.ts measures it across all
+// of tzdata and asserts it against the strides imported here.
+//
+// A stride wide enough to bracket both transitions fails silently, and this
+// zone is where it bites. gen-core scans on "longName|offset", so the Oct 29
+// flip IS a visible change: the binary search would converge on THAT boundary
+// while recording the offset sampled after the LATER one, backdating the
+// fall-back a full week and putting -360 across a week that was really -300.
+// Both ends of such a window still read correctly, so only the interior — what
+// these cases walk — can catch it.
+const CB = 'America/Cambridge_Bay';
+const CB_NAME_FLIP = Date.UTC(2000, 9, 29, 7); // CDT -> EST; offset unchanged at -300
+const CB_FALL_BACK = Date.UTC(2000, 10, 5, 5); // EST -> CST; -300 -> -360
+
+describe('the tightest transition pair in tzdata (America/Cambridge_Bay, 2000)', () => {
+  testIfAligned('the name-only CDT -> EST flip leaves the offset alone', () => {
+    for (const ts of [CB_NAME_FLIP - STEP_MS, CB_NAME_FLIP]) {
+      expect(icuOff(CB, ts)).toBe(-300);
+      expect(bakedOff(CB, ts)).toBe(-300);
+      expect(auditedOff(CB, ts)).toBe(-300);
+    }
+  });
+
+  testIfAligned('the whole 6.92d week between the two transitions stays at -300', () => {
+    for (let ts = CB_NAME_FLIP; ts < CB_FALL_BACK; ts += STEP_MS) {
+      expect(icuOff(CB, ts)).toBe(-300);
+      expect(bakedOff(CB, ts)).toBe(-300);
+      expect(auditedOff(CB, ts)).toBe(-300);
+    }
+  });
+
+  testIfAligned('the fall-back edge is exact to the 15-minute step', () => {
+    for (const off of [icuOff, bakedOff, auditedOff]) {
+      expect(off(CB, CB_FALL_BACK - STEP_MS)).toBe(-300);
+      expect(off(CB, CB_FALL_BACK)).toBe(-360);
+    }
+  });
+
+  // guards the strategy itself rather than its current output: the cases above
+  // only prove the scan resolves this pair today, and they'd keep passing if a
+  // future stride change re-broke a DIFFERENT zone's tight pair
+  test('the generator scans finer than this gap', () => {
+    const gapDays = (CB_FALL_BACK - CB_NAME_FLIP) / 86_400_000;
+
+    expect(gapDays).toBeCloseTo(6.92, 2);
+    expect(SCHEDULE_STRIDE_DAYS).toBeLessThan(gapDays);
+    expect(HISTORY_STRIDE_DAYS).toBeLessThan(gapDays);
+  });
 });
 
 describe('era boundaries switch regimes at the right year', () => {
