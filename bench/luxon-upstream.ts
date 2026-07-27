@@ -24,6 +24,7 @@
 //
 // Run: bun bench/luxon-upstream.ts
 
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { printTable } from '../tools/print-table.ts';
 import { genMeta, YEAR_START } from '../shared/schedule.ts';
 import { loadLuxon, patchWhat, type LuxonModule, type PatchKey } from './luxon-patches.ts';
@@ -48,10 +49,15 @@ const BASE_TS = Date.UTC(BAKE_YEAR, 0, 1);
 const ZONE = 'America/New_York';
 
 // A-D were found by profiling stock luxon, E-H by re-profiling the A-D build.
+// A-H are all caches or short-circuits; I is the structural one, and it makes B
+// and E redundant by construction (it parses each pattern once and folds
+// punctuation into literal runs), which the ACDFGHI row below checks.
 const CORE: PatchKey[] = ['numFast', 'parseFormatCache', 'zoneInfoCache', 'localeIntern'];
 const LATER: PatchKey[] = ['tokenLoop', 'intRoundTo', 'padStart2', 'tsToObjMath'];
-const ALL_PATCHES: PatchKey[] = [...CORE, ...LATER];
-const LETTER = new Map(ALL_PATCHES.map((k, i) => [k, 'ABCDEFGH'[i]!]));
+const CACHES: PatchKey[] = [...CORE, ...LATER];
+const ALL_PATCHES: PatchKey[] = [...CACHES, 'compileFormat'];
+const LETTER = new Map(ALL_PATCHES.map((k, i) => [k, 'ABCDEFGHI'[i]!]));
+const NO_B_OR_E: PatchKey[] = ALL_PATCHES.filter((k) => k !== 'parseFormatCache' && k !== 'tokenLoop');
 
 // ---- paths under test ----------------------------------------------------
 
@@ -104,18 +110,25 @@ const paths: Path[] = [
   // figure is pure measurement noise and calibrates the rest of the column.
   luxonPath('luxon (stock, control)', [], false, 'luxon (stock)'),
   luxonPath('luxon +C zoneInfoCache', ['zoneInfoCache'], false, 'luxon (stock)'),
-  luxonPath('luxon ABCDEFGH', ALL_PATCHES, false, 'luxon (stock)'),
+  luxonPath('luxon ABCDEFGHI', ALL_PATCHES, false, 'luxon (stock)'),
   luxonPath('easytz zone', [], true, undefined),
   luxonPath('easytz zone (control)', [], true, 'easytz zone'),
-  ...[...CORE, ...LATER]
-    .filter((k) => k !== 'zoneInfoCache')
-    .map((k) => luxonPath(`easytz +${LETTER.get(k)!} ${k}`, [k], true, 'easytz zone')),
-  luxonPath('easytz zone ABCDEFGH', ALL_PATCHES, true, 'easytz zone'),
+  ...ALL_PATCHES.filter((k) => k !== 'zoneInfoCache').map((k) =>
+    luxonPath(`easytz +${LETTER.get(k)!} ${k}`, [k], true, 'easytz zone')
+  ),
+  luxonPath('easytz ABCDEFGH (caches)', CACHES, true, 'easytz zone'),
+  luxonPath('easytz ABCDEFGHI (all)', ALL_PATCHES, true, 'easytz ABCDEFGH (caches)'),
+  // second control, at the scale of the fastest luxon rows: relative noise is
+  // larger down here than it is at the stock row's ~10x slower timings, so the
+  // B/E redundancy question below has to be judged against this, not against the
+  // control up top
+  luxonPath('easytz ABCDEFGHI (control)', ALL_PATCHES, true, 'easytz ABCDEFGHI (all)'),
+  luxonPath('easytz ACDFGHI (no B/E)', NO_B_OR_E, true, 'easytz ABCDEFGHI (all)'),
   {
     id: 'easytz fast path',
     patches: [],
     easyZone: true,
-    base: 'easytz zone ABCDEFGH',
+    base: 'easytz ABCDEFGHI (all)',
     make: (fmt) => {
       const fast = makeFastFormatter(ZONE, fmt);
 
@@ -158,15 +171,27 @@ async function measureAll(fmt: FormatKey): Promise<Map<string, number>> {
 }
 
 console.log(`luxon ${await pkgVersion('luxon')} vs moment ${await pkgVersion('moment')}`);
-console.log(`runtime: bun ${Bun.version}, tables: ${genMeta.host}, host ICU ${process.versions.icu ?? '?'}`);
+console.log(`runtime: ${runtime()}, tables: ${genMeta.host}, host ICU ${process.versions.icu ?? '?'}`);
 console.log(`${ZONE}, ${N} values/pass, median of ${REPS} interleaved passes\n`);
 
 async function pkgVersion(name: string): Promise<string> {
-  const pkg = (await Bun.file(new URL(`../node_modules/${name}/package.json`, import.meta.url)).json()) as {
-    version: string;
-  };
+  const path = new URL(`../node_modules/${name}/package.json`, import.meta.url);
+  const pkg = JSON.parse(await readFile(path, 'utf8')) as { version: string };
 
   return pkg.version;
+}
+
+/**
+ * Which engine these numbers came off. Worth printing rather than assuming:
+ * bun is JavaScriptCore and node is V8, and the patches here turn on allocation
+ * and inline-cache behaviour that the two do not have to agree about.
+ */
+function runtime(): string {
+  const versions = process.versions as Record<string, string | undefined>;
+
+  return versions['bun'] === undefined
+    ? `node ${versions['node']!} (V8 ${versions['v8']!})`
+    : `bun ${versions['bun']} (JavaScriptCore)`;
 }
 
 console.log('candidate upstream patches:\n');
@@ -264,8 +289,8 @@ for (const fmt of formatKeys) {
       patternFor('moment', fmt),
       cell('luxon (stock)'),
       cell('easytz zone'),
-      cell('luxon ABCDEFGH'),
-      cell('easytz zone ABCDEFGH'),
+      cell('luxon ABCDEFGHI'),
+      cell('easytz ABCDEFGHI (all)'),
       cell('easytz fast path'),
     ];
   });
@@ -289,14 +314,47 @@ for (const fmt of formatKeys) {
     return `${(((over - ms.get(id)!) / over) * 100).toFixed(0)}%`;
   };
 
-  const noise = Math.max(
-    ...[num, abbr].map((ms) => Math.abs(ms.get('luxon (stock)')! - ms.get('luxon (stock, control)')!) / ms.get('luxon (stock)')!)
-  );
+  const noiseBetween = (a: string, b: string) =>
+    Math.max(...[num, abbr].map((ms) => Math.abs(ms.get(a)! - ms.get(b)!) / ms.get(a)!));
+
+  const pct = (x: number) => `${(x * 100).toFixed(0)}%`;
+
+  /**
+   * Every patch except C, ranked by what it saves on the easy-tz numeric path
+   * and bucketed against the noise floor. Computed rather than asserted in
+   * prose, because the ranking is not the same on V8 and JavaScriptCore.
+   */
+  function tiers(): string {
+    const zone = num.get('easytz zone')!;
+    const floor = Math.abs(zone - num.get('easytz zone (control)')!) / zone;
+
+    const ranked = ALL_PATCHES.filter((k) => k !== 'zoneInfoCache')
+      .map((k) => ({
+        label: `${LETTER.get(k)!} ${k}`,
+        save: (zone - num.get(`easytz +${LETTER.get(k)!} ${k}`)!) / zone,
+      }))
+      .sort((a, b) => b.save - a.save);
+
+    const bucket = (s: number) =>
+      s >= Math.max(3 * floor, 0.04) ? 'worth keeping' : s >= Math.max(1.5 * floor, 0.02) ? 'marginal' : 'at noise';
+
+    const lines = ['worth keeping', 'marginal', 'at noise'].map((name) => {
+      const hits = ranked.filter((r) => bucket(r.save) === name);
+
+      return `  ${`${name}:`.padEnd(16)}${hits.length === 0 ? '—' : hits.map((r) => `${r.label} ${pct(r.save)}`).join(', ')}`;
+    });
+
+    return lines.join('\n');
+  }
+  const noise = noiseBetween('luxon (stock)', 'luxon (stock, control)');
+  const noiseMid = noiseBetween('easytz zone', 'easytz zone (control)');
+  const noiseFast = noiseBetween('easytz ABCDEFGHI (all)', 'easytz ABCDEFGHI (control)');
 
   const ratio = (ms: Map<string, number>, id: string) => (ms.get(id)! / ms.get('moment')!).toFixed(2);
 
   console.log(`
-findings (noise floor, from the control row: ~${(noise * 100).toFixed(0)}%)
+findings (noise floor from the three control rows, fastest rows being the
+noisiest: ~${pct(noise)} at the stock timings, ~${pct(noiseMid)} at the easy-tz zone, ~${pct(noiseFast)} at the fully patched)
 
 C is the one that matters and is barely an optimization: parseZoneInfo built a
 fresh Intl.DateTimeFormat per value, so any pattern containing a zone name paid
@@ -304,37 +362,72 @@ formatter construction per formatted value. Routing it through luxon's existing
 getCachedDTF saves ${saved(abbr, 'luxon +C zoneInfoCache')} of that format's cost — ${(abbr.get('luxon (stock)')! / abbr.get('moment')!).toFixed(1)}× moment down to
 ${(abbr.get('luxon +C zoneInfoCache')! / abbr.get('moment')!).toFixed(1)}× — as a one-line change.
 
-The other seven are all allocation-shaving, and none is individually dramatic.
-Measured against the easy-tz zone (numeric): B ${saved(num, 'easytz +B parseFormatCache')}, A ${saved(num, 'easytz +A numFast')}, D ${saved(num, 'easytz +D localeIntern')}, G ${saved(num, 'easytz +G padStart2')},
-H ${saved(num, 'easytz +H tsToObjMath')}, F ${saved(num, 'easytz +F intRoundTo')}, E ${saved(num, 'easytz +E tokenLoop')}, against a ${saved(num, 'easytz zone (control)')} noise floor. They stack rather than
-overlap: together they take that path from ${ratio(num, 'easytz zone')}× moment to ${ratio(num, 'easytz zone ABCDEFGH')}×, and stock luxon
-from ${ratio(num, 'luxon (stock)')}× to ${ratio(num, 'luxon ABCDEFGH')}× — without touching a public API or changing a byte of
-output.
+I is the biggest single patch: ${saved(num, 'easytz +I compileFormat')} of the numeric format against the easy-tz zone,
+more than any one cache. Compiling a pattern to handlers once removes three costs
+together — the ~70-case switch per token per value, the eight closures
+formatDateTimeFromString built per call, and the Intl options object literals its
+branches allocated — and folds punctuation into literal runs so separators cost a
+concat. It is not a substitute for the caches, though: those still come to
+${saved(num, 'easytz ABCDEFGH (caches)')} between them, and I adds ${saved(num, 'easytz ABCDEFGHI (all)')} on top of all of them.
 
-E and F are the two to drop. Skipping the token switch for punctuation and
-skipping roundTo for integers both looked obvious in a profile and both turn out
-to cost about what they save. H is the only patch that rewrites logic rather than
-adding a cache, so it carries the most review risk for ${saved(num, 'easytz +H tsToObjMath')}; it is verified against
-Date's own getters over 200k random instants across the full range, but it is
-still the first one to cut if a reviewer pushes back.
+The rest are individually modest, and which of them are worth keeping is engine
+dependent — bench:luxon-cross-engine runs this under both and diffs the two.
+Sorted by what they save here, against the easy-tz zone on the numeric format
+with a ~${pct(noiseMid)} noise floor:
 
-What is left after all eight is structural. Profiling the patched build puts
-~⅓ of a numeric format in tokenToString plus stringifyTokens: the token list is
-cached by B, but each token is still re-dispatched through a ~70-case switch per
-value, and formatDateTimeFromString allocates eight closures per call to do it.
-Resolving each token to a handler once per pattern — compiling the format rather
-than interpreting it — is the natural next step and would subsume A, E, F and G.
-That is a real change to Formatter's structure, not a memoization, so it is
-noted here rather than attempted.
+${tiers()}
 
-Externally, easy-tz alone still beats all eight patches (${ratio(num, 'easytz zone')}× / ${ratio(abbr, 'easytz zone')}× vs
-${ratio(num, 'luxon ABCDEFGH')}× / ${ratio(abbr, 'luxon ABCDEFGH')}×), and the two compose to ${ratio(num, 'easytz zone ABCDEFGH')}× / ${ratio(abbr, 'easytz zone ABCDEFGH')}× — faster than moment on
-both. Skipping the Formatter entirely for known patterns is another ${(num.get('easytz zone')! / num.get('easytz fast path')!).toFixed(0)}× beyond
-that, so the upstream patches are worth filing on their own merits rather than
-as a dependency of this work.
+I should also make B and E redundant by construction, since it parses each pattern
+once and folds punctuation into literal runs. The ACDFGHI row supports that:
+dropping both moves numeric by ${saved(num, 'easytz ACDFGHI (no B/E)')} (positive meaning faster without them), against
+~${pct(noiseFast)} noise at that timing scale, and the sign is not stable across runs. Keep B
+if it is already written; do not write it for I's sake.
 
-Recommended to file: C on its own (largest win, one line, hardest to argue
-with), then A, B, D and G as a small allocation-reduction set. Skip E and F.`);
+C and I are the shippable core on any engine. Of the rest, cross-engine puts
+A, B and D above the floor on both V8 and JavaScriptCore, and leaves E, G and H
+helping one engine and not the other — a single run of this file cannot tell
+those apart, so do not read the buckets above as a ship list on their own. H is
+the only patch that rewrites logic rather than adding a cache, and is verified
+against Date's own getters over 200k random instants across the full range.
+
+Stacked, all of it takes the easy-tz path from ${ratio(num, 'easytz zone')}× moment to ${ratio(num, 'easytz ABCDEFGHI (all)')}× and stock
+luxon from ${ratio(num, 'luxon (stock)')}× to ${ratio(num, 'luxon ABCDEFGHI')}×, without touching a public API or changing a byte
+of output — verified across every token in the switch, all macro tokens, four
+zones and four locales including a non-gregory calendar with non-latn digits.
+
+Externally, easy-tz alone is still worth more than every patch combined on the
+abbreviation format (${ratio(abbr, 'easytz zone')}× vs ${ratio(abbr, 'luxon ABCDEFGHI')}×), the two compose to ${ratio(num, 'easytz ABCDEFGHI (all)')}× / ${ratio(abbr, 'easytz ABCDEFGHI (all)')}×, and skipping
+the Formatter entirely for known patterns is a further ${(num.get('easytz ABCDEFGHI (all)')! / num.get('easytz fast path')!).toFixed(1)}× beyond even that. So
+the upstream patches remain worth filing on their own merits rather than as a
+dependency of this work.
+
+Recommended to file, in order: C alone (one line, largest win overall, hardest to
+argue with), then I (largest win on numeric, but a structural change that needs
+maintainer buy-in first), then whichever of the rest clear the bar on both
+engines. B is redundant once I lands.`);
+}
+
+// ---- machine-readable results -------------------------------------------
+// bench/luxon-cross-engine.ts runs this file under node and bun and diffs the
+// two, since the small patches do not rank the same on V8 and JavaScriptCore.
+
+{
+  const versions = process.versions as Record<string, string | undefined>;
+  const tag = versions['bun'] === undefined ? 'node' : 'bun';
+
+  await mkdir(new URL('../.tmp/', import.meta.url), { recursive: true });
+  await writeFile(
+    new URL(`../.tmp/luxon-upstream-${tag}.json`, import.meta.url),
+    JSON.stringify(
+      {
+        runtime: runtime(),
+        icu: process.versions.icu ?? null,
+        ms: Object.fromEntries([...results].map(([fmt, ms]) => [fmt, Object.fromEntries(ms)])),
+      },
+      null,
+      2
+    )
+  );
 }
 
 if (sink < 0) throw new Error('unreachable');

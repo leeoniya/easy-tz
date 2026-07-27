@@ -307,11 +307,13 @@ export interface LoopResult {
 export function timeLoop(format: (ts: number) => string, base: number, step: number, n: number): LoopResult {
   let checksum = 0;
 
-  const t0 = Bun.nanoseconds();
+  // performance.now() rather than Bun.nanoseconds() so these benches run under
+  // node too: luxon's users are overwhelmingly on V8, and bun is JavaScriptCore
+  const t0 = performance.now();
 
   for (let i = 0; i < n; i++) {
     checksum += format(base + i * step).length;
   }
 
-  return { ms: (Bun.nanoseconds() - t0) / 1e6, checksum };
+  return { ms: performance.now() - t0, checksum };
 }

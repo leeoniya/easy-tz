@@ -23,7 +23,8 @@ export type PatchKey =
   | 'tokenLoop'
   | 'intRoundTo'
   | 'padStart2'
-  | 'tsToObjMath';
+  | 'tsToObjMath'
+  | 'compileFormat';
 
 interface Edit {
   find: string;
@@ -467,6 +468,254 @@ const tsToObjMath: Patch = {
   ],
 };
 
+// ---- I: compile the format instead of interpreting it ----------------------
+// The structural one, and the only patch here that is not a cache or a
+// short-circuit. Everything above leaves the shape of formatDateTimeFromString
+// alone: per formatted value it builds eight closures over `dt`, then walks the
+// token list calling a ~70-case string switch per token, and re-allocates the
+// Intl options object literals inside the branches it happens to take.
+//
+// None of that depends on the value being formatted. Resolving each token to a
+// handler once per pattern turns formatting into a walk over a prebuilt array.
+// The representation is alternating literal/handler runs —
+//   lits[0] + fns[0]() + lits[1] + fns[1]() + ... + lits[n]
+// so literal text is concatenated rather than dispatched, and adjacent literals
+// collapse at compile time. That subsumes B (parseFormat now runs once per
+// pattern) and E (punctuation and unknown tokens fold into the literal runs,
+// which is what the interpreter's default branch effectively did anyway).
+//
+// The two locale-derived flags stay per call, passed as arguments rather than
+// baked into the program, so the cache can be keyed on the format string alone.
+//
+// Implemented by delegating from the original method and leaving its body in
+// place as formatDateTimeFromStringInterpreted: it keeps the patch readable and
+// the two implementations diffable. A real PR would delete it.
+const compileFormat: Patch = {
+  key: 'compileFormat',
+  what: 'Formatter: compile a format string to handlers once, instead of a switch per token per value',
+  edits: [
+    {
+      find: `  formatDateTimeFromString(dt, fmt) {
+    const knownEnglish = this.loc.listingMode() === "en",`,
+      replace: `  formatDateTimeFromString(dt, fmt) {
+    // UPSTREAM-I: see bench/luxon-patches.ts
+    return cfRun(this, dt, fmt);
+  }
+
+  formatDateTimeFromStringInterpreted(dt, fmt) {
+    const knownEnglish = this.loc.listingMode() === "en",`,
+    },
+    {
+      find: `const macroTokenToFormatOpts = {`,
+      replace: `// ---- UPSTREAM-I: compiled format programs ----------------------------------
+// A format string compiles to alternating literal/handler runs. Handlers take
+// (formatter, dateTime, knownEnglish, useDateTimeFormatter) so that a program
+// depends on the pattern alone and can be shared across locales and formatters.
+
+const cfPrograms = new Map();
+const CF_CACHE_MAX = 1000;
+
+const cfExtract = (f, dt, opts, field) => f.loc.extract(dt, opts, field);
+
+function cfOffset(format) {
+  return (f, dt) => {
+    if (dt.isOffsetFixed && dt.offset === 0 && f.opts.allowZ) {
+      return "Z";
+    }
+
+    return dt.isValid ? dt.zone.formatOffset(dt.ts, format) : "";
+  };
+}
+
+function cfMonth(length, standalone) {
+  // hoisted: the interpreter rebuilt this literal on every value
+  const opts = standalone ? { month: length } : { month: length, day: "numeric" };
+
+  return (f, dt, en) => (en ? monthForDateTime(dt, length) : cfExtract(f, dt, opts, "month"));
+}
+
+function cfWeekday(length, standalone) {
+  const opts = standalone
+    ? { weekday: length }
+    : { weekday: length, month: "long", day: "numeric" };
+
+  return (f, dt, en) => (en ? weekdayForDateTime(dt, length) : cfExtract(f, dt, opts, "weekday"));
+}
+
+function cfEra(length) {
+  const opts = { era: length };
+
+  return (f, dt, en) => (en ? eraForDateTime(dt, length) : cfExtract(f, dt, opts, "era"));
+}
+
+const CF_DAY_NUM = { day: "numeric" };
+const CF_DAY_2D = { day: "2-digit" };
+const CF_MONTH_NUM_DAY = { month: "numeric", day: "numeric" };
+const CF_MONTH_2D_DAY = { month: "2-digit", day: "numeric" };
+const CF_MONTH_NUM = { month: "numeric" };
+const CF_MONTH_2D = { month: "2-digit" };
+const CF_YEAR_NUM = { year: "numeric" };
+const CF_YEAR_2D = { year: "2-digit" };
+const CF_DAYPERIOD = { hour: "numeric", hourCycle: "h12" };
+
+// null prototype: token text comes from user format strings, so an inherited
+// property must not be mistaken for a handler
+const cfHandlers = Object.assign(Object.create(null), {
+  // ms
+  S: (f, dt) => f.num(dt.millisecond),
+  u: (f, dt) => f.num(dt.millisecond, 3),
+  SSS: (f, dt) => f.num(dt.millisecond, 3),
+  // seconds
+  s: (f, dt) => f.num(dt.second),
+  ss: (f, dt) => f.num(dt.second, 2),
+  // fractional seconds
+  uu: (f, dt) => f.num(Math.floor(dt.millisecond / 10), 2),
+  uuu: (f, dt) => f.num(Math.floor(dt.millisecond / 100)),
+  // minutes
+  m: (f, dt) => f.num(dt.minute),
+  mm: (f, dt) => f.num(dt.minute, 2),
+  // hours
+  h: (f, dt) => f.num(dt.hour % 12 === 0 ? 12 : dt.hour % 12),
+  hh: (f, dt) => f.num(dt.hour % 12 === 0 ? 12 : dt.hour % 12, 2),
+  H: (f, dt) => f.num(dt.hour),
+  HH: (f, dt) => f.num(dt.hour, 2),
+  // offset
+  Z: cfOffset("narrow"),
+  ZZ: cfOffset("short"),
+  ZZZ: cfOffset("techie"),
+  ZZZZ: (f, dt) => dt.zone.offsetName(dt.ts, { format: "short", locale: f.loc.locale }),
+  ZZZZZ: (f, dt) => dt.zone.offsetName(dt.ts, { format: "long", locale: f.loc.locale }),
+  // zone
+  z: (f, dt) => dt.zoneName,
+  // meridiems
+  a: (f, dt, en) =>
+    en ? meridiemForDateTime(dt) : cfExtract(f, dt, CF_DAYPERIOD, "dayperiod"),
+  // dates
+  d: (f, dt, en, useDTF) => (useDTF ? cfExtract(f, dt, CF_DAY_NUM, "day") : f.num(dt.day)),
+  dd: (f, dt, en, useDTF) => (useDTF ? cfExtract(f, dt, CF_DAY_2D, "day") : f.num(dt.day, 2)),
+  // weekdays - standalone
+  c: (f, dt) => f.num(dt.weekday),
+  ccc: cfWeekday("short", true),
+  cccc: cfWeekday("long", true),
+  ccccc: cfWeekday("narrow", true),
+  // weekdays - format
+  E: (f, dt) => f.num(dt.weekday),
+  EEE: cfWeekday("short", false),
+  EEEE: cfWeekday("long", false),
+  EEEEE: cfWeekday("narrow", false),
+  // months - standalone
+  L: (f, dt, en, useDTF) =>
+    useDTF ? cfExtract(f, dt, CF_MONTH_NUM_DAY, "month") : f.num(dt.month),
+  LL: (f, dt, en, useDTF) =>
+    useDTF ? cfExtract(f, dt, CF_MONTH_2D_DAY, "month") : f.num(dt.month, 2),
+  LLL: cfMonth("short", true),
+  LLLL: cfMonth("long", true),
+  LLLLL: cfMonth("narrow", true),
+  // months - format
+  M: (f, dt, en, useDTF) => (useDTF ? cfExtract(f, dt, CF_MONTH_NUM, "month") : f.num(dt.month)),
+  MM: (f, dt, en, useDTF) =>
+    useDTF ? cfExtract(f, dt, CF_MONTH_2D, "month") : f.num(dt.month, 2),
+  MMM: cfMonth("short", false),
+  MMMM: cfMonth("long", false),
+  MMMMM: cfMonth("narrow", false),
+  // years
+  y: (f, dt, en, useDTF) => (useDTF ? cfExtract(f, dt, CF_YEAR_NUM, "year") : f.num(dt.year)),
+  yy: (f, dt, en, useDTF) =>
+    useDTF ? cfExtract(f, dt, CF_YEAR_2D, "year") : f.num(dt.year.toString().slice(-2), 2),
+  yyyy: (f, dt, en, useDTF) =>
+    useDTF ? cfExtract(f, dt, CF_YEAR_NUM, "year") : f.num(dt.year, 4),
+  yyyyyy: (f, dt, en, useDTF) =>
+    useDTF ? cfExtract(f, dt, CF_YEAR_NUM, "year") : f.num(dt.year, 6),
+  // eras
+  G: cfEra("short"),
+  GG: cfEra("long"),
+  GGGGG: cfEra("narrow"),
+  // week dates
+  kk: (f, dt) => f.num(dt.weekYear.toString().slice(-2), 2),
+  kkkk: (f, dt) => f.num(dt.weekYear, 4),
+  W: (f, dt) => f.num(dt.weekNumber),
+  WW: (f, dt) => f.num(dt.weekNumber, 2),
+  n: (f, dt) => f.num(dt.localWeekNumber),
+  nn: (f, dt) => f.num(dt.localWeekNumber, 2),
+  ii: (f, dt) => f.num(dt.localWeekYear.toString().slice(-2), 2),
+  iiii: (f, dt) => f.num(dt.localWeekYear, 4),
+  // ordinal, quarter, epoch
+  o: (f, dt) => f.num(dt.ordinal),
+  ooo: (f, dt) => f.num(dt.ordinal, 3),
+  q: (f, dt) => f.num(dt.quarter),
+  qq: (f, dt) => f.num(dt.quarter, 2),
+  X: (f, dt) => f.num(Math.floor(dt.ts / 1000)),
+  x: (f, dt) => f.num(dt.ts),
+});
+
+function cfCompile(fmt) {
+  const lits = [];
+  const fns = [];
+  let lit = "";
+
+  for (const token of Formatter.parseFormat(fmt)) {
+    if (token.literal) {
+      lit += token.val;
+      continue;
+    }
+
+    const handler = cfHandlers[token.val];
+
+    if (handler !== undefined) {
+      lits.push(lit);
+      lit = "";
+      fns.push(handler);
+      continue;
+    }
+
+    const macroOpts = Formatter.macroTokenToFormatOpts(token.val);
+
+    if (macroOpts) {
+      lits.push(lit);
+      lit = "";
+      fns.push((f, dt) => f.formatWithSystemDefault(dt, macroOpts));
+      continue;
+    }
+
+    // the interpreter's default branch returned an unrecognized token verbatim,
+    // so it is nothing but literal text
+    lit += token.val;
+  }
+
+  lits.push(lit);
+
+  return { lits, fns };
+}
+
+function cfRun(f, dt, fmt) {
+  let program = cfPrograms.get(fmt);
+
+  if (program === undefined) {
+    program = cfCompile(fmt);
+
+    if (cfPrograms.size < CF_CACHE_MAX) {
+      cfPrograms.set(fmt, program);
+    }
+  }
+
+  const { lits, fns } = program;
+  const en = f.loc.listingMode() === "en";
+  const useDTF = f.loc.outputCalendar && f.loc.outputCalendar !== "gregory";
+
+  let s = lits[0];
+
+  for (let i = 0; i < fns.length; i++) {
+    s += fns[i](f, dt, en, useDTF) + lits[i + 1];
+  }
+
+  return s;
+}
+
+const macroTokenToFormatOpts = {`,
+    },
+  ],
+};
+
 const PATCHES: Patch[] = [
   numFast,
   parseFormatCache,
@@ -476,6 +725,7 @@ const PATCHES: Patch[] = [
   intRoundTo,
   padStart2,
   tsToObjMath,
+  compileFormat,
 ];
 
 export const patchWhat = new Map(PATCHES.map((p) => [p.key, p.what]));
