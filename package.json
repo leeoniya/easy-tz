@@ -56,6 +56,7 @@
     "bench:luxon-upstream": "node bench/luxon-upstream.ts",
     "bench:luxon-upstream:bun": "bun bench/luxon-upstream.ts",
     "bench:luxon-cross-engine": "node bench/luxon-cross-engine.ts",
+    "tz-transition-gap": "bun tools/tz-transition-gap.ts",
     "size": "bun bench/size.ts",
     "mem": "bun bench/mem.ts",
     "gen": "bun tools/gen-all.ts",

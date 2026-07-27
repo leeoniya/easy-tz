@@ -24,7 +24,9 @@ export type PatchKey =
   | 'intRoundTo'
   | 'padStart2'
   | 'tsToObjMath'
-  | 'compileFormat';
+  | 'compileFormat'
+  | 'offsetScan'
+  | 'offsetInterval';
 
 interface Edit {
   find: string;
@@ -716,6 +718,205 @@ const macroTokenToFormatOpts = {`,
   ],
 };
 
+// ---- J: IANAZone.offset decodes Intl output the expensive way -------------
+// Once A-I land, this is essentially all that is left between luxon and moment
+// on a zone-less pattern: every formatted value calls offset(), and offset()
+// costs a formatToParts (an array of seven {type, value} objects), six parseInt
+// calls on those strings, a wrapper Date and a second Date inside objToLocalTS.
+//
+// dtf.format() hands back the same six numbers in one string. Reading them with
+// charCodeAt and converting with integer civil math produces a bit-identical
+// answer while allocating nothing but that string. The field layout is read
+// once per zone from formatToParts rather than assumed, and any zone that does
+// not come back in the expected order keeps the original path, so a different
+// ICU layout degrades instead of decoding fields into the wrong slots.
+const offsetScan: Patch = {
+  key: 'offsetScan',
+  what: 'IANAZone.offset: read dtf.format() digits instead of formatToParts + parseInt',
+  edits: [
+    {
+      find: `const dtfCache = new Map();`,
+      replace: `const dtfCache = new Map();
+const scanCache = new Map();
+
+/** days since the epoch for a proleptic-gregorian date (Howard Hinnant) */
+function daysFromCivil(y, m, d) {
+  y -= m <= 2 ? 1 : 0;
+  const era = Math.floor(y / 400);
+  const yoe = y - era * 400;
+  const doy = ((153 * (m + (m > 2 ? -3 : 9)) + 2) / 5) | 0;
+  const doe = yoe * 365 + ((yoe / 4) | 0) - ((yoe / 100) | 0) + doy + d - 1;
+  return era * 146097 + doe - 719468;
+}
+
+function makeScanner(zoneName) {
+  const dtf = makeDTF(zoneName);
+  const layout = [];
+
+  for (const part of dtf.formatToParts(Date.UTC(2020, 5, 15, 12, 34, 56))) {
+    if (part.type !== "era" && typeToPos[part.type] !== undefined) layout.push(part.type);
+  }
+
+  if (layout.join() !== "month,day,year,hour,minute,second") return null;
+
+  return (t) => {
+    const s = dtf.format(t);
+    let month = 0,
+      day = 0,
+      year = 0,
+      hour = 0,
+      minute = 0,
+      second = 0,
+      run = 0,
+      acc = -1,
+      bc = false;
+
+    for (let i = 0; i <= s.length; i++) {
+      const c = i < s.length ? s.charCodeAt(i) : 0;
+
+      if (c >= 48 && c <= 57) {
+        acc = (acc < 0 ? 0 : acc * 10) + (c - 48);
+      } else {
+        if (c === 66) bc = true;
+        if (acc >= 0) {
+          if (run === 0) month = acc;
+          else if (run === 1) day = acc;
+          else if (run === 2) year = acc;
+          else if (run === 3) hour = acc;
+          else if (run === 4) minute = acc;
+          else second = acc;
+          run++;
+          acc = -1;
+        }
+      }
+    }
+
+    if (run !== 6) return NaN;
+    if (bc) year = -Math.abs(year) + 1;
+    if (hour === 24) hour = 0;
+
+    const asUTC = (daysFromCivil(year, month, day) * 86400 + hour * 3600 + minute * 60 + second) * 1000;
+
+    // integer math has no trouble here, but objToLocalTS goes through Date.UTC,
+    // which overflows to NaN past the Date range — match that rather than
+    // start returning offsets stock luxon does not
+    if (!(Math.abs(asUTC) <= 8.64e15)) return NaN;
+
+    const over = t % 1000;
+
+    return (asUTC - (t - (over >= 0 ? over : 1000 + over))) / 60000;
+  };
+}
+
+function zoneScanner(zoneName) {
+  let scan = scanCache.get(zoneName);
+  if (scan === undefined) scanCache.set(zoneName, (scan = makeScanner(zoneName)));
+  return scan;
+}`,
+    },
+    {
+      find: `  offset(ts) {
+    if (!this.valid) return NaN;
+    const date = new Date(ts);
+
+    if (isNaN(date)) return NaN;
+
+    const dtf = makeDTF(this.name);`,
+      replace: `  offset(ts) {
+    if (!this.valid) return NaN;
+
+    const scan = zoneScanner(this.name);
+
+    if (scan !== null) {
+      const t = Math.trunc(ts);
+      if (!(Math.abs(t) <= 8.64e15)) return NaN;
+      return scan(t);
+    }
+
+    const date = new Date(ts);
+
+    if (isNaN(date)) return NaN;
+
+    const dtf = makeDTF(this.name);`,
+    },
+  ],
+};
+
+// ---- K: offset() re-derives the same offset for every value ---------------
+// Requires J (it anchors on J's fast path). Offsets only change at transitions,
+// so a value that falls inside an interval already known to be transition-free
+// needs no Intl call at all.
+//
+// The interval is exact, not a heuristic. Probes are spaced 2 days apart, and
+// the tightest gap between two consecutive transitions anywhere in tzdata is
+// 6.92 days (America/Cambridge_Bay, Oct-Nov 2000; measured over all 219232
+// transitions moment-timezone ships). A window shorter than that gap holds at
+// most one transition, one transition necessarily changes the offset, so two
+// probes that agree prove the span between them is transition-free.
+//
+// How far to fan out is decided by what the previous interval actually
+// returned, which keeps the cache from betting on workloads it isn't getting:
+// a sequential reader earns a wide fan within a few misses, while random access
+// settles at no probing at all and pays exactly what J alone would.
+const offsetInterval: Patch = {
+  key: 'offsetInterval',
+  what: 'IANAZone.offset: cache the transition-free interval around the value (needs J)',
+  edits: [
+    {
+      find: `const scanCache = new Map();`,
+      replace: `const scanCache = new Map();
+const intervalCache = new Map();
+
+// half the 6.92d tightest gap in tzdata, leaving room for the data to tighten
+const PROBE_MS = 2 * 86400000;
+const MAX_REACH = 256;
+const MAX_TS = 8.64e15;
+
+function intervalOffset(zoneName, scan, t) {
+  let st = intervalCache.get(zoneName);
+
+  if (st === undefined) intervalCache.set(zoneName, (st = { lo: 1, hi: 0, off: 0, reach: 0, hits: 0, misses: 0 }));
+
+  if (t >= st.lo && t <= st.hi) {
+    st.hits++;
+    return st.off;
+  }
+
+  const off = scan(t);
+  const forward = t > st.hi;
+
+  st.off = off;
+  st.lo = t;
+  st.hi = t;
+
+  for (let k = 1; k <= st.reach; k++) {
+    const p = t + (forward ? k : -k) * PROBE_MS;
+    if (!(Math.abs(p) <= MAX_TS) || scan(p) !== off) break;
+    if (forward) st.hi = p;
+    else st.lo = p;
+  }
+
+  st.misses++;
+  // probe budget = what the last interval paid back; a miss streak (random
+  // access) decays it to zero, with an occasional single probe to notice if
+  // the caller has started walking in order after all
+  st.reach = st.hits > 0 ? Math.min(st.hits, MAX_REACH) : (st.misses & 15) === 0 ? 1 : 0;
+  st.hits = 0;
+
+  return off;
+}`,
+    },
+    {
+      find: `      const t = Math.trunc(ts);
+      if (!(Math.abs(t) <= 8.64e15)) return NaN;
+      return scan(t);`,
+      replace: `      const t = Math.trunc(ts);
+      if (!(Math.abs(t) <= 8.64e15)) return NaN;
+      return intervalOffset(this.name, scan, t);`,
+    },
+  ],
+};
+
 const PATCHES: Patch[] = [
   numFast,
   parseFormatCache,
@@ -726,6 +927,8 @@ const PATCHES: Patch[] = [
   padStart2,
   tsToObjMath,
   compileFormat,
+  offsetScan,
+  offsetInterval,
 ];
 
 export const patchWhat = new Map(PATCHES.map((p) => [p.key, p.what]));

@@ -112,7 +112,16 @@ console.log('\nheadline ratios vs moment\n');
 
 printTable(
   ['path', 'V8 numeric', 'JSC numeric', 'V8 abbr', 'JSC abbr'],
-  ['luxon (stock)', 'easytz zone', 'luxon ABCDEFGHI', 'easytz ABCDEFGHI (all)', 'easytz fast path'].map((path) => {
+  [
+    'luxon (stock)',
+    'luxon +J offsetScan',
+    'luxon +JK offsetInterval',
+    'luxon ABCDEFGHI',
+    'luxon ABCDEFGHIJK',
+    'easytz zone',
+    'easytz ABCDEFGHI (all)',
+    'easytz fast path',
+  ].map((path) => {
     const ratio = (run: Run, fmt: string) => `${(run.ms[fmt]![path]! / run.ms[fmt]!['moment']!).toFixed(2)}×`;
 
     return [path, ratio(v8, 'numeric'), ratio(jsc, 'numeric'), ratio(v8, 'abbr'), ratio(jsc, 'abbr')];

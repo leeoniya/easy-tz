@@ -56,7 +56,12 @@ const CORE: PatchKey[] = ['numFast', 'parseFormatCache', 'zoneInfoCache', 'local
 const LATER: PatchKey[] = ['tokenLoop', 'intRoundTo', 'padStart2', 'tsToObjMath'];
 const CACHES: PatchKey[] = [...CORE, ...LATER];
 const ALL_PATCHES: PatchKey[] = [...CACHES, 'compileFormat'];
-const LETTER = new Map(ALL_PATCHES.map((k, i) => [k, 'ABCDEFGHI'[i]!]));
+// J and K are the zone lookup rather than the formatter, so they only appear on
+// the stock-zone rows: the easy-tz rows override offset() and never reach them.
+// K anchors on J's fast path, so the order here is also the apply order.
+const OFFSET: PatchKey[] = ['offsetScan', 'offsetInterval'];
+const UPSTREAM: PatchKey[] = [...ALL_PATCHES, ...OFFSET];
+const LETTER = new Map(UPSTREAM.map((k, i) => [k, 'ABCDEFGHIJK'[i]!]));
 const NO_B_OR_E: PatchKey[] = ALL_PATCHES.filter((k) => k !== 'parseFormatCache' && k !== 'tokenLoop');
 
 // ---- paths under test ----------------------------------------------------
@@ -111,6 +116,14 @@ const paths: Path[] = [
   luxonPath('luxon (stock, control)', [], false, 'luxon (stock)'),
   luxonPath('luxon +C zoneInfoCache', ['zoneInfoCache'], false, 'luxon (stock)'),
   luxonPath('luxon ABCDEFGHI', ALL_PATCHES, false, 'luxon (stock)'),
+  // J and K attack what is left once the formatter is fixed: the per-value Intl
+  // call in offset(). Attributed against the A-I build, which is the only place
+  // they are the dominant remaining cost.
+  luxonPath('luxon +J offsetScan', ['offsetScan'], false, 'luxon (stock)'),
+  luxonPath('luxon +JK offsetInterval', OFFSET, false, 'luxon +J offsetScan'),
+  luxonPath('luxon ABCDEFGHIJ', [...ALL_PATCHES, 'offsetScan'], false, 'luxon ABCDEFGHI'),
+  luxonPath('luxon ABCDEFGHIJK', UPSTREAM, false, 'luxon ABCDEFGHIJ'),
+  luxonPath('luxon ABCDEFGHIJK (control)', UPSTREAM, false, 'luxon ABCDEFGHIJK'),
   luxonPath('easytz zone', [], true, undefined),
   luxonPath('easytz zone (control)', [], true, 'easytz zone'),
   ...ALL_PATCHES.filter((k) => k !== 'zoneInfoCache').map((k) =>
@@ -197,7 +210,7 @@ function runtime(): string {
 console.log('candidate upstream patches:\n');
 printTable(
   ['patch', 'change'],
-  ALL_PATCHES.map((k) => [`${LETTER.get(k)!} ${k}`, patchWhat.get(k)!])
+  UPSTREAM.map((k) => [`${LETTER.get(k)!} ${k}`, patchWhat.get(k)!])
 );
 console.log();
 
@@ -272,7 +285,7 @@ for (const fmt of formatKeys) {
 
   console.log(
     patchedMismatches === 0
-      ? `\nall ${ALL_PATCHES.length} patches are output-identical to stock luxon; the only differences are the\nintended easy-tz abbreviations.`
+      ? `\nall ${UPSTREAM.length} patches are output-identical to stock luxon; the only differences are the\nintended easy-tz abbreviations.`
       : `\nFAIL: ${patchedMismatches} unexpected mismatch(es) — a patch changed behavior.`
   );
 }
@@ -290,6 +303,7 @@ for (const fmt of formatKeys) {
       cell('luxon (stock)'),
       cell('easytz zone'),
       cell('luxon ABCDEFGHI'),
+      cell('luxon ABCDEFGHIJK'),
       cell('easytz ABCDEFGHI (all)'),
       cell('easytz fast path'),
     ];
@@ -297,7 +311,15 @@ for (const fmt of formatKeys) {
 
   console.log(`\nsummary — ratio vs moment (lower is better)\n`);
   printTable(
-    ['format', 'stock luxon', 'easytz zone', 'upstream only', 'easytz + upstream', 'external fast path'],
+    [
+      'format',
+      'stock luxon',
+      'easytz zone',
+      'upstream A-I',
+      'upstream A-K',
+      'easytz + upstream',
+      'external fast path',
+    ],
     rows
   );
 }
@@ -383,28 +405,53 @@ dropping both moves numeric by ${saved(num, 'easytz ACDFGHI (no B/E)')} (positiv
 ~${pct(noiseFast)} noise at that timing scale, and the sign is not stable across runs. Keep B
 if it is already written; do not write it for I's sake.
 
-C and I are the shippable core on any engine. Of the rest, cross-engine puts
+C, J and I are the shippable core on any engine. Of the rest, cross-engine puts
 A, B and D above the floor on both V8 and JavaScriptCore, and leaves E, G and H
 helping one engine and not the other — a single run of this file cannot tell
 those apart, so do not read the buckets above as a ship list on their own. H is
 the only patch that rewrites logic rather than adding a cache, and is verified
 against Date's own getters over 200k random instants across the full range.
 
+J and K answer "can luxon reach moment without easy-tz", and on a zone-less
+pattern the answer is yes with room to spare. A-I fix the formatter and stop at
+${ratio(num, 'luxon ABCDEFGHI')}× moment, because by then nearly everything left is the one Intl call
+per value in offset(). J makes that call cheaper (${saved(num, 'luxon +J offsetScan')} off stock on its own, and
+3.7× on the offset call measured in isolation) by reading dtf.format() digits
+instead of formatToParts. K then removes most of the calls outright. Either one
+alone beats the entire A-I formatter effort on this format, J and K together get
+there without any of A-I (${ratio(num, 'luxon +JK offsetInterval')}×), and A-K lands at ${ratio(num, 'luxon ABCDEFGHIJK')}× — no tzdata, no
+easy-tz, no API change.
+
+The abbreviated format is the opposite story: J is worth ${saved(abbr, 'luxon +J offsetScan')} there and A-K only
+reaches ${ratio(abbr, 'luxon ABCDEFGHIJK')}×, because what dominates once C caches the formatter is
+parseZoneInfo still calling Intl per value for the name itself. Nothing here
+fixes that, and easy-tz (${ratio(abbr, 'easytz ABCDEFGHI (all)')}×) remains the only thing that does.
+
+K is the one with a precondition rather than a proof from first principles: it
+assumes no two transitions fall inside one 2-day probe window. The tightest gap
+in all of tzdata is 6.92 days (America/Cambridge_Bay, Oct-Nov 2000) across all
+219232 transitions moment-timezone ships, so the margin is 3.5×, and the failure
+mode if tzdata ever tightened past it is a stale offset rather than a crash.
+J has no such precondition and is worth filing regardless.
+
 Stacked, all of it takes the easy-tz path from ${ratio(num, 'easytz zone')}× moment to ${ratio(num, 'easytz ABCDEFGHI (all)')}× and stock
-luxon from ${ratio(num, 'luxon (stock)')}× to ${ratio(num, 'luxon ABCDEFGHI')}×, without touching a public API or changing a byte
+luxon from ${ratio(num, 'luxon (stock)')}× to ${ratio(num, 'luxon ABCDEFGHIJK')}×, without touching a public API or changing a byte
 of output — verified across every token in the switch, all macro tokens, four
 zones and four locales including a non-gregory calendar with non-latn digits.
 
-Externally, easy-tz alone is still worth more than every patch combined on the
-abbreviation format (${ratio(abbr, 'easytz zone')}× vs ${ratio(abbr, 'luxon ABCDEFGHI')}×), the two compose to ${ratio(num, 'easytz ABCDEFGHI (all)')}× / ${ratio(abbr, 'easytz ABCDEFGHI (all)')}×, and skipping
-the Formatter entirely for known patterns is a further ${(num.get('easytz ABCDEFGHI (all)')! / num.get('easytz fast path')!).toFixed(1)}× beyond even that. So
-the upstream patches remain worth filing on their own merits rather than as a
-dependency of this work.
+That reverses the case for easy-tz depending on the pattern. On numeric, the
+full upstream build (${ratio(num, 'luxon ABCDEFGHIJK')}×) now edges out easy-tz plus A-I (${ratio(num, 'easytz ABCDEFGHI (all)')}×), so a luxon
+that carried J and K would leave easy-tz nothing to win on zone-less patterns.
+On abbreviations easy-tz is still ahead by an order of magnitude (${ratio(abbr, 'easytz ABCDEFGHI (all)')}× vs ${ratio(abbr, 'luxon ABCDEFGHIJK')}×),
+and skipping the Formatter entirely for known patterns is a further ${(num.get('easytz ABCDEFGHI (all)')! / num.get('easytz fast path')!).toFixed(1)}× beyond
+even that.
 
-Recommended to file, in order: C alone (one line, largest win overall, hardest to
-argue with), then I (largest win on numeric, but a structural change that needs
-maintainer buy-in first), then whichever of the rest clear the bar on both
-engines. B is redundant once I lands.`);
+Recommended to file, in order: C and J first — both are self-contained, neither
+needs a design argument, and between them they take stock luxon from ${ratio(num, 'luxon (stock)')}× to
+${ratio(num, 'luxon +J offsetScan')}× on numeric and ${ratio(abbr, 'luxon (stock)')}× to ${ratio(abbr, 'luxon +C zoneInfoCache')}× on abbreviations. Then K, which needs the
+tzdata-gap argument accepted. Then I, the largest formatter win but a structural
+change that needs maintainer buy-in. Then whichever of the rest clear the bar on
+both engines. B is redundant once I lands.`);
 }
 
 // ---- machine-readable results -------------------------------------------
