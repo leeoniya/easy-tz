@@ -22,9 +22,9 @@ import type { TimeZoneInfo } from '../../shared/types.ts';
 import { zones } from '../../shared/zones.ts';
 import { zoneAliases, zoneAbbrOverrides } from '../../shared/abbrs.ts';
 import { classGroups } from '../../shared/classes.ts';
-import { hourBucketMemo } from '../../shared/hourCache.ts';
+import { liveListApi } from '../../shared/listApi.ts';
 import { liveParts } from '../../shared/live.ts';
-import { makeInfo, canonicalZone, canonicalView, type CanonicalView } from '../../shared/zoneLinks.ts';
+import { makeInfo, canonicalZone } from '../../shared/zoneLinks.ts';
 
 export interface InitInfo {
   temporal: boolean;
@@ -138,26 +138,13 @@ function compute(timestamp: number): TimeZoneInfo[] {
   return out;
 }
 
-const memo = hourBucketMemo(compute);
+const { getTimeZonesAt, clearCache } = liveListApi(compute);
 
-// alias-free view of the memo's output, built on first opt-out. One instance
-// serves both list getters here, since they share the one memo.
-let canon: CanonicalView | null = null;
-
-export function getTimeZonesAt(timestamp: number, withAliases = true): TimeZoneInfo[] {
-  const full = memo.get(timestamp);
-
-  return withAliases ? full : (canon ??= canonicalView())(full);
-}
+export { getTimeZonesAt, clearCache };
 
 // current-instant convenience; 08 is live (no baked history), so it shares the
 // same hour-bucket memo as getTimeZonesAt
 export const getTimeZones = (withAliases = true): TimeZoneInfo[] => getTimeZonesAt(Date.now(), withAliases);
-
-export function clearCache(): void {
-  memo.clear();
-  canon = null;
-}
 
 export { formatOffset } from '../../shared/offsetFormat.ts';
 

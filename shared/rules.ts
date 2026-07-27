@@ -45,6 +45,21 @@ export function buildScheduleIndex(zoneList: readonly string[], classes: readonl
   return zoneList.map((z) => idxOf.get(z) ?? idxOf.get(zoneLinks.get(z) ?? '') ?? -1);
 }
 
+// Zones in an irregular (kind 2) class. Morocco and Palestine suspend DST for
+// Ramadan, a non-Gregorian rule no Gregorian schedule expresses, so the tables
+// only ever approximate them: history stores no eras, and the schedule answers
+// every instant with the generated year's shape. Anything that reports or
+// corrects against reality has to exclude them, hence the shared definition.
+export function irregularZones(classes: readonly ScheduleClass[]): Set<string> {
+  const out = new Set<string>();
+
+  for (const c of classes) {
+    if (c.kind === 2) for (const z of c.zones) out.add(z);
+  }
+
+  return out;
+}
+
 // ---- allocation-free civil-date math (Howard Hinnant's algorithms) ----
 //
 // The rule/era resolvers run in tight per-zone loops (hundreds of classes per

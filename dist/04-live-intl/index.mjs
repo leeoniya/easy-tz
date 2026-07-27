@@ -96,6 +96,22 @@ function hourBucketMemo(compute) {
   };
 }
 
+// shared/listApi.ts
+function liveListApi(compute) {
+  const memo = hourBucketMemo(compute);
+  let canon = null;
+  return {
+    getTimeZonesAt(timestamp, withAliases = true) {
+      const full = memo.get(timestamp);
+      return withAliases ? full : (canon ??= canonicalView())(full);
+    },
+    clearCache() {
+      memo.clear();
+      canon = null;
+    }
+  };
+}
+
 // shared/abbrs.ts
 var zoneAliases = {
   "Europe/Guernsey": "Europe/London",
@@ -386,17 +402,8 @@ function compute(timestamp) {
   }
   return out;
 }
-var memo = hourBucketMemo(compute);
-var canon = null;
-function getTimeZonesAt(timestamp, withAliases = true) {
-  const full = memo.get(timestamp);
-  return withAliases ? full : (canon ??= canonicalView())(full);
-}
+var { getTimeZonesAt, clearCache } = liveListApi(compute);
 var getTimeZones = (withAliases = true) => getTimeZonesAt(Date.now(), withAliases);
-function clearCache() {
-  memo.clear();
-  canon = null;
-}
 function getTimeZoneAt(name, timestamp, withAliases = true) {
   return liveZoneInfo(withAliases ? name : canonicalZone(name), timestamp);
 }

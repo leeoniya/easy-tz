@@ -32,6 +32,7 @@
 
 import { inChromePage, chromeLabel } from './chrome-harness.ts';
 import { printTable } from './print-table.ts';
+import { parseYearRange } from './cli-years.ts';
 import {
   measureTransitionGaps,
   SCHEDULE_STRIDE_DAYS,
@@ -43,18 +44,7 @@ import {
 
 const DAY = 86_400_000;
 
-const args = process.argv.slice(2);
-const local = args.includes('--local');
-const years = args.filter((a) => /^\d{4}$/.test(a)).map(Number);
-
-const bakeYear = new Date().getUTCFullYear();
-const fromYear = years[0] ?? HISTORY_FROM;
-const toYear = years[1] ?? bakeYear + 2;
-
-if (fromYear > toYear) {
-  console.error(`from year ${fromYear} > to year ${toYear}`);
-  process.exit(1);
-}
+const { local, fromYear, toYear } = parseYearRange(HISTORY_FROM);
 
 let result: GapMeasurement;
 let runtime: string;

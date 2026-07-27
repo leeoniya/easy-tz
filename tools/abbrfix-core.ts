@@ -21,8 +21,10 @@
 
 import { scanChanges, strideSteps } from './step-scan.ts';
 import { liveParts } from '../shared/live.ts';
+import { zones } from '../shared/zones.ts';
+import type { GeneratedTables, GeneratedHistory } from './gen-core.ts';
 import { zoneAliases, zoneAbbrOverrides } from '../shared/abbrs.ts';
-import { resolveHistory, resolveClass, buildScheduleIndex, historyAbbr, type ScheduleClass, type HistoryClass } from '../shared/rules.ts';
+import { resolveHistory, resolveClass, buildScheduleIndex, historyAbbr, irregularZones, type ScheduleClass, type HistoryClass } from '../shared/rules.ts';
 import { gmtLabel } from '../shared/fmt.ts';
 
 // probe stride for the boundary scan, in 15-min steps. 6d, the same bound
@@ -83,6 +85,29 @@ export interface AbbrFixResult {
   };
 }
 
+// Every caller audits a table set it just generated, and seven of the nine
+// arguments below are then the same projections of `tables` and `history`.
+// Spelling them out per call site is how they get transposed, so the four
+// generators and equivalence checks go through here instead. Only `boundaries`
+// varies: tools/abbrfix-equiv.ts passes null to force the standalone scan.
+export function auditTableSet(
+  tables: GeneratedTables,
+  history: GeneratedHistory,
+  boundaries: Record<string, number[]> | null = history.boundaries
+): AbbrFixResult {
+  return auditAbbrFix(
+    zones,
+    tables.scheduleClasses,
+    history.classes,
+    history.fromYear,
+    history.toYear,
+    tables.yearStart,
+    tables.stepMs,
+    INCLUDE_VAGUE,
+    boundaries
+  );
+}
+
 export function auditAbbrFix(
   zoneList: readonly string[],
   scheduleClasses: ScheduleClass[],
@@ -123,20 +148,11 @@ export function auditAbbrFix(
     return { abbr, vague: abbr.startsWith('GMT'), defer: false };
   };
 
-  // Irregular (kind 2) zones are skipped for the same reason gen-core skips
-  // them in history: Morocco and Palestine suspend DST for Ramadan, a
-  // non-Gregorian rule that isn't expressible in ANY year, so their history
-  // would be raw per-year segments end to end. history.ts stores no eras for
-  // them and the schedule class answers every historical instant with the
-  // current year's shape — which is knowingly wrong for both offset AND label.
-  // Correcting only the label there would dress a deliberately-approximate
-  // offset in an authoritative name, and these four zones alone were 15-19% of
-  // the payload. See tools/gen-core.ts "the irregular-class zones are excluded".
-  const irregular = new Set<string>();
-
-  for (const c of scheduleClasses) {
-    if (c.kind === 2) for (const z of c.zones) irregular.add(z);
-  }
+  // Skipped here for the same reason gen-core skips them in history (see
+  // irregularZones). Correcting only the LABEL on a knowingly-approximate
+  // offset would dress it in an authoritative name, and these four zones alone
+  // were 15-19% of the payload.
+  const irregular = irregularZones(scheduleClasses);
 
   // every Jan 1 in the window, where the baked side can move on its own
   const yearStarts: number[] = [];

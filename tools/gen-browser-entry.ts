@@ -2,8 +2,7 @@
 // as globalThis.__gen so the host can invoke it via page.evaluate.
 
 import { generateTables, verifyTables, generateHistory } from './gen-core.ts';
-import { auditAbbrFix, INCLUDE_VAGUE } from './abbrfix-core.ts';
-import { zones } from '../shared/zones.ts';
+import { auditTableSet } from './abbrfix-core.ts';
 
 (globalThis as { __gen?: unknown }).__gen = () => {
   const tables = generateTables();
@@ -14,17 +13,7 @@ import { zones } from '../shared/zones.ts';
 
   // audited here rather than from a second browser session, against the same
   // ICU that produced the labels, reusing the probe's boundaries
-  const abbrfix = auditAbbrFix(
-    zones,
-    tables.scheduleClasses,
-    history.classes,
-    history.fromYear,
-    history.toYear,
-    tables.yearStart,
-    tables.stepMs,
-    INCLUDE_VAGUE,
-    history.boundaries
-  );
+  const abbrfix = auditTableSet(tables, history);
 
   // boundaries are consumed above; the host has no use for ~40k more numbers
   return { tables, verification, history: { ...history, boundaries: {} }, abbrfix };

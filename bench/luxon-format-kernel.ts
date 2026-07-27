@@ -47,6 +47,29 @@ export function easyTZCanResolve(name: string): boolean {
   return knownZones.has(name) && !irregularZones.has(name);
 }
 
+// luxon asks for the offset and the offset name of the SAME instant back to
+// back while formatting one value, so a single-slot memo halves the lookups for
+// abbreviation-bearing formats. Keyed on the exact ts, so it can't skew a result
+// the way an hour-bucket memo could across a DST transition.
+//
+// Shared by both zone subclasses below. They extend different luxon bases
+// (IANAZone, SystemZone) so there is no common superclass to hang it on, and
+// the two copies this replaces are exactly the kind of thing that drifts into
+// making one benchmark row measure something the other doesn't.
+function zoneMemo(name: string): (ts: number) => TimeZoneInfo {
+  let at = NaN;
+  let info: TimeZoneInfo | undefined;
+
+  return (ts) => {
+    if (info === undefined || ts !== at) {
+      at = ts;
+      info = getTimeZoneAt(name, ts);
+    }
+
+    return info;
+  };
+}
+
 /**
  * A real luxon IANAZone whose offset and short offset name come from easy-tz's
  * baked rules instead of Intl. Everything else — `type`, `name`, `equals`,
@@ -59,29 +82,11 @@ export function easyTZCanResolve(name: string): boolean {
  */
 export function makeEasyZoneClass(Base: typeof IANAZone) {
   return class EasyTZZone extends Base {
-    readonly #name: string;
-
-    // luxon asks for the offset and the offset name of the SAME instant back to
-    // back while formatting one value, so a single-slot memo halves the lookups
-    // for abbreviation-bearing formats. Keyed on the exact ts, so it can't skew
-    // a result the way an hour-bucket memo could across a DST transition.
-    #ts = NaN;
-    #info: TimeZoneInfo | undefined;
+    readonly #at: (ts: number) => TimeZoneInfo;
 
     constructor(name: string) {
       super(name);
-      this.#name = name;
-    }
-
-    #at(ts: number): TimeZoneInfo {
-      let info = this.#info;
-
-      if (info === undefined || ts !== this.#ts) {
-        this.#ts = ts;
-        this.#info = info = getTimeZoneAt(this.#name, ts);
-      }
-
-      return info;
+      this.#at = zoneMemo(name);
     }
 
     override offset(ts: number): number {
@@ -128,19 +133,7 @@ export const hostZoneName = new Intl.DateTimeFormat().resolvedOptions().timeZone
  * this instance discarded — the same caveat as luxon's own zone caches.
  */
 export class EasySystemZone extends SystemZone {
-  #ts = NaN;
-  #info: TimeZoneInfo | undefined;
-
-  #at(ts: number): TimeZoneInfo {
-    let info = this.#info;
-
-    if (info === undefined || ts !== this.#ts) {
-      this.#ts = ts;
-      this.#info = info = getTimeZoneAt(hostZoneName, ts);
-    }
-
-    return info;
-  }
+  readonly #at = zoneMemo(hostZoneName);
 
   override offsetName(ts: number, opts: OffsetNameOpts): string | null {
     return opts.format === 'long' ? super.offsetName(ts, opts) : this.#at(ts).abbr;

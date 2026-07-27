@@ -22,8 +22,7 @@
 
 import { inChromePage } from './chrome-harness.ts';
 import { generateTables, generateHistory } from './gen-core.ts';
-import { auditAbbrFix, INCLUDE_VAGUE, type AbbrFixResult } from './abbrfix-core.ts';
-import { zones } from '../shared/zones.ts';
+import { auditTableSet, type AbbrFixResult } from './abbrfix-core.ts';
 
 interface Pair {
   scanned: AbbrFixResult;
@@ -47,18 +46,7 @@ function runLocal(): Pair {
   const tables = generateTables();
   const history = generateHistory(tables);
 
-  const audit = (boundaries: Record<string, number[]> | null) =>
-    auditAbbrFix(
-      zones,
-      tables.scheduleClasses,
-      history.classes,
-      history.fromYear,
-      history.toYear,
-      tables.yearStart,
-      tables.stepMs,
-      INCLUDE_VAGUE,
-      boundaries
-    );
+  const audit = (boundaries: Record<string, number[]> | null) => auditTableSet(tables, history, boundaries);
 
   return { scanned: audit(null), seeded: audit(history.boundaries) };
 }

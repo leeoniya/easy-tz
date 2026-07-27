@@ -38,8 +38,8 @@ import { zones } from '../../shared/zones.ts';
 import { scheduleClasses, YEAR_START, STEP_MS } from '../../shared/schedule.ts';
 import { resolveClass, ruleInstant, historyAbbr, type ScheduleClass } from '../../shared/rules.ts';
 import { gmtLabel } from '../../shared/fmt.ts';
-import { hourBucketMemo, type HourBucketMemo } from '../../shared/hourCache.ts';
-import { makeInfo, canonicalZone, canonicalView, type CanonicalView } from '../../shared/zoneLinks.ts';
+import { lazyList, listAt, clearList } from '../../shared/listApi.ts';
+import { makeInfo, canonicalZone } from '../../shared/zoneLinks.ts';
 import { computeSchedule, scheduleZoneInfo, classIdx, zoneIndexOf } from '../../shared/bakedSchedule.ts';
 import { computeBaked, getTimeZoneAt as bakedGetTimeZoneAt, HISTORY_TO_MS } from '../../shared/bakedHistory.ts';
 
@@ -73,17 +73,7 @@ function liveRecovered(name: string, instant: TZInstant): TimeZoneInfo {
   return makeInfo(name, gmtLabel(offMin), offMin);
 }
 
-export interface AuditInfo {
-  temporal: boolean;
-  auditMs: number;
-  auditedZones: number;
-  recoveredZones: string[]; // failed audit or unknown -> Temporal-live for the session
-}
-
-let auditInfo: AuditInfo | null = null;
 let recovered: Set<number> | null = null; // zone indices
-
-export const getAuditInfo = (): AuditInfo | null => auditInfo;
 
 // predicted (transition instant, offset-after) list for `cls` in `year`;
 // irregular classes predict transitions only within their generated year
@@ -139,12 +129,7 @@ function auditZone(zone: string, cls: ScheduleClass, yearStart: number, yearEnd:
 }
 
 function init(): void {
-  const t0 = performance.now();
-
   recovered = new Set();
-
-  const recoveredNames: string[] = [];
-  let audited = 0;
 
   if (hasTemporal) {
     const year = new Date().getUTCFullYear();
@@ -154,27 +139,13 @@ function init(): void {
     for (let z = 0; z < zones.length; z++) {
       const ci = classIdx[z]!;
 
-      if (ci === -1) {
+      // unknown zone, or one whose baked class disagrees with this year's
+      // reality — either way it runs Temporal-live for the session
+      if (ci === -1 || !auditZone(zones[z]!, scheduleClasses[ci]!, yearStart, yearEnd, year)) {
         recovered.add(z);
-        recoveredNames.push(zones[z]!);
-        continue;
-      }
-
-      audited++;
-
-      if (!auditZone(zones[z]!, scheduleClasses[ci]!, yearStart, yearEnd, year)) {
-        recovered.add(z);
-        recoveredNames.push(zones[z]!);
       }
     }
   }
-
-  auditInfo = {
-    temporal: hasTemporal,
-    auditMs: performance.now() - t0,
-    auditedZones: audited,
-    recoveredZones: recoveredNames,
-  };
 }
 
 // Overwrites the session-recovered zones — those that failed the current-year
@@ -269,26 +240,19 @@ function computeOneCurrent(name: string, timestamp: number): TimeZoneInfo {
   return scheduleZoneInfo(name, classIdx[z]!, timestamp);
 }
 
-// memos created lazily so that a consumer importing only getTimeZones() never
-// references compute()/computeBaked() and drops the baked history eras
-let fullMemo: HourBucketMemo | null = null;
-let curMemo: HourBucketMemo | null = null;
-
-// alias-free views of the two memos' outputs, built on first opt-out. One per
-// memo: a shared instance would thrash between the two responses.
-let fullCanon: CanonicalView | null = null;
-let curCanon: CanonicalView | null = null;
+// One lazy memo (plus its alias-free view) per response shape. compute() is
+// handed to listAt() inside getTimeZonesAt's body rather than at module scope,
+// so a getTimeZones()-only consumer never references compute()/computeBaked()
+// and drops the baked history eras — see shared/listApi.ts.
+const full = lazyList();
+const cur = lazyList();
 
 export function getTimeZonesAt(timestamp: number, withAliases = true): TimeZoneInfo[] {
-  const full = (fullMemo ??= hourBucketMemo(compute)).get(timestamp);
-
-  return withAliases ? full : (fullCanon ??= canonicalView())(full);
+  return listAt(full, compute, timestamp, withAliases);
 }
 
 export function getTimeZones(withAliases = true): TimeZoneInfo[] {
-  const full = (curMemo ??= hourBucketMemo(computeCurrent)).get(Date.now());
-
-  return withAliases ? full : (curCanon ??= canonicalView())(full);
+  return listAt(cur, computeCurrent, Date.now(), withAliases);
 }
 
 // the canonical substitution happens out here rather than inside computeOne /
@@ -303,10 +267,8 @@ export function getTimeZone(name: string, withAliases = true): TimeZoneInfo {
 }
 
 export function clearCache(): void {
-  fullMemo?.clear();
-  curMemo?.clear();
-  fullCanon = null;
-  curCanon = null;
+  clearList(full);
+  clearList(cur);
 }
 
 export { formatOffset } from '../../shared/offsetFormatBaked.ts';

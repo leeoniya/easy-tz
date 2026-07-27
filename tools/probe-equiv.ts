@@ -20,22 +20,12 @@
 // has Temporal. Exits 1 on any disagreement.
 
 import { inChromePage, chromeLabel } from './chrome-harness.ts';
-import { compareProbeStrategies, SCHEDULE_STRIDE_DAYS, type StrategyComparison } from './gen-core.ts';
+import { parseYearRange } from './cli-years.ts';
+import { compareProbeStrategies, SCHEDULE_STRIDE_DAYS, HISTORY_FROM, type StrategyComparison } from './gen-core.ts';
 
-const args = process.argv.slice(2);
-const local = args.includes('--local');
+const { args, local, fromYear, toYear } = parseYearRange(HISTORY_FROM);
 const strideIdx = args.indexOf('--stride');
 const strideDays = strideIdx === -1 ? SCHEDULE_STRIDE_DAYS : Number(args[strideIdx + 1]);
-const years = args.filter((a) => /^\d{4}$/.test(a)).map(Number);
-
-const bakeYear = new Date().getUTCFullYear();
-const fromYear = years[0] ?? 1995;
-const toYear = years[1] ?? bakeYear + 2;
-
-if (fromYear > toYear) {
-  console.error(`from year ${fromYear} > to year ${toYear}`);
-  process.exit(1);
-}
 
 let result: StrategyComparison;
 let runtime: string;

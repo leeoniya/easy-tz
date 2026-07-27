@@ -538,6 +538,17 @@ function hourBucketMemo(compute) {
   };
 }
 
+// shared/listApi.ts
+var lazyList = () => ({ memo: null, canon: null });
+function listAt(state, compute, timestamp, withAliases) {
+  const full = (state.memo ??= hourBucketMemo(compute)).get(timestamp);
+  return withAliases ? full : (state.canon ??= canonicalView())(full);
+}
+function clearList(state) {
+  state.memo?.clear();
+  state.canon = null;
+}
+
 // shared/tables/chrome/offsets.ts
 var offsetStrings = new Map([
   [-660, "-11:00"],
@@ -592,17 +603,13 @@ function formatOffset(minutes) {
 }
 
 // impls/07-baked-rules/index.ts
-var histMemo = null;
-var schedMemo = null;
-var histCanon = null;
-var schedCanon = null;
+var hist = lazyList();
+var sched = lazyList();
 function getTimeZonesAt(timestamp, withAliases = true) {
-  const full = (histMemo ??= hourBucketMemo(computeBaked)).get(timestamp);
-  return withAliases ? full : (histCanon ??= canonicalView())(full);
+  return listAt(hist, computeBaked, timestamp, withAliases);
 }
 function getTimeZones(withAliases = true) {
-  const full = (schedMemo ??= hourBucketMemo(computeSchedule)).get(Date.now());
-  return withAliases ? full : (schedCanon ??= canonicalView())(full);
+  return listAt(sched, computeSchedule, Date.now(), withAliases);
 }
 function getTimeZoneAt2(name, timestamp, withAliases = true) {
   return getTimeZoneAt(withAliases ? name : canonicalZone(name), timestamp);
@@ -611,10 +618,8 @@ function getTimeZone(name, withAliases = true) {
   return scheduleGetTimeZoneAt(withAliases ? name : canonicalZone(name), Date.now());
 }
 function clearCache() {
-  histMemo?.clear();
-  schedMemo?.clear();
-  histCanon = null;
-  schedCanon = null;
+  clearList(hist);
+  clearList(sched);
 }
 export {
   getTimeZonesAt,

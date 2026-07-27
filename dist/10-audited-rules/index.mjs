@@ -400,6 +400,17 @@ function hourBucketMemo(compute) {
   };
 }
 
+// shared/listApi.ts
+var lazyList = () => ({ memo: null, canon: null });
+function listAt(state, compute, timestamp, withAliases) {
+  const full = (state.memo ??= hourBucketMemo(compute)).get(timestamp);
+  return withAliases ? full : (state.canon ??= canonicalView())(full);
+}
+function clearList(state) {
+  state.memo?.clear();
+  state.canon = null;
+}
+
 // shared/etcZones.ts
 function buildFixedZones() {
   const out = new Map([
@@ -602,7 +613,6 @@ function liveRecovered(name, instant) {
   const offMin = parseOffset(instant.toZonedDateTimeISO(name).offset);
   return makeInfo(name, gmtLabel(offMin), offMin);
 }
-var auditInfo = null;
 var recovered = null;
 function predictedTransitions(cls, year) {
   if (cls.kind === 0)
@@ -642,34 +652,18 @@ function auditZone(zone, cls, yearStart, yearEnd, year) {
   return i === predicted.length;
 }
 function init() {
-  const t0 = performance.now();
   recovered = new Set;
-  const recoveredNames = [];
-  let audited = 0;
   if (hasTemporal) {
     const year = new Date().getUTCFullYear();
     const yearStart = Date.UTC(year, 0, 1);
     const yearEnd = Date.UTC(year + 1, 0, 1);
     for (let z = 0;z < zones.length; z++) {
       const ci = classIdx[z];
-      if (ci === -1) {
+      if (ci === -1 || !auditZone(zones[z], scheduleClasses[ci], yearStart, yearEnd, year)) {
         recovered.add(z);
-        recoveredNames.push(zones[z]);
-        continue;
-      }
-      audited++;
-      if (!auditZone(zones[z], scheduleClasses[ci], yearStart, yearEnd, year)) {
-        recovered.add(z);
-        recoveredNames.push(zones[z]);
       }
     }
   }
-  auditInfo = {
-    temporal: hasTemporal,
-    auditMs: performance.now() - t0,
-    auditedZones: audited,
-    recoveredZones: recoveredNames
-  };
 }
 function applyRecovered(out, timestamp) {
   if (recovered.size > 0) {
@@ -720,17 +714,13 @@ function computeOneCurrent(name, timestamp) {
     return liveRecovered(name, Temporal.Instant.fromEpochMilliseconds(timestamp));
   return scheduleZoneInfo(name, classIdx[z], timestamp);
 }
-var fullMemo = null;
-var curMemo = null;
-var fullCanon = null;
-var curCanon = null;
+var full = lazyList();
+var cur = lazyList();
 function getTimeZonesAt(timestamp, withAliases = true) {
-  const full = (fullMemo ??= hourBucketMemo(compute)).get(timestamp);
-  return withAliases ? full : (fullCanon ??= canonicalView())(full);
+  return listAt(full, compute, timestamp, withAliases);
 }
 function getTimeZones(withAliases = true) {
-  const full = (curMemo ??= hourBucketMemo(computeCurrent)).get(Date.now());
-  return withAliases ? full : (curCanon ??= canonicalView())(full);
+  return listAt(cur, computeCurrent, Date.now(), withAliases);
 }
 function getTimeZoneAt2(name, timestamp, withAliases = true) {
   return computeOne(withAliases ? name : canonicalZone(name), timestamp);
@@ -739,10 +729,8 @@ function getTimeZone(name, withAliases = true) {
   return computeOneCurrent(withAliases ? name : canonicalZone(name), Date.now());
 }
 function clearCache() {
-  fullMemo?.clear();
-  curMemo?.clear();
-  fullCanon = null;
-  curCanon = null;
+  clearList(full);
+  clearList(cur);
 }
 export {
   getTimeZonesAt,

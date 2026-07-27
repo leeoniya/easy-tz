@@ -10,8 +10,7 @@
 import { generateTables, verifyTables, generateHistory } from './gen-core.ts';
 import { type GenMeta } from './emitters.ts';
 import { writeAndReport } from './write-tables.ts';
-import { auditAbbrFix, INCLUDE_VAGUE } from './abbrfix-core.ts';
-import { zones } from '../shared/zones.ts';
+import { auditTableSet } from './abbrfix-core.ts';
 
 const tables = generateTables();
 const verification = verifyTables(tables);
@@ -26,17 +25,7 @@ const history = generateHistory(tables);
 // audited in the same session as the probe that fed it: the corrections key off
 // the boundaries generateHistory already resolved, so this costs one live-Intl
 // read per segment instead of its own scan
-const abbrfix = auditAbbrFix(
-  zones,
-  tables.scheduleClasses,
-  history.classes,
-  history.fromYear,
-  history.toYear,
-  tables.yearStart,
-  tables.stepMs,
-  INCLUDE_VAGUE,
-  history.boundaries
-);
+const abbrfix = auditTableSet(tables, history);
 
 const meta: GenMeta = {
   host: `bun ${Bun.version}`,

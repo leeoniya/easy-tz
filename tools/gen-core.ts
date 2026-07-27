@@ -955,7 +955,6 @@ function mergeTrans(run: [TransFit, TransFit], f: [TransFit, TransFit]): boolean
 // (the zone then needs no history class at all). Years the schedule gets
 // right become defer eras (kind 3) instead of stored data.
 function buildEras(
-  zone: string,
   cls: ScheduleClass,
   fromYear: number,
   toYear: number,
@@ -1097,7 +1096,7 @@ export function generateHistory(tables: GeneratedTables, fromYear: number = HIST
 
     zoneCount++;
 
-    const eras = buildEras(zone, classOf.get(zone)!, fromYear, toYear, (y) => segsOf(zone, y));
+    const eras = buildEras(classOf.get(zone)!, fromYear, toYear, (y) => segsOf(zone, y));
 
     if (eras === null) {
       coveredZones++;

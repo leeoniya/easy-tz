@@ -30,36 +30,26 @@
 import type { TimeZoneInfo } from '../../shared/types.ts';
 import { computeSchedule, scheduleGetTimeZoneAt } from '../../shared/bakedSchedule.ts';
 import { computeBaked, getTimeZoneAt as bakedGetTimeZoneAt } from '../../shared/bakedHistory.ts';
-import { hourBucketMemo, type HourBucketMemo } from '../../shared/hourCache.ts';
-import { canonicalZone, canonicalView, type CanonicalView } from '../../shared/zoneLinks.ts';
+import { lazyList, listAt, clearList } from '../../shared/listApi.ts';
+import { canonicalZone } from '../../shared/zoneLinks.ts';
 
-// Two hour-bucket memos, created lazily on first use. The history-backed one
-// is referenced ONLY inside getTimeZonesAt/getTimeZoneAt below, and the
-// history table is imported ONLY by shared/bakedHistory.ts — so a consumer that
-// imports just getTimeZones() never pulls computeBaked, and the baked history
-// eras tree-shake out of their bundle (see shared/bakedHistory.ts).
-let histMemo: HourBucketMemo | null = null;
-let schedMemo: HourBucketMemo | null = null;
-
-// alias-free views of the two memos' outputs, built on first opt-out. One per
-// memo: a shared instance would thrash between the two responses.
-let histCanon: CanonicalView | null = null;
-let schedCanon: CanonicalView | null = null;
+// One lazy memo (plus its alias-free view) per response shape. computeBaked is
+// handed to listAt() inside getTimeZonesAt's body rather than at module scope,
+// which is what lets a getTimeZones()-only consumer shake the history eras out
+// — see shared/listApi.ts.
+const hist = lazyList();
+const sched = lazyList();
 
 // full response at `timestamp`: schedule for the bake year onward, baked
 // historical eras for earlier years.
 export function getTimeZonesAt(timestamp: number, withAliases = true): TimeZoneInfo[] {
-  const full = (histMemo ??= hourBucketMemo(computeBaked)).get(timestamp);
-
-  return withAliases ? full : (histCanon ??= canonicalView())(full);
+  return listAt(hist, computeBaked, timestamp, withAliases);
 }
 
 // current-instant response, schedule-only — no history. Importing only this
 // lets shared/history.ts tree-shake away.
 export function getTimeZones(withAliases = true): TimeZoneInfo[] {
-  const full = (schedMemo ??= hourBucketMemo(computeSchedule)).get(Date.now());
-
-  return withAliases ? full : (schedCanon ??= canonicalView())(full);
+  return listAt(sched, computeSchedule, Date.now(), withAliases);
 }
 
 // single-zone / many-timestamps resolver (history-capable, same as getTimeZonesAt)
@@ -76,10 +66,8 @@ export function getTimeZone(name: string, withAliases = true): TimeZoneInfo {
 }
 
 export function clearCache(): void {
-  histMemo?.clear();
-  schedMemo?.clear();
-  histCanon = null;
-  schedCanon = null;
+  clearList(hist);
+  clearList(sched);
 }
 
 export { formatOffset } from '../../shared/offsetFormatBaked.ts';

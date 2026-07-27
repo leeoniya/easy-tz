@@ -12,6 +12,7 @@
 import { impls } from '../impls/registry.ts';
 import { getInitInfo } from '../impls/08-verified-sharing/index.ts';
 import { scheduleClasses } from '../shared/schedule.ts';
+import { irregularZones } from '../shared/rules.ts';
 import { installKernel } from './browser-kernel.ts';
 
 export type { BenchResult, BenchOneResult, ValidateResult, Vs04 } from './browser-kernel.ts';
@@ -29,11 +30,7 @@ installKernel(impls, impl04, (id) => (id === '08-verified-sharing' ? getInitInfo
 (globalThis as { __verifyFuture?: unknown }).__verifyFuture = (implId: string, skipIrregular: boolean) => {
   const other = impls.find((i) => i.id === implId)!;
 
-  const irregular = new Set<string>();
-
-  for (const c of scheduleClasses) {
-    if (c.kind === 2) for (const z of c.zones) irregular.add(z);
-  }
+  const irregular = irregularZones(scheduleClasses);
 
   // winter + summer + just past the next year's US/EU spring-forwards
   const instants = [
