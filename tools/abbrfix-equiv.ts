@@ -20,9 +20,7 @@
 //   bun run abbrfix-equiv --local  this runtime only
 // Exits 1 on any disagreement.
 
-import puppeteer from 'puppeteer-core';
-import { findHeadlessShell } from './browser.ts';
-import { bundleForBrowser } from './chrome-harness.ts';
+import { inChromePage } from './chrome-harness.ts';
 import { generateTables, generateHistory } from './gen-core.ts';
 import { auditAbbrFix, INCLUDE_VAGUE, type AbbrFixResult } from './abbrfix-core.ts';
 import { zones } from '../shared/zones.ts';
@@ -66,22 +64,11 @@ function runLocal(): Pair {
 }
 
 async function runChrome(): Promise<Pair> {
-  const executablePath = await findHeadlessShell();
-  const code = await bundleForBrowser(new URL('./abbrfix-equiv-browser-entry.ts', import.meta.url).pathname);
-  const browser = await puppeteer.launch({ executablePath, args: ['--no-sandbox', '--disable-gpu'] });
-
-  try {
-    const page = await browser.newPage();
-
-    page.setDefaultTimeout(0);
-    await page.evaluate(code);
-
-    return (await page.evaluate(() =>
-      (globalThis as unknown as { __abbrFixEquiv: () => unknown }).__abbrFixEquiv()
-    )) as Pair;
-  } finally {
-    await browser.close();
-  }
+  return inChromePage(
+    new URL('./abbrfix-equiv-browser-entry.ts', import.meta.url).pathname,
+    async (page) =>
+      (await page.evaluate(() => (globalThis as unknown as { __abbrFixEquiv: () => unknown }).__abbrFixEquiv())) as Pair
+  );
 }
 
 const local = process.argv.includes('--local');

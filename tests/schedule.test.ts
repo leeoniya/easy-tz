@@ -2,6 +2,7 @@ import { describe, test, expect } from 'bun:test';
 import { getTimeZonesAt as precomputed, clearCache as clear07 } from '../impls/07-baked-rules/index.ts';
 import { getTimeZonesAt as baseline, clearCache as clear04 } from '../impls/04-live-intl/index.ts';
 import { scheduleClasses, genMeta } from '../shared/schedule.ts';
+import { alignedWith } from './aligned.ts';
 import { zones, runtimeZones } from '../shared/zones.ts';
 import { fixtures } from '../shared/fixtures.ts';
 
@@ -10,7 +11,7 @@ const YEAR = 2026;
 // equivalence against live Intl is only meaningful when this runtime's ICU
 // matches the one the tables were generated from (see genMeta provenance);
 // Chrome-generated tables are verified in-browser by tools/gen-chrome.ts
-const aligned = genMeta.host === `bun ${Bun.version}` && genMeta.icu === process.versions.icu;
+const aligned = alignedWith(genMeta);
 const testIfAligned = aligned ? test : test.skip;
 
 if (!aligned) {

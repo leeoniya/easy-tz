@@ -18,6 +18,7 @@
 
 import moment from 'moment-timezone';
 import { printTable } from '../tools/print-table.ts';
+import { median } from '../tools/bench-config.ts';
 import { genMeta, YEAR_START } from '../shared/schedule.ts';
 import { zones } from '../shared/zones.ts';
 import {
@@ -63,8 +64,6 @@ const BENCH_ZONES = [
   'Asia/Kolkata',
   'Australia/Lord_Howe', // 30-minute DST shift
 ];
-
-const median = (xs: number[]) => xs.toSorted((a, b) => a - b)[xs.length >> 1]!;
 
 let sink = 0;
 

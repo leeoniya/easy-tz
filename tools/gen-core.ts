@@ -24,6 +24,7 @@
 // must reflect exactly what this runtime's ICU enumerates, and the canonical
 // spellings added by shared/zones.ts are bridged at lookup time via
 // zoneLinks (buildScheduleIndex) instead of being baked into every table
+import { scanChanges, strideSteps } from './step-scan.ts';
 import { runtimeZones as zones } from '../shared/zones.ts';
 import { abbrOverrides, zoneAliases, zoneAbbrOverrides } from '../shared/abbrs.ts';
 import { fmtCache, formatOffset, initialsAbbr, compactGmt } from '../shared/fmt.ts';
@@ -43,6 +44,20 @@ const YEAR_START = Date.UTC(YEAR, 0, 1);
 const STEP_MS = 900_000; // 15 min
 const STEPS_PER_DAY = 96;
 
+// What a generation pass cost. Both table sets report it, and both are timed
+// the same way, so the shape and the measurement live together.
+export interface ProbeStats {
+  probeMs: number;
+  probeStrategy: 'temporal' | 'stride'; // which probe this runtime used
+  probedZoneYears: number; // zone-years probed this run
+}
+
+const probeStats = (t0: number, probedZoneYears: number): ProbeStats => ({
+  probeMs: Date.now() - t0,
+  probeStrategy: PROBE_STRATEGY,
+  probedZoneYears,
+});
+
 export interface GeneratedTables {
   year: number;
   years: number[];
@@ -60,10 +75,7 @@ export interface GeneratedTables {
     ruleClasses: number;
     irregularClasses: number;
     irregularZones: number;
-    probeMs: number;
-    probeStrategy: 'temporal' | 'stride'; // which probe this runtime used
-    probedZoneYears: number; // zone-years probed this run
-  };
+  } & ProbeStats;
 }
 
 export interface Mismatch {
@@ -167,7 +179,8 @@ const MINUTE_MS = 60_000;
 // transition up to the grid is a straight loss — America/Goose_Bay,
 // America/Moncton and America/St_Johns switched at 00:01 local until 2011 (as
 // did Antarctica/Casey in 2020-22) and were being fitted as 00:15, leaving the
-// baked answer 14 minutes stale twice a year. Costs ~4 probes per change.
+// baked answer 14 minutes stale twice a year. Costs one probe per change in
+// virtually every case — see the fast path below.
 //
 // Assumes the window holds ONE change, the same assumption scanAt already makes
 // at step granularity. tools/tz-transition-gap.ts measures the headroom: the
@@ -202,16 +215,8 @@ function refineToMinute(zone: string, from: string, lo: number, hi: number): num
 // stride samples, plus the year's final step — a transition in the last hours
 // of Dec 31 (e.g. Kosrae's +12 -> +11 at local midnight 1999-01-01, mid-day
 // Dec 31 UTC) would otherwise fall between the last sample and the year end
-function strideCheckpoints(lastStep: number, strideDays: number): number[] {
-  const stride = STEPS_PER_DAY * strideDays;
-  const out: number[] = [];
-
-  for (let step = stride; step < lastStep; step += stride) out.push(step);
-
-  out.push(lastStep);
-
-  return out;
-}
+const strideCheckpoints = (lastStep: number, strideDays: number): number[] =>
+  strideSteps(lastStep, STEPS_PER_DAY * strideDays);
 
 // every offset transition Temporal reports inside the year, each paired with
 // the step before it. The pair brackets the transition tightly enough that
@@ -248,47 +253,24 @@ function temporalCheckpoints(
 
 // Samples `zone` at each checkpoint (ascending 15-min step indices, ending at
 // the year's last step) and resolves every signature change between
-// consecutive samples to its exact step.
-//
-// The outer loop is what makes multi-change windows safe. Each search returns
-// the FIRST step differing from `prev`, and the value read AT that step
-// becomes the new `prev` — never the value at the far sample, which may sit
-// beyond further changes. Asia/Chita 2014 needs this even at a 1-day stride:
-// it moves +10 -> +08 at 16:00Z and CLDR's metazone boundary follows an hour
-// later, so the signature changes twice inside the hour.
+// consecutive samples to its exact step, then times each one to the minute.
+// scanChanges() owns the walk; see tools/step-scan.ts for why the outer loop
+// has to re-read the value at each resolved step.
 function scanAt(zone: string, start: number, checkpoints: number[]): Seg[] {
   const segs: Seg[] = [];
-  let prev = probe(zone, start);
-  let prevStep = 0; // last resolved step; probe(prevStep) === prev
 
-  segs.push(toSeg(0, start, prev));
+  scanChanges(
+    (step) => probe(zone, start + step * STEP_MS),
+    checkpoints,
+    (step, from, to) => {
+      // the bisection always closes to one step, so the change sits in the
+      // single step ending at `step` — narrow enough to time to the minute
+      const atMs = refineToMinute(zone, from, start + (step - 1) * STEP_MS, start + step * STEP_MS);
 
-  for (const s of checkpoints) {
-    if (s <= prevStep) continue; // strategies may propose duplicates
-
-    const cur = probe(zone, start + s * STEP_MS);
-
-    while (cur !== prev) {
-      let lo = prevStep; // probe(lo) === prev
-      let hi = s; // probe(hi) !== prev
-
-      while (hi - lo > 1) {
-        const mid = (lo + hi) >> 1;
-        if (probe(zone, start + mid * STEP_MS) === prev) lo = mid;
-        else hi = mid;
-      }
-
-      // the loop above always closes to hi - lo === 1, so the change sits in
-      // the single step ending at `hi` — narrow enough to time to the minute
-      const atMs = refineToMinute(zone, prev, start + (hi - 1) * STEP_MS, start + hi * STEP_MS);
-
-      prev = hi === s ? cur : probe(zone, start + hi * STEP_MS); // `cur` already holds step s
-      segs.push(toSeg(hi, atMs, prev));
-      prevStep = hi; // strictly advances, so this terminates
-    }
-
-    prevStep = s;
-  }
+      segs.push(toSeg(step, atMs, to));
+    },
+    (open) => segs.push(toSeg(0, start, open))
+  );
 
   return segs;
 }
@@ -796,9 +778,7 @@ export function generateTables(): GeneratedTables {
       ruleClasses,
       irregularClasses,
       irregularZones,
-      probeMs: Date.now() - t0,
-      probeStrategy: PROBE_STRATEGY,
-      probedZoneYears,
+      ...probeStats(t0, probedZoneYears),
     },
   };
 }
@@ -838,10 +818,7 @@ export interface GeneratedHistory {
     ruleEras: number;
     rawYears: number;
     deferEras: number;
-    probeMs: number;
-    probeStrategy: 'temporal' | 'stride'; // which probe this runtime used
-    probedZoneYears: number; // zone-years probed this run
-  };
+  } & ProbeStats;
 }
 
 interface TransFit {
@@ -1182,9 +1159,7 @@ export function generateHistory(tables: GeneratedTables, fromYear: number = HIST
       ruleEras,
       rawYears,
       deferEras,
-      probeMs: Date.now() - t0,
-      probeStrategy: PROBE_STRATEGY,
-      probedZoneYears,
+      ...probeStats(t0, probedZoneYears),
     },
   };
 }

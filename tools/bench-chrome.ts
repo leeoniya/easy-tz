@@ -23,7 +23,7 @@ import { impls } from '../impls/registry.ts';
 import { minifiedSizes } from '../bench/size.ts';
 import { bundleBrowserEntry, bundleSingleLibEntry, launchChrome } from './chrome-harness.ts';
 import { printTable } from './print-table.ts';
-import { GETONE_ZONE, GETONE_CALLS, GETONE_STEP_HOURS, SAMPLING_NOTE, SWEEP_NOTE, type SampleBudget } from './bench-config.ts';
+import { GETONE_ZONE, GETONE_CALLS, GETONE_STEP_HOURS, SAMPLING_NOTE, SWEEP_NOTE, median, type SampleBudget } from './bench-config.ts';
 import { withLibs } from './bench-opts.ts';
 import type { BenchResult, BenchOneResult } from './bench-browser-entry.ts';
 
@@ -194,11 +194,10 @@ try {
       await page.close();
 
       colds.push(result.coldMs);
-      colds.sort((a, b) => a - b);
 
       results.push({
         ...result,
-        coldMs: colds[colds.length >> 1]!,
+        coldMs: median(colds),
         rendererMB: rssBefore !== null && rssAfter !== null ? (rssAfter - rssBefore) / 1048576 : null,
       });
     } catch (e) {

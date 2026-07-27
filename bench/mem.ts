@@ -13,6 +13,7 @@
 import { impls } from '../impls/registry.ts';
 import { libImpls } from '../impls/lib-registry.ts';
 import { printTable } from '../tools/print-table.ts';
+import { median } from '../tools/bench-config.ts';
 
 const SAMPLES = 5;
 
@@ -24,7 +25,6 @@ interface Probe {
   totalJs: number;
 }
 
-const median = (xs: number[]) => xs.toSorted((a, b) => a - b)[xs.length >> 1]!;
 const probePath = new URL('./mem-probe.ts', import.meta.url).pathname;
 
 const rows: string[][] = [];

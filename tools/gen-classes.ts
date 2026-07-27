@@ -8,8 +8,8 @@
 // Run: bun run gen
 
 import { generateTables, verifyTables, generateHistory } from './gen-core.ts';
-import { emitClassesTs, emitScheduleTs, emitHistoryTs, emitAbbrFixTs, type GenMeta } from './emitters.ts';
-import { writeTableSet } from './table-files.ts';
+import { type GenMeta } from './emitters.ts';
+import { writeAndReport } from './write-tables.ts';
 import { auditAbbrFix, INCLUDE_VAGUE } from './abbrfix-core.ts';
 import { zones } from '../shared/zones.ts';
 
@@ -44,21 +44,4 @@ const meta: GenMeta = {
   generated: new Date().toISOString(),
 };
 
-const active = writeTableSet('bun', {
-  classes: emitClassesTs(tables, meta),
-  schedule: emitScheduleTs(tables, meta),
-  history: emitHistoryTs(history, tables, meta),
-  abbrfix: emitAbbrFixTs(abbrfix, tables, history.fromYear, history.toYear, meta),
-});
-
-const s = tables.stats;
-const h = history.stats;
-const a = abbrfix.stats;
-
-console.log(
-  `wrote shared/tables/bun/{classes,schedule,history,abbrfix}.ts (host: ${meta.host}, icu ${meta.icu}, active variant: ${active}):\n` +
-    `  ${s.zones} zones -> ${s.sigClasses} classes / ${s.schedClasses} schedule classes (${s.staticClasses} static, ${s.ruleClasses} rule, ${s.irregularClasses} irregular w/ ${s.irregularZones} zones), ${s.probedZoneYears} zone-years probed in ${s.probeMs}ms via ${s.probeStrategy}\n` +
-    `  history ${history.fromYear}-${history.toYear - 1}: ${h.zones} zones (${h.coveredZones} schedule-covered) -> ${h.classes} classes (${h.staticEras} static, ${h.ruleEras} rule, ${h.rawYears} raw, ${h.deferEras} defer eras), ${h.probedZoneYears} zone-years probed in ${h.probeMs}ms via ${h.probeStrategy}\n` +
-    `  abbr corrections: ${a.zones} zones -> ${abbrfix.classes.length} shared payloads, ${a.spans} spans -> ${a.ranges} (year range, offset) records + ${a.fallbackSpans} spans, audited in ${a.auditMs}ms\n` +
-    `  self-verified: ${verification.checks} checks at ${verification.instants} instants, 0 mismatches`
-);
+writeAndReport('bun', meta, tables, history, abbrfix, verification, 'self-verified');

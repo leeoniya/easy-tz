@@ -177,6 +177,20 @@ function init(): void {
   };
 }
 
+// Overwrites the session-recovered zones — those that failed the current-year
+// audit, or were unknown at init — with their live offset. Deliberately touches
+// only the schedule side, so computeCurrent() can call it without pulling the
+// history eras into a getTimeZones()-only bundle.
+function applyRecovered(out: TimeZoneInfo[], timestamp: number): TimeZoneInfo[] {
+  if (recovered!.size > 0) {
+    const instant = Temporal.Instant.fromEpochMilliseconds(timestamp);
+
+    for (const z of recovered!) out[z] = liveRecovered(zones[z]!, instant);
+  }
+
+  return out;
+}
+
 function compute(timestamp: number): TimeZoneInfo[] {
   if (recovered === null) init();
 
@@ -195,17 +209,7 @@ function compute(timestamp: number): TimeZoneInfo[] {
 
   // bake year and later, or a no-Temporal runtime: shared baked resolver
   // (schedule + baked history eras) — identical to impl 07
-  const out = computeBaked(timestamp);
-
-  // current/future on a Temporal runtime: overwrite the session-recovered
-  // zones (failed the current-year audit, or unknown) with their live offset
-  if (recovered!.size > 0) {
-    const instant = Temporal.Instant.fromEpochMilliseconds(timestamp);
-
-    for (const z of recovered!) out[z] = liveRecovered(zones[z]!, instant);
-  }
-
-  return out;
+  return applyRecovered(computeBaked(timestamp), timestamp);
 }
 
 // single-zone resolver mirroring compute()'s three regimes for one zone (same
@@ -243,15 +247,7 @@ function computeOne(name: string, timestamp: number): TimeZoneInfo {
 function computeCurrent(timestamp: number): TimeZoneInfo[] {
   if (recovered === null) init();
 
-  const out = computeSchedule(timestamp);
-
-  if (recovered!.size > 0) {
-    const instant = Temporal.Instant.fromEpochMilliseconds(timestamp);
-
-    for (const z of recovered!) out[z] = liveRecovered(zones[z]!, instant);
-  }
-
-  return out;
+  return applyRecovered(computeSchedule(timestamp), timestamp);
 }
 
 // single-zone counterpart to computeCurrent(): the same two current-instant

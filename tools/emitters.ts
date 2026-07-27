@@ -143,20 +143,53 @@ export function scheduleZoneOrder(t: GeneratedTables): string[] {
   return [0, 1, 2].flatMap((k) => t.scheduleClasses.filter((c) => c.kind === k)).flatMap((c) => c.zones);
 }
 
+// base-36, zero-padded to a fixed field width. Width 1 is plain toString(36),
+// since padStart only ever pads.
+const b36 = (n: number, width = 1): string => n.toString(36).padStart(width, '0');
+
+// zone -> index in the schedule table's enumeration, which is the index space
+// every sidecar table references (see the ORDERING CONTRACT above). 1296 is the
+// ceiling of a 2-char base-36 reference.
+function zoneIndex(t: GeneratedTables): Map<string, number> {
+  const ordered = scheduleZoneOrder(t);
+
+  if (ordered.length > 1296) throw new Error(`zone index overflow: ${ordered.length} > 1296`);
+
+  return new Map(ordered.map((z, i) => [z, i]));
+}
+
+// A shared dictionary: hands each distinct payload a stable index in first-use
+// order and returns a fixed-width base-36 reference to it. All the packing wins
+// come from one of these — a few dozen distinct payloads back hundreds of
+// references, so the references are what the table actually spends bytes on.
+function interner(width: number) {
+  const values: string[] = [];
+  const idx = new Map<string, number>();
+
+  return {
+    values,
+    // `key` identifies the entry; pass `stored` when the shipped form differs
+    // from the identity (rule tuples pack their fields, and key on the raw ones)
+    ref(key: string, stored: string = key): string {
+      let i = idx.get(key);
+
+      if (i == null) {
+        i = values.length;
+        values.push(stored);
+        idx.set(key, i);
+      }
+
+      return b36(i, width);
+    },
+  };
+}
+
 export function emitHistoryTs(h: GeneratedHistory, t: GeneratedTables, meta: GenMeta): string {
-  const b36 = (n: number, width: number) => n.toString(36).padStart(width, '0');
+  const zoneIdx = zoneIndex(t);
 
-  const orderedZones = scheduleZoneOrder(t);
-  const zoneIdx = new Map(orderedZones.map((z, i) => [z, i]));
-
-  if (orderedZones.length > 1296) throw new Error(`zone index overflow: ${orderedZones.length} > 1296`);
-
-  const dict: string[] = [];
-  const dictIdx = new Map<string, number>();
-  const pairs: string[] = [];
-  const pairIdx = new Map<string, number>();
-  const tuples: string[] = [];
-  const tupleIdx = new Map<string, number>();
+  const eraDict = interner(2);
+  const pairDict = interner(2);
+  const tupleDict = interner(2);
 
   // OFFSETS ship in quarter-hour units — every real UTC offset is a multiple of
   // 15 min, including the :45 ones (Kathmandu +05:45, Chatham +12:45). Rule wall
@@ -168,18 +201,7 @@ export function emitHistoryTs(h: GeneratedHistory, t: GeneratedTables, meta: Gen
 
   // rule-span offset pairs get their own dictionary: only ~38 distinct pairs
   // back hundreds of rule spans, so a 2-char index beats inlining 'qA,qB'
-  const pairRef = (offA: number, offB: number): string => {
-    const key = `${q(offA)},${q(offB)}`;
-    let i = pairIdx.get(key);
-
-    if (i == null) {
-      i = pairs.length;
-      pairs.push(key);
-      pairIdx.set(key, i);
-    }
-
-    return b36(i, 2);
-  };
+  const pairRef = (offA: number, offB: number): string => pairDict.ref(`${q(offA)},${q(offB)}`);
 
   // rule (month, nth, dow, at) tuples get their own dictionary too, as fixed
   // 6-char records (no delimiters): the same tuple recurs across many offset
@@ -191,16 +213,10 @@ export function emitHistoryTs(h: GeneratedHistory, t: GeneratedTables, meta: Gen
   const tupleRef = (r: Rule): string => {
     if (r.atMin < 0 || r.atMin > 1439) throw new Error(`rule wall minute out of range: ${r.atMin}`);
 
-    const key = `${r.month},${r.nth},${r.dow},${r.atMin}`;
-    let i = tupleIdx.get(key);
-
-    if (i == null) {
-      i = tuples.length;
-      tuples.push(`${b36(r.month, 1)}${b36(r.nth, 1)}${b36(r.dow, 1)}${b36(r.atMin, 3)}`);
-      tupleIdx.set(key, i);
-    }
-
-    return b36(i, 2);
+    return tupleDict.ref(
+      `${r.month},${r.nth},${r.dow},${r.atMin}`,
+      `${b36(r.month)}${b36(r.nth)}${b36(r.dow)}${b36(r.atMin, 3)}`
+    );
   };
 
   const eraPayload = (e: HistoryEra): string => {
@@ -220,22 +236,15 @@ export function emitHistoryTs(h: GeneratedHistory, t: GeneratedTables, meta: Gen
     const zs = c.zones.map((z) => b36(zoneIdx.get(z)!, 2)).join('');
 
     const eras = c.eras
-      .map((e) => {
-        const p = eraPayload(e);
-        let i = dictIdx.get(p);
-
-        if (i == null) {
-          i = dict.length;
-          dict.push(p);
-          dictIdx.set(p, i);
-        }
-
-        return `${(e.fromYear - h.fromYear).toString(36)}${b36(i, 2)}`;
-      })
+      .map((e) => `${b36(e.fromYear - h.fromYear)}${eraDict.ref(eraPayload(e))}`)
       .join('');
 
     return `${zs}~${eras}`;
   });
+
+  const dict = eraDict.values;
+  const pairs = pairDict.values;
+  const tuples = tupleDict.values;
 
   if (dict.length > 1296) throw new Error(`era dictionary overflow: ${dict.length} > 1296`);
   if (pairs.length > 1296) throw new Error(`offset-pair dictionary overflow: ${pairs.length} > 1296`);
@@ -287,26 +296,10 @@ export function emitAbbrFixTs(
   toYear: number,
   meta: GenMeta
 ): string {
-  const b36 = (n: number) => n.toString(36);
-  const orderedZones = scheduleZoneOrder(t);
-  const zoneIdx = new Map(orderedZones.map((z, i) => [z, i]));
-
-  if (orderedZones.length > 1296) throw new Error(`zone index overflow: ${orderedZones.length} > 1296`);
-
-  const dict: string[] = [];
-  const dictIdx = new Map<string, number>();
-
-  const abbrRef = (abbr: string): string => {
-    let i = dictIdx.get(abbr);
-
-    if (i == null) {
-      i = dict.length;
-      dict.push(abbr);
-      dictIdx.set(abbr, i);
-    }
-
-    return b36(i);
-  };
+  const zoneIdx = zoneIndex(t);
+  const abbrDict = interner(1);
+  const dict = abbrDict.values;
+  const abbrRef = (abbr: string): string => abbrDict.ref(abbr);
 
   const classes: string[] = [];
 

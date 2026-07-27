@@ -26,6 +26,7 @@
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { printTable } from '../tools/print-table.ts';
+import { median } from '../tools/bench-config.ts';
 import { genMeta, YEAR_START } from '../shared/schedule.ts';
 import { loadLuxon, patchWhat, type LuxonModule, type PatchKey } from './luxon-patches.ts';
 import {
@@ -172,8 +173,6 @@ const paths: Path[] = [
 ];
 
 // ---- measurement --------------------------------------------------------
-
-const median = (xs: number[]) => xs.toSorted((a, b) => a - b)[xs.length >> 1]!;
 
 let sink = 0;
 

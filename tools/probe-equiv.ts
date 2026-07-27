@@ -19,9 +19,7 @@
 // from. --local runs in this process instead of the browser, for a host that
 // has Temporal. Exits 1 on any disagreement.
 
-import puppeteer from 'puppeteer-core';
-import { findHeadlessShell } from './browser.ts';
-import { bundleForBrowser } from './chrome-harness.ts';
+import { inChromePage, chromeLabel } from './chrome-harness.ts';
 import { compareProbeStrategies, SCHEDULE_STRIDE_DAYS, type StrategyComparison } from './gen-core.ts';
 
 const args = process.argv.slice(2);
@@ -46,28 +44,19 @@ if (local) {
   result = compareProbeStrategies(fromYear, toYear, strideDays);
   runtime = `${typeof Bun === 'undefined' ? 'node' : 'bun'} ${typeof Bun === 'undefined' ? process.versions.node : Bun.version}`;
 } else {
-  const executablePath = await findHeadlessShell();
-  const code = await bundleForBrowser(new URL('./probe-equiv-browser-entry.ts', import.meta.url).pathname);
-  const browser = await puppeteer.launch({ executablePath, args: ['--no-sandbox', '--disable-gpu'] });
-
-  try {
-    runtime = (await browser.version()).replace(/^HeadlessChrome\//, 'chrome-headless-shell ');
-
-    const page = await browser.newPage();
-
-    page.setDefaultTimeout(0);
-    await page.evaluate(code);
-
-    result = (await page.evaluate(
-      (a, b, c) =>
-        (globalThis as unknown as { __probeEquiv: (x: number, y: number, z: number) => unknown }).__probeEquiv(a, b, c),
-      fromYear,
-      toYear,
-      strideDays
-    )) as StrategyComparison;
-  } finally {
-    await browser.close();
-  }
+  ({ runtime, result } = await inChromePage(
+    new URL('./probe-equiv-browser-entry.ts', import.meta.url).pathname,
+    async (page, version) => ({
+      runtime: chromeLabel(version),
+      result: (await page.evaluate(
+        (a, b, c) =>
+          (globalThis as unknown as { __probeEquiv: (x: number, y: number, z: number) => unknown }).__probeEquiv(a, b, c),
+        fromYear,
+        toYear,
+        strideDays
+      )) as StrategyComparison,
+    })
+  ));
 }
 
 console.log(`${runtime}, ${fromYear}-${toYear}, fallback stride ${result.strideDays}d\n`);

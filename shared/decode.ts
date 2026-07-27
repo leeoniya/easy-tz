@@ -19,6 +19,20 @@ function decodeZone(prefixes: string[], z: string): string {
 const decodeZones = (prefixes: string[], packed: string): string[] =>
   packed.split(';').map((z) => decodeZone(prefixes, z));
 
+// Fixed-width base-36 indexes into the already-decoded zone list, two chars
+// each. The history and abbrfix classes both open with one of these instead of
+// carrying a prefix dictionary of their own — they group zones the schedule has
+// already named.
+function zonesByIndex(zs: string, zoneList: readonly string[]): string[] {
+  const out: string[] = [];
+
+  for (let i = 0; i < zs.length; i += 2) {
+    out.push(zoneList[parseInt(zs.slice(i, i + 2), 36)]!);
+  }
+
+  return out;
+}
+
 export function decodeGroups(prefixesPacked: string, groupsPacked: string): string[][] {
   const prefixes = prefixesPacked.split('|');
 
@@ -168,12 +182,7 @@ export function decodeHistory(
     const zs = c.slice(0, cut);
     const es = c.slice(cut + 1);
 
-    const zones: string[] = [];
-
-    for (let i = 0; i < zs.length; i += 2) {
-      zones.push(zoneList[parseInt(zs.slice(i, i + 2), 36)]!);
-    }
-
+    const zones = zonesByIndex(zs, zoneList);
     const eras: HistoryEra[] = [];
 
     for (let i = 0; i < es.length; i += 3) {
@@ -209,11 +218,7 @@ export function decodeAbbrFix(
   return classesPacked.split('|').map((c) => {
     const [zs, rangesPacked, spansPacked] = c.split('~') as [string, string, string];
 
-    const zones: string[] = [];
-
-    for (let i = 0; i < zs.length; i += 2) {
-      zones.push(zoneList[parseInt(zs.slice(i, i + 2), 36)]!);
-    }
+    const zones = zonesByIndex(zs, zoneList);
 
     const fromYear: number[] = [];
     const toYear: number[] = [];

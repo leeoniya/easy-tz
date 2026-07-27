@@ -3,6 +3,7 @@ import { getTimeZonesAt as baked07, getTimeZoneAt as bakedAt07, clearCache as cl
 import { getTimeZonesAt as audited10, getTimeZoneAt as auditedAt10, clearCache as clear10 } from '../impls/10-audited-rules/index.ts';
 import { getTimeZonesAt as baseline04, getTimeZoneAt as baselineAt04, clearCache as clear04 } from '../impls/04-live-intl/index.ts';
 import { scheduleClasses, genMeta, YEAR_START, STEP_MS } from '../shared/schedule.ts';
+import { alignedWith } from './aligned.ts';
 import { abbrFixClasses, ABBRFIX_FROM } from '../shared/abbrfix.ts';
 import { historyClasses } from '../shared/history.ts';
 import { resolveClass, buildScheduleIndex } from '../shared/rules.ts';
@@ -20,7 +21,7 @@ import { SCHEDULE_STRIDE_DAYS, HISTORY_STRIDE_DAYS } from '../tools/gen-core.ts'
 // Equivalence against live Intl is only meaningful when this runtime's ICU
 // matches the one the tables were generated from (same gate as
 // schedule.test.ts); Chrome-generated tables are checked in-browser.
-const aligned = genMeta.host === `bun ${Bun.version}` && genMeta.icu === process.versions.icu;
+const aligned = alignedWith(genMeta);
 const testIfAligned = aligned ? test : test.skip;
 // known gaps: fails today, and bun flags it the moment it starts passing so
 // remediation can't land silently

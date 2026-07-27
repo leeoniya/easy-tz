@@ -82,6 +82,25 @@ export interface Vs04 {
   mismatches: string[];
 }
 
+// Shared tally for the __verify* hooks. Counts every check and every failure,
+// but keeps only the first few messages: a genuinely broken impl fails on most
+// of ~440 zones, and the host only needs a sample to name the problem.
+function tally() {
+  let checked = 0;
+  let mismatchCount = 0;
+  const mismatches: string[] = [];
+
+  return {
+    check: () => void checked++,
+    fail: (msg: string) => {
+      mismatchCount++;
+
+      if (mismatches.length < 10) mismatches.push(msg);
+    },
+    result: (): Vs04 => ({ checked, mismatchCount, mismatches }),
+  };
+}
+
 export function installKernel(
   list: Impl[],
   baseline: Impl,
@@ -278,32 +297,26 @@ export function installKernel(
   // instants so rule-scheduled pairs are checked in both DST states.
   (globalThis as { __verifyAliasPairs?: unknown }).__verifyAliasPairs = (implId: string): Vs04 => {
     const impl = find(implId);
-
-    let checked = 0;
-    let mismatchCount = 0;
-    const mismatches: string[] = [];
+    const t = tally();
 
     for (const ts of [Date.UTC(2026, 0, 15, 12), Date.UTC(2026, 6, 15, 12)]) {
       const byName = new Map(impl.getTimeZonesAt(ts).map((z) => [z.name, z]));
 
       for (const [canonical, alias] of zoneLinkPairs) {
-        checked++;
+        t.check();
 
         const c = byName.get(canonical);
         const a = byName.get(alias);
 
         if (c == null || a == null || a.abbr !== c.abbr || a.offset !== c.offset) {
-          mismatchCount++;
+          const show = (z: typeof c) => (z == null ? 'missing' : `${z.abbr} ${z.offset}`);
 
-          if (mismatches.length < 10) {
-            const show = (z: typeof c) => (z == null ? 'missing' : `${z.abbr} ${z.offset}`);
-            mismatches.push(`${alias} @ ${new Date(ts).toISOString()}: ${show(a)} vs ${canonical}=${show(c)}`);
-          }
+          t.fail(`${alias} @ ${new Date(ts).toISOString()}: ${show(a)} vs ${canonical}=${show(c)}`);
         }
       }
     }
 
-    return { checked, mismatchCount, mismatches };
+    return t.result();
   };
 
   // the fixed-offset ids (Etc/GMT±N, UTC, Etc/UTC) that Chrome's ICU accepts
@@ -315,12 +328,9 @@ export function installKernel(
     const impl = find(implId);
     const one = impl.getTimeZoneAt;
     const baseOne = baseline.getTimeZoneAt;
+    const t = tally();
 
-    let checked = 0;
-    let mismatchCount = 0;
-    const mismatches: string[] = [];
-
-    if (one == null || baseOne == null) return { checked, mismatchCount, mismatches };
+    if (one == null || baseOne == null) return t.result();
 
     const names = ['UTC', 'Etc/UTC'];
 
@@ -331,28 +341,22 @@ export function installKernel(
     // so the historical route must answer identically
     for (const ts of [Date.UTC(2026, 6, 15, 12), Date.UTC(1998, 5, 15, 12)]) {
       for (const name of names) {
-        checked++;
+        t.check();
 
         const x = baseOne(name, ts);
         const y = one(name, ts);
 
         if (x.abbr !== y.abbr || x.offset !== y.offset) {
-          mismatchCount++;
-
-          if (mismatches.length < 10) {
-            mismatches.push(`${name} @ ${new Date(ts).toISOString()}: 04=${x.abbr} ${x.offset} vs ${implId}=${y.abbr} ${y.offset}`);
-          }
+          t.fail(`${name} @ ${new Date(ts).toISOString()}: 04=${x.abbr} ${x.offset} vs ${implId}=${y.abbr} ${y.offset}`);
         } else if (one(name, ts) !== y || !Object.isFrozen(y)) {
           // interning: on Chrome these ids reach the derived fallback rather
           // than a table class, and must still be pooled like any other zone
-          mismatchCount++;
-
-          if (mismatches.length < 10) mismatches.push(`${name}: not interned/frozen`);
+          t.fail(`${name}: not interned/frozen`);
         }
       }
     }
 
-    return { checked, mismatchCount, mismatches };
+    return t.result();
   };
 
   // the withAliases = false opt-out. Worth checking HERE specifically because
@@ -364,49 +368,38 @@ export function installKernel(
   // single-zone substitution lands on that same interned instance.
   (globalThis as { __verifyCanonicalOnly?: unknown }).__verifyCanonicalOnly = (implId: string): Vs04 => {
     const impl = find(implId);
-
-    let checked = 0;
-    let mismatchCount = 0;
-    const mismatches: string[] = [];
+    const t = tally();
 
     const ts = Date.UTC(2026, 6, 15, 12);
     const full = impl.getTimeZonesAt(ts);
     const canon = impl.getTimeZonesAt(ts, false);
     const byName = new Map(canon.map((z) => [z.name, z]));
 
-    checked++;
+    t.check();
 
     const survivors = canon.filter((z) => z.aliasOf != null).length;
 
     if (canon.length !== full.length - zoneLinkPairs.length || survivors > 0) {
-      mismatchCount++;
-      mismatches.push(`list: kept ${canon.length} of ${full.length}, expected ${full.length - zoneLinkPairs.length}; ${survivors} aliasOf survivors`);
+      t.fail(`list: kept ${canon.length} of ${full.length}, expected ${full.length - zoneLinkPairs.length}; ${survivors} aliasOf survivors`);
     }
 
     // filtered lists honor the same by-reference memo contract
-    checked++;
+    t.check();
 
-    if (impl.getTimeZonesAt(ts, false) !== canon) {
-      mismatchCount++;
-      mismatches.push('list: filtered array not returned by reference');
-    }
+    if (impl.getTimeZonesAt(ts, false) !== canon) t.fail('list: filtered array not returned by reference');
 
     const one = impl.getTimeZoneAt;
 
     for (const [canonical, alias] of zoneLinkPairs) {
-      checked++;
+      t.check();
 
       const kept = byName.get(canonical);
       const dropped = full.find((z) => z.name === alias);
 
       if (kept == null || dropped == null || kept.abbr !== dropped.abbr || kept.offset !== dropped.offset) {
-        mismatchCount++;
+        const show = (z: typeof kept) => (z == null ? 'missing' : `${z.abbr} ${z.offset}`);
 
-        if (mismatches.length < 10) {
-          const show = (z: typeof kept) => (z == null ? 'missing' : `${z.abbr} ${z.offset}`);
-          mismatches.push(`${canonical}: ${show(kept)} vs dropped ${alias}=${show(dropped)}`);
-        }
-
+        t.fail(`${canonical}: ${show(kept)} vs dropped ${alias}=${show(dropped)}`);
         continue;
       }
 
@@ -415,15 +408,11 @@ export function installKernel(
       const sub = one(alias, ts, false);
 
       if (sub !== kept) {
-        mismatchCount++;
-
-        if (mismatches.length < 10) {
-          mismatches.push(`${alias} -> ${canonical}: substitution is ${sub.name} ${sub.abbr} ${sub.offset}, not the list instance`);
-        }
+        t.fail(`${alias} -> ${canonical}: substitution is ${sub.name} ${sub.abbr} ${sub.offset}, not the list instance`);
       }
     }
 
-    return { checked, mismatchCount, mismatches };
+    return t.result();
   };
 
   // the two current-instant APIs must agree zone for zone. Worth checking
@@ -432,30 +421,23 @@ export function installKernel(
   // tests (no Temporal), where both APIs collapse onto the baked schedule.
   (globalThis as { __verifyCurrentApis?: unknown }).__verifyCurrentApis = (implId: string): Vs04 => {
     const impl = find(implId);
-
-    let checked = 0;
-    let mismatchCount = 0;
-    const mismatches: string[] = [];
+    const t = tally();
 
     if (impl.getTimeZones != null && impl.getTimeZone != null) {
       const one = impl.getTimeZone;
 
       for (const z of impl.getTimeZones()) {
-        checked++;
+        t.check();
 
         const o = one(z.name);
 
         if (o.name !== z.name || o.abbr !== z.abbr || o.offset !== z.offset) {
-          mismatchCount++;
-
-          if (mismatches.length < 10) {
-            mismatches.push(`${z.name}: getTimeZone()=${o.abbr} ${o.offset} vs getTimeZones()=${z.abbr} ${z.offset}`);
-          }
+          t.fail(`${z.name}: getTimeZone()=${o.abbr} ${o.offset} vs getTimeZones()=${z.abbr} ${z.offset}`);
         }
       }
     }
 
-    return { checked, mismatchCount, mismatches };
+    return t.result();
   };
 
   // deep output-equality against the live-Intl baseline at monthly +
@@ -467,34 +449,28 @@ export function installKernel(
 
     for (let m = 0; m < 12; m++) instants.push(Date.UTC(2026, m, 15, 12));
 
-    for (const t of [Date.UTC(2026, 2, 8, 7), Date.UTC(2026, 2, 29, 1), Date.UTC(2026, 9, 25, 1), Date.UTC(2026, 10, 1, 6)]) {
-      instants.push(t - 60_000, t + 60_000);
+    for (const edge of [Date.UTC(2026, 2, 8, 7), Date.UTC(2026, 2, 29, 1), Date.UTC(2026, 9, 25, 1), Date.UTC(2026, 10, 1, 6)]) {
+      instants.push(edge - 60_000, edge + 60_000);
     }
 
-    let checked = 0;
-    let mismatchCount = 0;
-    const mismatches: string[] = [];
+    const t = tally();
 
     for (const ts of instants) {
       const a = baseline.getTimeZonesAt(ts);
       const b = other.getTimeZonesAt(ts);
 
       for (let k = 0; k < a.length; k++) {
-        checked++;
+        t.check();
 
         const x = a[k]!;
         const y = b[k]!;
 
         if (x.name !== y.name || x.abbr !== y.abbr || x.offset !== y.offset) {
-          mismatchCount++;
-
-          if (mismatches.length < 10) {
-            mismatches.push(`${x.name} @ ${new Date(ts).toISOString()}: 04=${x.abbr} ${x.offset} vs ${implId}=${y.abbr} ${y.offset}`);
-          }
+          t.fail(`${x.name} @ ${new Date(ts).toISOString()}: 04=${x.abbr} ${x.offset} vs ${implId}=${y.abbr} ${y.offset}`);
         }
       }
     }
 
-    return { checked, mismatchCount, mismatches };
+    return t.result();
   };
 }

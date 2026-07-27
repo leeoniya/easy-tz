@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'bun:test';
 import { classGroups, genMeta } from '../shared/classes.ts';
+import { alignedWith } from './aligned.ts';
 import { zones } from '../shared/zones.ts';
 import { liveParts } from '../shared/live.ts';
 
@@ -11,7 +12,7 @@ const YEAR = 2026;
 // matches the one the table was generated from (see genMeta provenance);
 // Chrome-generated tables are verified in-browser by tools/gen-chrome.ts,
 // and impl 08 additionally re-verifies groups at runtime via Temporal.
-const aligned = genMeta.host === `bun ${Bun.version}` && genMeta.icu === process.versions.icu;
+const aligned = alignedWith(genMeta);
 const testIfAligned = aligned ? test : test.skip;
 
 if (!aligned) {

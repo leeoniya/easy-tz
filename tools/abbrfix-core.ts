@@ -19,6 +19,7 @@
 // Browser-safe (no node imports): the chrome variant is audited inside
 // chrome-headless-shell, against THAT runtime's ICU.
 
+import { scanChanges, strideSteps } from './step-scan.ts';
 import { liveParts } from '../shared/live.ts';
 import { zoneAliases, zoneAbbrOverrides } from '../shared/abbrs.ts';
 import { resolveHistory, resolveClass, buildScheduleIndex, historyAbbr, type ScheduleClass, type HistoryClass } from '../shared/rules.ts';
@@ -27,8 +28,8 @@ import { gmtLabel } from '../shared/fmt.ts';
 // probe stride for the boundary scan, in 15-min steps. 6d, the same bound
 // tools/tz-transition-gap.ts holds gen-core to: below the tightest window in
 // which the runtime's own data changes and returns to where it started (6.96d,
-// America/Boa_Vista 2000), so a window can never hide a whole segment. The
-// bisection below resolves any number of changes inside one window.
+// America/Boa_Vista 2000), so a window can never hide a whole segment.
+// scanChanges() resolves any number of changes inside one window.
 const STRIDE = 6 * 96;
 
 // Option B: correct only the spans where the offset-keyed label is a confident
@@ -186,35 +187,16 @@ export function auditAbbrFix(
     };
 
     // fallback when no boundaries were supplied: find this zone's live changes
-    // the slow way, at a stride below tzdata's tightest gap, bisecting each
-    // window (which may hold more than one change)
+    // the slow way, at a stride below the tightest change-and-return window,
+    // bisecting each stride window (which may hold more than one change)
     const scan = (): number[] => {
       const found: number[] = [];
-      let prevKey = key(epoch);
-      let prevStep = 0;
 
-      for (let s = STRIDE; ; s = Math.min(s + STRIDE, lastStep)) {
-        const cur = key(epoch + s * stepMs);
-
-        while (cur !== prevKey) {
-          let lo = prevStep, hi = s;
-
-          while (hi - lo > 1) {
-            const mid = (lo + hi) >> 1;
-
-            if (key(epoch + mid * stepMs) === prevKey) lo = mid;
-            else hi = mid;
-          }
-
-          found.push(hi);
-          prevKey = hi === s ? cur : key(epoch + hi * stepMs);
-          prevStep = hi;
-        }
-
-        if (s >= lastStep) break;
-
-        prevStep = s;
-      }
+      scanChanges(
+        (step) => key(epoch + step * stepMs),
+        strideSteps(lastStep, STRIDE),
+        (step) => found.push(step)
+      );
 
       return merge(yearStarts, found);
     };

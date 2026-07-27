@@ -3,7 +3,7 @@
 // and launching the browser.
 
 import { existsSync } from 'node:fs';
-import puppeteer, { type Browser } from 'puppeteer-core';
+import puppeteer, { type Browser, type Page } from 'puppeteer-core';
 import { findHeadlessShell } from './browser.ts';
 import { selectTables } from './use-tables.ts';
 import { activeVariant } from './table-files.ts';
@@ -100,4 +100,32 @@ export async function launchChrome(): Promise<Browser> {
     executablePath: await findHeadlessShell(),
     args: ['--no-sandbox', '--disable-gpu'],
   });
+}
+
+// "HeadlessChrome/151.0.7922.47" -> "chrome-headless-shell 151.0.7922.47"
+export const chromeLabel = (version: string): string => version.replace(/^HeadlessChrome\//, 'chrome-headless-shell ');
+
+// The one-shot shape every non-bench Chrome script wants: bundle `entryPath`,
+// launch, evaluate the bundle into a fresh page, hand that page to `fn`, and
+// close the browser whatever happens. The bench scripts drive their own pages
+// (fresh one per sample) and so stay on launchChrome directly.
+//
+// setDefaultTimeout(0) is the reason this is worth sharing: the sweeps run for
+// minutes and puppeteer's 30s default would kill them, which is easy to forget
+// in a new script and looks like a browser crash when it happens.
+export async function inChromePage<T>(entryPath: string, fn: (page: Page, version: string) => Promise<T>): Promise<T> {
+  const code = await bundleForBrowser(entryPath);
+  const browser = await launchChrome();
+
+  try {
+    const version = await browser.version();
+    const page = await browser.newPage();
+
+    page.setDefaultTimeout(0);
+    await page.evaluate(code);
+
+    return await fn(page, version);
+  } finally {
+    await browser.close();
+  }
 }

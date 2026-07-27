@@ -7,30 +7,14 @@
 // Requires the browser once: bunx browsers install chrome-headless-shell@stable --path .browsers
 // Run via `bun run gen` (tools/gen-all.ts); not exposed as its own script.
 
-import puppeteer from 'puppeteer-core';
-import { findHeadlessShell } from './browser.ts';
-import { bundleForBrowser } from './chrome-harness.ts';
-import { emitClassesTs, emitScheduleTs, emitHistoryTs, emitAbbrFixTs, type GenMeta } from './emitters.ts';
-import { writeTableSet } from './table-files.ts';
+import { inChromePage, chromeLabel } from './chrome-harness.ts';
+import { type GenMeta } from './emitters.ts';
+import { writeAndReport } from './write-tables.ts';
 import type { GeneratedTables, GeneratedHistory, Verification } from './gen-core.ts';
 import type { AbbrFixResult } from './abbrfix-core.ts';
 
-const executablePath = await findHeadlessShell();
-
-// self-contained script for the browser: defines globalThis.__gen
-const code = await bundleForBrowser(new URL('./gen-browser-entry.ts', import.meta.url).pathname);
-
-const browser = await puppeteer.launch({
-  executablePath,
-  args: ['--no-sandbox', '--disable-gpu'],
-});
-
-try {
-  const version = await browser.version(); // e.g. "HeadlessChrome/150.0.7871.115"
-  const page = await browser.newPage();
-
-  await page.evaluate(code);
-
+// the entry is self-contained for the browser: it defines globalThis.__gen
+await inChromePage(new URL('./gen-browser-entry.ts', import.meta.url).pathname, async (page, version) => {
   const { tables, verification, history, abbrfix } = (await page.evaluate(() =>
     (globalThis as unknown as { __gen: () => unknown }).__gen()
   )) as {
@@ -46,29 +30,10 @@ try {
   }
 
   const meta: GenMeta = {
-    host: `chrome-headless-shell ${version.replace(/^HeadlessChrome\//, '')}`,
+    host: chromeLabel(version),
     icu: null, // browsers don't expose their ICU version
     generated: new Date().toISOString(),
   };
 
-  const active = writeTableSet('chrome', {
-    classes: emitClassesTs(tables, meta),
-    schedule: emitScheduleTs(tables, meta),
-    history: emitHistoryTs(history, tables, meta),
-    abbrfix: emitAbbrFixTs(abbrfix, tables, history.fromYear, history.toYear, meta),
-  });
-
-  const s = tables.stats;
-  const h = history.stats;
-  const a = abbrfix.stats;
-
-  console.log(
-    `wrote shared/tables/chrome/{classes,schedule,history,abbrfix}.ts (host: ${meta.host}, active variant: ${active}):\n` +
-      `  ${s.zones} zones -> ${s.sigClasses} classes / ${s.schedClasses} schedule classes (${s.staticClasses} static, ${s.ruleClasses} rule, ${s.irregularClasses} irregular w/ ${s.irregularZones} zones), ${s.probedZoneYears} zone-years probed in ${s.probeMs}ms via ${s.probeStrategy}\n` +
-      `  history ${history.fromYear}-${history.toYear - 1}: ${h.zones} zones (${h.coveredZones} schedule-covered) -> ${h.classes} classes (${h.staticEras} static, ${h.ruleEras} rule, ${h.rawYears} raw, ${h.deferEras} defer eras), ${h.probedZoneYears} zone-years probed in ${h.probeMs}ms via ${h.probeStrategy}\n` +
-      `  abbr corrections: ${a.zones} zones -> ${abbrfix.classes.length} shared payloads, ${a.spans} spans -> ${a.ranges} (year range, offset) records + ${a.fallbackSpans} spans, audited in ${a.auditMs}ms\n` +
-      `  in-browser verified: ${verification.checks} checks at ${verification.instants} instants, 0 mismatches`
-  );
-} finally {
-  await browser.close();
-}
+  writeAndReport('chrome', meta, tables, history, abbrfix, verification, 'in-browser verified');
+});
