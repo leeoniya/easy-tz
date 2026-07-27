@@ -55,6 +55,14 @@ Methodology:
     already blows the budget (only `timezonecomplete`, at ~250ms). Never 4, so the median
     stays a true middle element.
   - **miss/hist** — 25 samples for anything cheap, as few as 5 for a ~100ms/call library.
+  - **hist reads cheaper than miss for two libraries** — the historical sweep is anchored in 2000
+    and the current-era one in 2026 (same month and hour). `timezonecomplete` and
+    `bigeasy-timezone` replay transitions forward from the start of each zone's history instead of
+    binary-searching a table (`findLastLessEqual` walks from `findFirst()`; bigeasy widens its rule
+    search window to the target year), so their per-call cost grows monotonically with the anchor
+    year — verified across 1900-2040, with no cliff. Their `hist` figure is therefore "cost at a
+    2000-era instant" (~7x and ~2.5x cheaper respectively), not a historical-lookup penalty. The
+    three table-driven libraries are flat across eras.
 - **bundle KB** — `Bun.build` minified, no gzip.
 - Reproducible via `bun run test` / `bun run bench:libs` / `bun run size` (the library rows are
   opt-in — plain `bun run bench` covers this repo's impls only).
