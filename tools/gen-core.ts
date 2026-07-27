@@ -15,8 +15,9 @@
 //
 // Method: per zone/year, linear samples a fixed stride apart; each detected
 // change is refined to a 15-minute boundary by binary search (covers
-// half-hour-offset zones like Lord Howe). Assumes at most one transition per
-// stride window — see SCHEDULE_STRIDE_DAYS for why that holds.
+// half-hour-offset zones like Lord Howe), repeatedly where a window holds more
+// than one. Assumes only that a window never returns to the value it started
+// on — see SCHEDULE_STRIDE_DAYS.
 
 // probe the raw runtime enumeration, NOT the augmented public list: tables
 // must reflect exactly what this runtime's ICU enumerates, and the canonical
@@ -60,6 +61,7 @@ export interface GeneratedTables {
     irregularClasses: number;
     irregularZones: number;
     probeMs: number;
+    probeStrategy: 'temporal' | 'stride'; // which probe this runtime used
     cachedZoneYears: number; // zone-years served from the seed cache
     probedZoneYears: number; // zone-years freshly probed this run
   };
@@ -116,47 +118,114 @@ interface Seg {
   offsetMin: number;
 }
 
-// linear-scan strides. A stride window can hold at most one transition as
-// long as the stride stays under the tightest gap between two consecutive
-// transitions anywhere in tzdata — 6.92d today, asserted by
-// tools/tz-transition-gap.ts. That bound is what makes a coarse stride safe:
-// one transition per window means the binary search below always converges on
-// the single real edge. A wider stride fails silently — a pair inside one
-// window makes the search find the FIRST edge while recording the LAST
-// offset, and a pair that returns to the same offset isn't detected at all.
+// ---- probing a zone-year ----
 //
-// The schedule probe can afford the coarser end of that range: transitions in
-// the bake window (current + 2 years) are months apart. History keeps the
-// daily stride — its 1995+ years hold the tightest real gaps, and it's cached
-// anyway.
+// Two strategies produce the same Seg[]; they differ only in WHERE they
+// sample. Turning "something changed between these two samples" into exact
+// 15-minute edges is shared (scanAt), because BOTH need it: a stride window
+// can hold several changes, and so can the span between two offset
+// transitions — CLDR renames zones without moving their offset, and the
+// signature carries the name.
+//
+// Temporal (Chrome, Firefox, official node >= 26) reports exact transition
+// instants, so it needs no stride at all. Everywhere else (bun, Safari, node
+// built without the Temporal component) falls back to the linear scan.
+// tools/probe-equiv.ts asserts the two agree.
+// bound once, so callers narrow it at the call site and pass it in rather
+// than re-asserting the global on every zone-year
+type TemporalApi = NonNullable<typeof Temporal>;
+
+const temporal: TemporalApi | null = typeof Temporal === 'undefined' ? null : Temporal;
+
+export const PROBE_STRATEGY: 'temporal' | 'stride' = temporal !== null ? 'temporal' : 'stride';
+
+// Fallback strides. scanAt() resolves any number of changes between two
+// samples, so a stride does NOT have to be narrow enough to isolate them —
+// only narrow enough that a window never changes and RETURNS to the same
+// value, which no sampling can see. For offsets that's bounded by the tightest
+// gap between consecutive transitions anywhere in tzdata (6.92d today,
+// asserted by tools/tz-transition-gap.ts); CLDR names have no published bound,
+// but no zone in 1995-2028 changes name and reverts inside six days.
 export const SCHEDULE_STRIDE_DAYS = 6;
-export const HISTORY_STRIDE_DAYS = 1;
+export const HISTORY_STRIDE_DAYS = 6;
 
-function signature(zone: string, start: number, end: number, strideDays: number): Seg[] {
-  const toSeg = (step: number, key: string): Seg => {
-    const cut = key.lastIndexOf('|');
-    return { step, longName: key.slice(0, cut), offsetMin: +key.slice(cut + 1) };
-  };
+const toSeg = (step: number, key: string): Seg => {
+  const cut = key.lastIndexOf('|');
+  return { step, longName: key.slice(0, cut), offsetMin: +key.slice(cut + 1) };
+};
 
-  const totalSteps = (end - start) / STEP_MS;
+// stride samples, plus the year's final step — a transition in the last hours
+// of Dec 31 (e.g. Kosrae's +12 -> +11 at local midnight 1999-01-01, mid-day
+// Dec 31 UTC) would otherwise fall between the last sample and the year end
+function strideCheckpoints(lastStep: number, strideDays: number): number[] {
   const stride = STEPS_PER_DAY * strideDays;
+  const out: number[] = [];
+
+  for (let step = stride; step < lastStep; step += stride) out.push(step);
+
+  out.push(lastStep);
+
+  return out;
+}
+
+// every offset transition Temporal reports inside the year, each paired with
+// the step before it. The pair brackets the transition tightly enough that
+// scanAt's search settles immediately; the gap from one pair to the next
+// brackets the offset-constant span between them, which is where a name-only
+// change hides (America/Cambridge_Bay's CDT -> EST flip in Oct 2000, and 67
+// others between 1995 and 2028).
+function temporalCheckpoints(
+  api: TemporalApi,
+  zone: string,
+  start: number,
+  end: number,
+  lastStep: number
+): number[] {
+  const out: number[] = [];
+  let zdt = api.Instant.fromEpochMilliseconds(start).toZonedDateTimeISO(zone);
+
+  for (;;) {
+    const next = zdt.getTimeZoneTransition('next');
+
+    if (next === null || next.epochMilliseconds >= end) break;
+
+    const step = Math.ceil((next.epochMilliseconds - start) / STEP_MS);
+
+    if (step > 0 && step <= lastStep) out.push(step - 1, step);
+
+    zdt = next;
+  }
+
+  out.push(lastStep);
+
+  return out;
+}
+
+// Samples `zone` at each checkpoint (ascending 15-min step indices, ending at
+// the year's last step) and resolves every signature change between
+// consecutive samples to its exact step.
+//
+// The outer loop is what makes multi-change windows safe. Each search returns
+// the FIRST step differing from `prev`, and the value read AT that step
+// becomes the new `prev` — never the value at the far sample, which may sit
+// beyond further changes. Asia/Chita 2014 needs this even at a 1-day stride:
+// it moves +10 -> +08 at 16:00Z and CLDR's metazone boundary follows an hour
+// later, so the signature changes twice inside the hour.
+function scanAt(zone: string, start: number, checkpoints: number[]): Seg[] {
   const segs: Seg[] = [];
   let prev = probe(zone, start);
-  let prevStep = 0; // last sampled step; probe(prevStep) === prev
+  let prevStep = 0; // last resolved step; probe(prevStep) === prev
 
   segs.push(toSeg(0, prev));
 
-  // stride-day samples, plus the year's final step — a transition in the last
-  // hours of Dec 31 (e.g. Kosrae's +12 -> +11 at local midnight 1999-01-01,
-  // mid-day Dec 31 UTC) would otherwise fall between the last sample and the
-  // year boundary. Each detected change is binary-searched to its 15-min edge.
-  for (let step = stride; ; step += stride) {
-    const s = Math.min(step, totalSteps - 1);
+  for (const s of checkpoints) {
+    if (s <= prevStep) continue; // strategies may propose duplicates
+
     const cur = probe(zone, start + s * STEP_MS);
 
-    if (cur !== prev) {
+    while (cur !== prev) {
       let lo = prevStep; // probe(lo) === prev
-      let hi = s; // probe(hi) === cur
+      let hi = s; // probe(hi) !== prev
 
       while (hi - lo > 1) {
         const mid = (lo + hi) >> 1;
@@ -164,16 +233,107 @@ function signature(zone: string, start: number, end: number, strideDays: number)
         else hi = mid;
       }
 
-      segs.push(toSeg(hi, cur));
-      prev = cur;
+      prev = hi === s ? cur : probe(zone, start + hi * STEP_MS); // `cur` already holds step s
+      segs.push(toSeg(hi, prev));
+      prevStep = hi; // strictly advances, so this terminates
     }
 
     prevStep = s;
-
-    if (s === totalSteps - 1) break;
   }
 
   return segs;
+}
+
+function signature(zone: string, start: number, end: number, strideDays: number): Seg[] {
+  const lastStep = (end - start) / STEP_MS - 1;
+
+  return scanAt(
+    zone,
+    start,
+    temporal !== null
+      ? temporalCheckpoints(temporal, zone, start, end, lastStep)
+      : strideCheckpoints(lastStep, strideDays)
+  );
+}
+
+// ---- strategy equivalence (tools/probe-equiv.ts) ----
+//
+// The probe cache is keyed by a runtime fingerprint that says nothing about
+// which strategy filled it, so a cache built one way is reused verbatim by the
+// other. That's only sound while the two agree — which is what this measures,
+// on any runtime that has both (Chrome; bun can only run the stride side).
+
+export interface StrategyDiff {
+  key: string; // "zone|year"
+  temporal: string;
+  stride: string;
+}
+
+export interface StrategyComparison {
+  available: boolean; // false without Temporal: nothing to compare against
+  zoneYears: number;
+  diffs: StrategyDiff[];
+  temporalMs: number;
+  strideMs: number;
+  strideDays: number;
+}
+
+export function compareProbeStrategies(
+  fromYear: number,
+  toYear: number,
+  strideDays: number = SCHEDULE_STRIDE_DAYS
+): StrategyComparison {
+  if (temporal === null) {
+    return { available: false, zoneYears: 0, diffs: [], temporalMs: 0, strideMs: 0, strideDays };
+  }
+
+  const api = temporal;
+
+  const sig = (zone: string, y: number, useTemporal: boolean): string => {
+    const start = Date.UTC(y, 0, 1);
+    const end = Date.UTC(y + 1, 0, 1);
+    const lastStep = (end - start) / STEP_MS - 1;
+
+    return encodeSig(
+      scanAt(
+        zone,
+        start,
+        useTemporal
+          ? temporalCheckpoints(api, zone, start, end, lastStep)
+          : strideCheckpoints(lastStep, strideDays)
+      )
+    );
+  };
+
+  const run = (useTemporal: boolean): [Record<string, string>, number] => {
+    const t0 = Date.now();
+    const out: Record<string, string> = {};
+
+    for (const zone of zones) {
+      for (let y = fromYear; y <= toYear; y++) out[`${zone}|${y}`] = sig(zone, y, useTemporal);
+    }
+
+    return [out, Date.now() - t0];
+  };
+
+  const [byTemporal, temporalMs] = run(true);
+  const [byStride, strideMs] = run(false);
+  const diffs: StrategyDiff[] = [];
+
+  for (const key in byTemporal) {
+    if (byTemporal[key] !== byStride[key]) {
+      diffs.push({ key, temporal: byTemporal[key]!, stride: byStride[key]! });
+    }
+  }
+
+  return {
+    available: true,
+    zoneYears: Object.keys(byTemporal).length,
+    diffs,
+    temporalMs,
+    strideMs,
+    strideDays,
+  };
 }
 
 const resolveAbbr = (longName: string): string =>
@@ -406,6 +566,7 @@ export function generateTables(seed: ProbeCache | null = null): GeneratedTables 
       irregularClasses,
       irregularZones,
       probeMs: Date.now() - t0,
+      probeStrategy: PROBE_STRATEGY,
       cachedZoneYears,
       probedZoneYears,
     },
@@ -442,6 +603,7 @@ export interface GeneratedHistory {
     rawYears: number;
     deferEras: number;
     probeMs: number;
+    probeStrategy: 'temporal' | 'stride'; // which probe this runtime used
     cachedZoneYears: number; // zone-years served from the seed cache
     probedZoneYears: number; // zone-years freshly probed this run
   };
@@ -878,6 +1040,7 @@ export function generateHistory(
       rawYears,
       deferEras,
       probeMs: Date.now() - t0,
+      probeStrategy: PROBE_STRATEGY,
       cachedZoneYears,
       probedZoneYears,
     },

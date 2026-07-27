@@ -7,9 +7,11 @@
 // - bench/luxon-patches.ts (offsetInterval) caches the offset across a span
 //   two agreeing probes prove transition-free — valid only while the probe
 //   spacing is shorter than the gap.
-// - tools/gen-core.ts scans zone-years at a fixed stride and binary-searches
-//   each detected change to its exact edge — valid only while the stride is
-//   shorter than the gap. A wider stride mislabels or drops a pair silently.
+// - tools/gen-core.ts scans zone-years at a fixed stride. It resolves any
+//   number of changes within a window, so what it needs from this number is
+//   narrower: a window must never change and RETURN to the value it started
+//   on, which is invisible to any sampling. Two transitions closer together
+//   than the stride are what would make that possible.
 //
 // Run this after a tzdata bump. Both spacings are asserted below; if the
 // tightest gap ever drops to meet one, that consumer needs a tighter spacing

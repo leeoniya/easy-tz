@@ -73,8 +73,8 @@ try {
 
   console.log(
     `wrote shared/tables/chrome/{classes,schedule,history}.ts (host: ${meta.host}, active variant: ${active}):\n` +
-      `  ${s.zones} zones -> ${s.sigClasses} classes / ${s.schedClasses} schedule classes (${s.staticClasses} static, ${s.ruleClasses} rule, ${s.irregularClasses} irregular w/ ${s.irregularZones} zones), probe ${s.probeMs}ms (${s.cachedZoneYears} cached / ${s.probedZoneYears} probed)\n` +
-      `  history ${history.fromYear}-${history.toYear - 1}: ${h.zones} zones (${h.coveredZones} schedule-covered) -> ${h.classes} classes (${h.staticEras} static, ${h.ruleEras} rule, ${h.rawYears} raw, ${h.deferEras} defer eras), probe ${h.probeMs}ms (${h.cachedZoneYears} cached / ${h.probedZoneYears} probed)\n` +
+      `  ${s.zones} zones -> ${s.sigClasses} classes / ${s.schedClasses} schedule classes (${s.staticClasses} static, ${s.ruleClasses} rule, ${s.irregularClasses} irregular w/ ${s.irregularZones} zones), probe ${s.probeMs}ms via ${s.probeStrategy} (${s.cachedZoneYears} cached / ${s.probedZoneYears} probed)\n` +
+      `  history ${history.fromYear}-${history.toYear - 1}: ${h.zones} zones (${h.coveredZones} schedule-covered) -> ${h.classes} classes (${h.staticEras} static, ${h.ruleEras} rule, ${h.rawYears} raw, ${h.deferEras} defer eras), probe ${h.probeMs}ms via ${h.probeStrategy} (${h.cachedZoneYears} cached / ${h.probedZoneYears} probed)\n` +
       `  in-browser verified: ${verification.checks} checks at ${verification.instants} instants, 0 mismatches`
   );
 } finally {
