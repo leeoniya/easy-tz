@@ -32,6 +32,14 @@ import { historyAbbr } from '../shared/bakedSchedule.ts';
 // changes inside one window.
 const STRIDE = 6 * 96;
 
+// Option B: correct only the spans where the offset-keyed label is a confident
+// lie — it names another identity the zone has since left. Spans where the
+// historical offset matches no state of the modern class already degrade to a
+// vague GMT±N, which is honest, and correcting those too (option B+) costs
+// roughly 3x the bytes for labels nobody is currently being misled by.
+// Flip to true to ship B+.
+export const INCLUDE_VAGUE = false;
+
 export interface FixSpan {
   from: number; // 15-min steps since Jan 1 of fromYear
   to: number; // exclusive
@@ -83,7 +91,8 @@ export function auditAbbrFix(
   toYear: number,
   yearStart: number,
   stepMs: number,
-  includeVague: boolean
+  includeVague: boolean,
+  boundaries: Record<string, number[]> | null = null
 ): AbbrFixResult {
   const t0 = Date.now();
 
@@ -129,6 +138,34 @@ export function auditAbbrFix(
     if (c.kind === 2) for (const z of c.zones) irregular.add(z);
   }
 
+  // every Jan 1 in the window, where the baked side can move on its own
+  const yearStarts: number[] = [];
+
+  for (let y = fromYear; y < toYear; y++) yearStarts.push((Date.UTC(y, 0, 1) - epoch) / stepMs);
+
+  const merge = (a: readonly number[], b: readonly number[]): number[] =>
+    [...new Set([...a, ...b])].sort((x, y) => x - y);
+
+  // The generator resolved every change of a zone's "longName|offset" while
+  // probing, so when it hands those over this costs one liveAbbr per segment
+  // instead of a scan. Reuse is sound because the audit's own key is coarser:
+  // its abbreviation is derived from that same long name, so an abbr change
+  // cannot happen without one. A superset is fine either way — emit re-merges
+  // adjacent identical spans. The exception is the handful of zones that borrow
+  // another zone's name (zoneAliases), where the label follows the TARGET's
+  // transitions, so the target's boundaries have to come along too.
+  // tools/abbrfix-equiv.ts holds this to the standalone scan.
+  const seeded = (zone: string): number[] | null => {
+    const own = boundaries?.[zone];
+
+    if (own == null) return null;
+
+    const alias = zoneAliases[zone];
+    const viaAlias = alias == null ? null : boundaries?.[alias];
+
+    return merge(yearStarts, viaAlias == null ? own : merge(own, viaAlias));
+  };
+
   const byPayload = new Map<string, { zones: string[]; spans: FixSpan[] }>();
   let lieSpans = 0, vagueSpans = 0, deferSpans = 0, lieSteps = 0, vagueSteps = 0, zoneCount = 0;
 
@@ -142,13 +179,48 @@ export function auditAbbrFix(
     const spans: FixSpan[] = [];
     let open: FixSpan | null = null;
 
-    // walk the year's segments: a boundary is any change in the live label OR
-    // the offset (which is what moves the baked label)
+    // the live label plus the offset, which is what moves the baked label
     const key = (ts: number) => {
       const p = liveParts(zoneAliases[zone] ?? zone, ts);
 
       return `${zoneAbbrOverrides[zone] ?? p.abbr}|${p.offset}`;
     };
+
+    // fallback when no boundaries were supplied: find this zone's live changes
+    // the slow way, at a stride below tzdata's tightest gap, bisecting each
+    // window (which may hold more than one change)
+    const scan = (): number[] => {
+      const found: number[] = [];
+      let prevKey = key(epoch);
+      let prevStep = 0;
+
+      for (let s = STRIDE; ; s = Math.min(s + STRIDE, lastStep)) {
+        const cur = key(epoch + s * stepMs);
+
+        while (cur !== prevKey) {
+          let lo = prevStep, hi = s;
+
+          while (hi - lo > 1) {
+            const mid = (lo + hi) >> 1;
+
+            if (key(epoch + mid * stepMs) === prevKey) lo = mid;
+            else hi = mid;
+          }
+
+          found.push(hi);
+          prevKey = hi === s ? cur : key(epoch + hi * stepMs);
+          prevStep = hi;
+        }
+
+        if (s >= lastStep) break;
+
+        prevStep = s;
+      }
+
+      return merge(yearStarts, found);
+    };
+
+    const boundariesFor = (z2: string): number[] => seeded(z2) ?? scan();
 
     const emit = (fromStep: number, toStep: number) => {
       const ts = epoch + fromStep * stepMs;
@@ -166,28 +238,21 @@ export function auditAbbrFix(
       }
     };
 
-    let prevKey = key(epoch);
+    // Both sides of the comparison move, so a segment has to start wherever
+    // EITHER could change. Live moves at this runtime's transitions; the baked
+    // answer moves at those too, plus every Jan 1, where an era can begin or
+    // start deferring to the schedule class without anything happening in the
+    // real world. Asia/Anadyr 2012 is the case that shows it: live sits on MAGT
+    // across 2011-2015 while the era behind it flips to a defer at the year
+    // line, so a walk that only follows live reads the baked label once, in
+    // 2011, and never notices.
     let prevStep = 0;
 
-    for (let s = STRIDE; ; s = Math.min(s + STRIDE, lastStep)) {
-      const cur = key(epoch + s * stepMs);
+    for (const s of boundariesFor(zone)) {
+      if (s <= prevStep) continue;
 
-      while (cur !== prevKey) {
-        let lo = prevStep, hi = s;
-
-        while (hi - lo > 1) {
-          const mid = (lo + hi) >> 1;
-
-          if (key(epoch + mid * stepMs) === prevKey) lo = mid;
-          else hi = mid;
-        }
-
-        emit(prevStep, hi);
-        prevKey = hi === s ? cur : key(epoch + hi * stepMs);
-        prevStep = hi;
-      }
-
-      if (s >= lastStep) break;
+      emit(prevStep, s);
+      prevStep = s;
     }
 
     emit(prevStep, lastStep);

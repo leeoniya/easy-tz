@@ -20,13 +20,17 @@ export function activeVariant(): Variant | null {
   return m === null ? null : (m[1] as Variant);
 }
 
-export function writeTableSet(variant: Variant, files: { classes: string; schedule: string; history: string }): Variant {
+export function writeTableSet(
+  variant: Variant,
+  files: { classes: string; schedule: string; history: string; abbrfix: string }
+): Variant {
   const dir = new URL(`../shared/tables/${variant}/`, import.meta.url);
 
   mkdirSync(dir, { recursive: true });
   writeFileSync(new URL('classes.ts', dir), files.classes);
   writeFileSync(new URL('schedule.ts', dir), files.schedule);
   writeFileSync(new URL('history.ts', dir), files.history);
+  writeFileSync(new URL('abbrfix.ts', dir), files.abbrfix);
 
   // create/normalize selectors when absent or still in the legacy
   // single-file format; otherwise leave the active choice alone

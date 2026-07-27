@@ -58,6 +58,7 @@
     "bench:luxon-cross-engine": "node bench/luxon-cross-engine.ts",
     "tz-transition-gap": "bun tools/tz-transition-gap.ts",
     "probe-equiv": "bun tools/probe-equiv.ts",
+    "abbrfix-equiv": "bun tools/abbrfix-equiv.ts",
     "size": "bun bench/size.ts",
     "mem": "bun bench/mem.ts",
     "gen": "bun tools/gen-all.ts",

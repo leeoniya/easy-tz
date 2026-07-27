@@ -1,11 +1,12 @@
 // Asserts that gen-core's two probe strategies produce IDENTICAL zone-year
 // signatures.
 //
-// Why this needs asserting: the probe cache is keyed by a runtime content
-// fingerprint that says nothing about which strategy filled it, so a cache
-// built on Chrome (Temporal) is reused verbatim by a stride scan and vice
-// versa. Table output is likewise strategy-independent by assumption. Both
-// hold only while the strategies agree.
+// Why this needs asserting: which strategy builds a table is an accident of
+// the runtime doing the building — the chrome variant comes off Temporal, the
+// bun variant off the stride scan — and the two are compared against each
+// other as though they were the same tzdata seen twice. That only holds while
+// the strategies agree; a disagreement means the stride stepped over a
+// transition Temporal enumerates.
 //
 // The comparison has to run somewhere that HAS both: Chrome ships native
 // Temporal alongside the same Intl the fallback scan uses. bun and node

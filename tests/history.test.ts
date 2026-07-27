@@ -234,6 +234,18 @@ const identityDrift: { label: string; zone: string; ts: number; abbr: string }[]
   // rather than the historical-offset branch.
   { label: 'Asia/Macau before the 1999 handover (defer)', zone: 'Asia/Macau', ts: Date.UTC(1997, 5, 15, 12), abbr: 'MST' },
   { label: 'Pacific/Saipan on NMIT before the 2000 rename (defer)', zone: 'Pacific/Saipan', ts: Date.UTC(1997, 5, 15, 12), abbr: 'NMIT' },
+  // Corrections that only exist because the audit samples the BAKED side at
+  // every Jan 1 as well as at live transitions. Russia stopped changing its
+  // clocks in 2011, so live sits on one label for years at a stretch while the
+  // era behind it flips to a defer at a year line — an audit that only walked
+  // live transitions read the baked label once, before the flip, and saw no
+  // disagreement. tools/abbrfix-core.ts explains the two-sided walk; these
+  // pin it, since losing it would silently shrink the overlay again.
+  { label: 'Europe/Astrakhan on Moscow time (2012, past a year-line era flip)', zone: 'Europe/Astrakhan', ts: Date.UTC(2012, 5, 15, 12), abbr: 'MSK' },
+  { label: 'Europe/Ulyanovsk on Moscow time (2013, past a year-line era flip)', zone: 'Europe/Ulyanovsk', ts: Date.UTC(2013, 0, 15, 12), abbr: 'MSK' },
+  { label: 'Asia/Anadyr on Magadan time (2013, past a year-line era flip)', zone: 'Asia/Anadyr', ts: Date.UTC(2013, 5, 15, 12), abbr: 'MAGT' },
+  // Chile's 2015 permanent-DST year, likewise invisible to a live-only walk
+  { label: 'America/Punta_Arenas during permanent CLST (2015)', zone: 'America/Punta_Arenas', ts: Date.UTC(2015, 5, 15, 12), abbr: 'CLST' },
 ];
 
 describe('historical labels are corrected where the offset-keyed answer would lie', () => {

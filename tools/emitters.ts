@@ -133,14 +133,20 @@ export const scheduleClasses = decodeSchedule(P, S, R, I);
 `;
 }
 
+// ORDERING CONTRACT: the sidecar tables (history, abbrfix) address zones by
+// index into the schedule table's DECODED enumeration. decodeSchedule returns
+// statics, then rules, then irregulars (each preserving generator order), which
+// is NOT the order scheduleClasses arrives in here, so it can't be read off the
+// live array — `t.scheduleClasses.flatMap((c) => c.zones)` disagrees with the
+// runtime in ~90% of positions. Every sidecar emitter must index through this.
+export function scheduleZoneOrder(t: GeneratedTables): string[] {
+  return [0, 1, 2].flatMap((k) => t.scheduleClasses.filter((c) => c.kind === k)).flatMap((c) => c.zones);
+}
+
 export function emitHistoryTs(h: GeneratedHistory, t: GeneratedTables, meta: GenMeta): string {
   const b36 = (n: number, width: number) => n.toString(36).padStart(width, '0');
 
-  // ORDERING CONTRACT: zones are indexed into the schedule table's DECODED
-  // enumeration — decodeSchedule returns statics, then rules, then
-  // irregulars (each preserving generator order), so flatten in that order,
-  // exactly what `scheduleClasses.flatMap((c) => c.zones)` yields at runtime
-  const orderedZones = [0, 1, 2].flatMap((k) => t.scheduleClasses.filter((c) => c.kind === k)).flatMap((c) => c.zones);
+  const orderedZones = scheduleZoneOrder(t);
   const zoneIdx = new Map(orderedZones.map((z, i) => [z, i]));
 
   if (orderedZones.length > 1296) throw new Error(`zone index overflow: ${orderedZones.length} > 1296`);
@@ -265,19 +271,18 @@ export const historyClasses = /*@__PURE__*/ decodeHistory(Z, P, T, E, H, HISTORY
 // Historical abbreviation corrections (shared/tables/<variant>/abbrfix.ts):
 // the spans where the offset-keyed historical label disagrees with live Intl.
 // See tools/abbrfix-core.ts for how they're found and shared/rules.ts
-// AbbrFixClass for what they mean.
-//
-// `orderedZones` MUST be the same zone-index space the history table uses —
-// scheduleClasses.flatMap((c) => c.zones) in decoded order — so both tables
-// address zones identically.
+// AbbrFixClass for what they mean. Takes the whole table set rather than a zone
+// list so the index space comes from scheduleZoneOrder and cannot be passed in
+// wrong — see the ORDERING CONTRACT above.
 export function emitAbbrFixTs(
   result: AbbrFixResult,
-  orderedZones: readonly string[],
+  t: GeneratedTables,
   fromYear: number,
   toYear: number,
   meta: GenMeta
 ): string {
   const b36 = (n: number) => n.toString(36);
+  const orderedZones = scheduleZoneOrder(t);
   const zoneIdx = new Map(orderedZones.map((z, i) => [z, i]));
 
   if (orderedZones.length > 1296) throw new Error(`zone index overflow: ${orderedZones.length} > 1296`);

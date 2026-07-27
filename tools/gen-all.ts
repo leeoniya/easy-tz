@@ -26,11 +26,13 @@ function run(label: string, script: string): void {
   }
 }
 
+// each generator also audits its own historical abbreviations before writing:
+// that runs in the same session as the probe, reusing its transition
+// boundaries (tools/abbrfix-equiv.ts pins that shortcut to the standalone scan)
 run('chrome tables (primary, verified in-browser)', './gen-chrome.ts');
 run('bun tables (supplementary, for local tests + Safari-fallback coverage)', './gen-classes.ts');
-// post-passes over the tables just written: both read the committed files, so
-// they must follow the generators above
-run('historical abbr corrections (audits both variants\u2019 tables vs live Intl)', './gen-abbrfix.ts');
+// post-pass over the tables just written: reads the committed files, so it must
+// follow the generators above
 run('offset lookup (derived from both variants\u2019 tables)', './gen-offsets.ts');
 
 selectTables('bun');
