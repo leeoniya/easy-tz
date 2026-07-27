@@ -47,11 +47,17 @@ Methodology:
 - **vs 04** — deep output-equality against live-Intl impl `04-live-intl` at 20 instants × 418
   zones.
 - **Benchmarks** — chrome-headless-shell 150 on an idle machine outside the dev sandbox
-  (consistent with the anchors in `impls/registry.ts` / `summary.md`). Cold is the median over
-  5 fresh page contexts. This repo's impls and the libraries are bundled separately so the
-  libraries' ~4MB of tzdata never inflates our impls' pages.
+  (consistent with the anchors in `impls/registry.ts` / `summary.md`). Every library gets its
+  OWN bundle, so no page ever parses another library's tzdata (or ours). Sample counts are
+  time-budgeted rather than fixed, which measurements showed costs no stability (the
+  run-to-run spread of the median is the same at either count):
+  - **cold** — median over 5 fresh page contexts, or 3 for a library whose single first call
+    already blows the budget (only `timezonecomplete`, at ~250ms). Never 4, so the median
+    stays a true middle element.
+  - **miss/hist** — 25 samples for anything cheap, as few as 5 for a ~100ms/call library.
 - **bundle KB** — `Bun.build` minified, no gzip.
-- Reproducible via `bun run test` / `bun run bench` / `bun run size`.
+- Reproducible via `bun run test` / `bun run bench:libs` / `bun run size` (the library rows are
+  opt-in — plain `bun run bench` covers this repo's impls only).
 
 This repo's implementations (🔷) vs qualified libraries (📦).
 

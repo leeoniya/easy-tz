@@ -7,13 +7,17 @@
 // Run: bun bench/size.ts
 
 import { impls } from '../impls/registry.ts';
-import { libImpls } from '../impls/lib-registry.ts';
 import { printTable } from '../tools/print-table.ts';
 import { selectTables } from '../tools/use-tables.ts';
 import { activeVariant } from '../tools/table-files.ts';
 
-export async function minifiedSizes(): Promise<Map<string, number>> {
+export async function minifiedSizes(includeLibs = true): Promise<Map<string, number>> {
   const sizes = new Map<string, number>();
+
+  // dynamic: importing the library registry EXECUTES the libraries, loading
+  // ~4MB of tzdata into whichever process asked for sizes — pointless when
+  // their rows aren't wanted (this module is imported by both bench passes)
+  const libImpls = includeLibs ? (await import('../impls/lib-registry.ts')).libImpls : [];
 
   // Bun.build reads sources fresh from disk, so temporarily selecting the
   // shipped (chrome) tables here doesn't disturb impl modules already loaded in

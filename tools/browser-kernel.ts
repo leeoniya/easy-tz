@@ -14,10 +14,25 @@ import { zones } from '../shared/zones.ts';
 import { zoneLinkPairs } from '../shared/zoneLinks.ts';
 import { installIntlCounter, intlConstructCount } from '../shared/intl-count.ts';
 import { formatOffset } from '../shared/fmt.ts';
-import { GETONE_ZONE, GETONE_CALLS, GETONE_STEP_MS, GETONE_CUR_BASE, GETONE_HIST_BASE } from './bench-config.ts';
+import {
+  GETONE_ZONE,
+  GETONE_CALLS,
+  GETONE_STEP_MS,
+  GETONE_CUR_BASE,
+  GETONE_HIST_BASE,
+  MISS_SAMPLES,
+  WARMUP_SAMPLES,
+  SWEEP_PASSES,
+  sampleTimes,
+  median,
+  steadyState,
+} from './bench-config.ts';
 
-const MISS_ITERATIONS = 25;
-const HIT_CALLS = 50_000;
+// 200k rather than 50k because Chrome coarsens performance.now() to ~100µs: at
+// single-digit ns/hit a 50k pass spans only ~4 ticks, quantizing the result to
+// ±25%. 200k costs ~1.6ms per pass — nothing next to the sweeps — and buys 4x
+// the resolution.
+const HIT_CALLS = 200_000;
 const HOUR_MS = 3_600_000;
 const BASE_TS = Date.UTC(2026, 5, 1, 12, 0);
 // historical anchor (pre-2007 US / EU-stable / single-year DST): a miss here
@@ -34,6 +49,7 @@ export interface BenchResult {
   hitUs: number;
   missMedMs: number; // median over the miss loop (current year)
   histMedMs: number; // median over the miss loop anchored in a historical year
+  missSamples: number; // samples the budget allowed (see MISS_SAMPLES)
   // Intl.DateTimeFormat constructions, counted via a global constructor
   // proxy so library-internal formatters are measured too. Each impl is
   // benched in a fresh page, so the count attributes to that impl alone.
@@ -44,8 +60,10 @@ export interface BenchOneResult {
   id: string;
   supported: boolean; // false for impls without a getTimeZoneAt() (the libs)
   calls: number;
-  curMs: number; // total ms to resolve `calls` present-era timestamps
+  curMs: number; // fastest pass: ms to resolve `calls` present-era timestamps
   histMs: number; // same, anchored in a historical year
+  curPasses: number; // passes taken before the budget ran out (see SWEEP_PASSES)
+  histPasses: number;
   formatters: number; // Intl.DateTimeFormat constructions during the sweeps
 }
 
@@ -98,81 +116,106 @@ export function installKernel(
 
     // brief untimed warm-up (JIT + memo paths) for both the current-year
     // schedule path and the historical era path
-    for (let i = 0; i < 5; i++) impl.getTimeZonesAt(BASE_TS - (i + 1) * HOUR_MS);
-    for (let i = 0; i < 5; i++) impl.getTimeZonesAt(HIST_TS - (i + 1) * HOUR_MS);
+    sampleTimes(() => performance.now(), (i) => impl.getTimeZonesAt(BASE_TS - (i + 1) * HOUR_MS), WARMUP_SAMPLES);
+    sampleTimes(() => performance.now(), (i) => impl.getTimeZonesAt(HIST_TS - (i + 1) * HOUR_MS), WARMUP_SAMPLES);
 
-    // hits: aggregate loop within one hour bucket
+    // hits: aggregate loop within one hour bucket. Same steady-state treatment
+    // as the single-zone sweeps — one shared sweep function, fastest pass wins —
+    // since a single pass reads 2-4x high on the ramp (08: 0.040 -> 0.010µs).
     impl.getTimeZonesAt(BASE_TS);
 
-    const h0 = performance.now();
+    // the result is summed rather than discarded: once the loop reaches its
+    // optimized tier an unused return value invites the engine to elide the work
+    let hitSink = 0;
 
-    for (let i = 0; i < HIT_CALLS; i++) {
-      impl.getTimeZonesAt(BASE_TS + (i % 1000));
-    }
+    const hitSweep = (): number => {
+      const h0 = performance.now();
 
-    const hitUs = ((performance.now() - h0) / HIT_CALLS) * 1000;
+      for (let i = 0; i < HIT_CALLS; i++) hitSink += impl.getTimeZonesAt(BASE_TS + (i % 1000)).length;
+
+      return performance.now() - h0;
+    };
+
+    const hitUs = (steadyState(hitSweep, SWEEP_PASSES).ms / HIT_CALLS) * 1000;
+
+    if (hitSink < 0) throw new Error('unreachable');
 
     // misses: individually timed, each iteration advances one hour bucket
-    const missTimes: number[] = [];
-
-    for (let i = 0; i < MISS_ITERATIONS; i++) {
-      const m0 = performance.now();
-      impl.getTimeZonesAt(BASE_TS + (i + 1) * HOUR_MS);
-      missTimes.push(performance.now() - m0);
-    }
+    const missTimes = sampleTimes(
+      () => performance.now(),
+      (i) => impl.getTimeZonesAt(BASE_TS + (i + 1) * HOUR_MS),
+      MISS_SAMPLES
+    );
 
     // historical misses: same loop anchored in a pre-bake-year year, so the
     // rule-baking impls run the era resolver instead of the schedule
-    const histTimes: number[] = [];
-
-    for (let i = 0; i < MISS_ITERATIONS; i++) {
-      const m0 = performance.now();
-      impl.getTimeZonesAt(HIST_TS + (i + 1) * HOUR_MS);
-      histTimes.push(performance.now() - m0);
-    }
-
-    const med = (xs: number[]) => xs.toSorted((a, b) => a - b)[xs.length >> 1]!;
+    const histTimes = sampleTimes(
+      () => performance.now(),
+      (i) => impl.getTimeZonesAt(HIST_TS + (i + 1) * HOUR_MS),
+      MISS_SAMPLES
+    );
 
     return {
       id: implId,
       zones: zones.length,
       coldMs,
       hitUs,
-      missMedMs: med(missTimes),
-      histMedMs: med(histTimes),
+      missMedMs: median(missTimes),
+      histMedMs: median(histTimes),
+      missSamples: missTimes.length,
       formatters: intlConstructCount(),
     };
   };
 
   // single-zone getTimeZoneAt() sweep: one DST zone resolved at GETONE_CALLS
-  // timestamps in the present, then in a historical year. Run in its own fresh
+  // timestamps in the present, then in a historical year, each reported as the
+  // fastest of several passes (see SWEEP_PASSES — a single pass measures the
+  // JIT ramp more than the impl). Run in its own fresh
   // page (see bench-chrome.ts) so the formatter count reflects only this
   // workload — one formatter for 04/08, none for the baked impls. Impls without
   // a getTimeZoneAt() (the comparison libraries) report supported: false.
   (globalThis as { __benchOne?: unknown }).__benchOne = (implId: string): BenchOneResult => {
     const one = find(implId).getTimeZoneAt;
 
-    if (one == null) return { id: implId, supported: false, calls: 0, curMs: 0, histMs: 0, formatters: 0 };
-
-    // untimed warm-up (JIT + intern pool for both DST states, both eras)
-    let sink = 0;
-
-    for (let i = 0; i < 500; i++) {
-      sink += Math.abs(one(GETONE_ZONE, GETONE_CUR_BASE + i * GETONE_STEP_MS).offset);
-      sink += Math.abs(one(GETONE_ZONE, GETONE_HIST_BASE + i * GETONE_STEP_MS).offset);
+    if (one == null) {
+      return { id: implId, supported: false, calls: 0, curMs: 0, histMs: 0, curPasses: 0, histPasses: 0, formatters: 0 };
     }
 
-    let t0 = performance.now();
-    for (let i = 0; i < GETONE_CALLS; i++) sink += Math.abs(one(GETONE_ZONE, GETONE_CUR_BASE + i * GETONE_STEP_MS).offset);
-    const curMs = performance.now() - t0;
+    let sink = 0;
 
-    t0 = performance.now();
-    for (let i = 0; i < GETONE_CALLS; i++) sink += Math.abs(one(GETONE_ZONE, GETONE_HIST_BASE + i * GETONE_STEP_MS).offset);
-    const histMs = performance.now() - t0;
+    // ONE sweep function, so every pass shares its inner call site and therefore
+    // its type-feedback slots — a sweep written inline per era would hand each
+    // era an untrained slot and re-pay the ramp (see SWEEP_PASSES).
+    const sweep = (base: number, calls: number): number => {
+      const t0 = performance.now();
+
+      for (let i = 0; i < calls; i++) sink += Math.abs(one(GETONE_ZONE, base + i * GETONE_STEP_MS).offset);
+
+      return performance.now() - t0;
+    };
+
+    // short untimed priming for ONE-TIME work only — impl init (10's Temporal
+    // audit) and the intern pool for both DST states. The JIT ramp is handled by
+    // repeating the timed sweep, which no amount of priming here can substitute
+    // for.
+    sweep(GETONE_CUR_BASE, 100);
+    sweep(GETONE_HIST_BASE, 100);
+
+    const cur = steadyState(() => sweep(GETONE_CUR_BASE, GETONE_CALLS), SWEEP_PASSES);
+    const hist = steadyState(() => sweep(GETONE_HIST_BASE, GETONE_CALLS), SWEEP_PASSES);
 
     if (sink < 0) throw new Error('unreachable'); // keep the loops from being optimized away
 
-    return { id: implId, supported: true, calls: GETONE_CALLS, curMs, histMs, formatters: intlConstructCount() };
+    return {
+      id: implId,
+      supported: true,
+      calls: GETONE_CALLS,
+      curMs: cur.ms,
+      histMs: hist.ms,
+      curPasses: cur.passes,
+      histPasses: hist.passes,
+      formatters: intlConstructCount(),
+    };
   };
 
   (globalThis as { __validate?: unknown }).__validate = (implId: string): ValidateResult => {

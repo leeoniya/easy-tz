@@ -51,6 +51,50 @@ export async function bundleLibBrowserEntry(): Promise<string> {
   return bundleForBrowser(new URL('./lib-browser-entry.ts', import.meta.url).pathname);
 }
 
+// ONE library per bundle, for the benchmark's fresh-page-per-sample loop. The
+// combined entry above is ~4.3MB, so benching all five from it made each of the
+// ~25 library pages spend ~520ms parsing the other four libraries' tzdata; a
+// single-library page parses only its own (~0.9MB for the largest).
+//
+// The entry is synthesized as a virtual module rather than kept as five
+// near-identical files, so the set stays derived from lib-registry.ts. Its
+// imports are absolute because a virtual module has no directory for relative
+// specifiers to resolve against. The correctness pass (tools/test-chrome.ts)
+// still uses the combined entry — it runs every library on one page, where the
+// shared parse cost is paid once and measures nothing.
+export async function bundleSingleLibEntry(libId: string): Promise<string> {
+  const root = new URL('../', import.meta.url).pathname;
+  const path = (rel: string) => JSON.stringify(root + rel);
+
+  const source = `
+    import { getTimeZonesAt } from ${path(`impls/${libId}/index.ts`)};
+    import { getTimeZonesAt as live04 } from ${path('impls/04-live-intl/index.ts')};
+    import { installKernel } from ${path('tools/browser-kernel.ts')};
+
+    installKernel(
+      [{ id: ${JSON.stringify(libId)}, label: ${JSON.stringify(libId)}, features: {}, getTimeZonesAt }],
+      { id: '04-live-intl', label: 'live Intl baseline', features: {}, getTimeZonesAt: live04 }
+    );
+  `;
+
+  const result = await Bun.build({
+    entrypoints: ['virtual:lib-entry'],
+    target: 'browser',
+    format: 'iife',
+    plugins: [
+      {
+        name: 'virtual-lib-entry',
+        setup(build) {
+          build.onResolve({ filter: /^virtual:lib-entry$/ }, () => ({ path: 'virtual:lib-entry', namespace: 'virtual' }));
+          build.onLoad({ filter: /.*/, namespace: 'virtual' }, () => ({ contents: source, loader: 'ts' }));
+        },
+      },
+    ],
+  });
+
+  return result.outputs[0]!.text();
+}
+
 export async function launchChrome(): Promise<Browser> {
   return puppeteer.launch({
     executablePath: await findHeadlessShell(),

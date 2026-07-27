@@ -130,12 +130,26 @@ in-Chrome vs-04 sweeps are the tripwire that makes table staleness loud.
   5 including no-Temporal Safari-fallback pages), 2027 rollover checks for
   07/10, and an informational (non-gating) pass over the 5 comparison
   libraries.
-- `bun run bench` — performance only: Chrome table (cold/hit/miss,
-  formatter counts, renderer RSS, bundle KB) for our impls + the comparison
-  libraries + supplementary bun pass (Safari-fallback proxy) + the feature
+- `bun run bench` — performance only (~5s): Chrome table (cold/hit/miss,
+  formatter counts, renderer RSS, bundle KB) for our impls + the feature
   comparison matrix. Formatter counts come from a counting proxy over the
   global Intl.DateTimeFormat constructor (`shared/intl-count.ts`), so
-  library-internal formatters are measured too.
+  library-internal formatters are measured too. Sample counts are
+  time-budgeted rather than fixed: miss/hist take 25 samples when cheap and
+  as few as 5 at ~100ms/call (reported in the `n` column), and cold is the
+  median over 5 fresh pages, or 3 for an impl whose single first call blows
+  the budget. The aggregate loops (single-zone sweeps, `hit`) instead report
+  the fastest of 3-8 repeated passes: engines allocate type feedback per call
+  site, so a separate warm-up loop cannot warm the timed one, and a single
+  pass measured the JIT ramp rather than the impl — 4-5x high for the baked
+  sweeps under V8, up to 25x under JSC, since the ramp's roughly fixed cost
+  swamps a cheap loop. Two opt-in expansions, each costing more wall time than the
+  information moves: `bun run bench:libs` (~12s) adds the 5 comparison
+  libraries, which only move when their pinned versions do — each is bundled
+  alone, and each bun subprocess imports only the impl it measures, so
+  nothing is measured against another library's loaded tzdata.
+  `bun run bench:all` (~20s) adds the supplementary bun pass, the
+  Safari-fallback perf proxy.
 - `bun run size` / `bun run mem` — bundle sizes; phase-split memory with
   JS-heap vs native (~ICU) attribution.
 - `bun run audit` — curated-map drift detection against current CLDR.

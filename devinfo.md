@@ -66,10 +66,35 @@ bun run test:tz  # same suite under TZ=UTC, America/Chicago, Pacific/Kiritimati
 bun run gen      # regenerate ALL tables: chrome variant (primary, verified
                  # in-browser — the shippable artifact) + bun variant
                  # (supplementary, keeps the local suite fully covered)
-bun run bench    # PERFORMANCE ONLY: chrome benchmark (primary) +
-                 # supplementary bun pass (whose numbers double as the
-                 # Safari-fallback perf proxy). correctness incl. the
-                 # no-Temporal fallback paths lives in `bun run test`
+bun run bench    # PERFORMANCE ONLY (~5s): chrome benchmark (the primary
+                 # target) for this repo's impls, plus the features matrix.
+                 # correctness incl. the no-Temporal fallback paths lives
+                 # in `bun run test`. Sample counts are time-budgeted, so a
+                 # slow impl costs a bounded amount instead of a fixed one:
+                 #   miss/hist  25 samples for anything cheap, fewer for a
+                 #              slow impl (the median is no more stable at
+                 #              25 than at 5) — the `n` column reports which
+                 #   cold       median of 5 fresh pages, or 3 once a single
+                 #              sample exceeds the budget; never 4, so the
+                 #              median stays a true middle element
+                 #   sweeps     the aggregate loops (single-zone cur/hist,
+                 #              `hit`) report the FASTEST of 3-8 passes, not
+                 #              one timing: type feedback is per call site, so
+                 #              a separate warm-up loop can't warm the timed
+                 #              one and a lone pass measures the JIT ramp
+                 #              (4-5x high for the baked sweeps under V8, up
+                 #              to 25x under JSC). `passes` reports the count
+bun run bench:libs  # + the 5 third-party comparison libraries (~12s; they
+                 # dominate the runtime while their numbers only move when
+                 # package.json is bumped, so they're opt-in). Each library
+                 # is bundled ALONE for the browser pass, and each bun
+                 # subprocess imports ONLY the impl it measures, so nothing
+                 # is measured against another library's loaded tzdata. Use
+                 # before refreshing the tables in comparison.md
+bun run bench:all   # + the supplementary bun pass (~20s), whose numbers
+                 # double as the Safari-fallback perf proxy. Opt-in (--bun)
+                 # for the same reason: a third of the default runtime for
+                 # timings that are JSC's rather than any browser's
 bun run size     # minified bundle size per impl (Bun.build, minified)
 bun run mem      # memory: fresh subprocess per impl, median of 5 runs,
                  # phase deltas (import / first call / +25 misses) and a
@@ -86,13 +111,19 @@ bun run tables <bun|chrome>  # (plumbing) switch the active table variant;
 ```
 
 Chrome bench notes: it always bundles against the Chrome table variant
-(temporarily flipping the selector and restoring it); Chrome coarsens
-`performance.now()` to ~100µs, so
+(temporarily flipping the selector and restoring it); bundles are served from a
+throwaway local HTTP server and loaded as `<script src>` rather than injected
+via `page.evaluate(code)`, which avoids re-shipping megabytes over the DevTools
+protocol per page and lets Chrome reuse its V8 code cache across the fresh
+pages; Chrome coarsens `performance.now()` to ~100µs, so
 cache hits are timed as a 50k-call aggregate and sub-0.1ms misses read as 0;
 the JS heap column excludes ICU's native formatter memory, so a
-`renderer rss MB` column (Linux `/proc` scan of the renderer process)
-captures the native side. RSS deltas approximate peak allocation — freed
-pages aren't returned to the OS — so treat them comparatively.
+`renderer rss MB` column captures the native side, via a Linux `/proc` read of
+the VmRSS of the measured page's OWN renderer process — identified by diffing
+the renderer pid set across the `newPage()` that spawns it, which keeps the
+always-open initial `about:blank` page out of the delta. RSS deltas approximate
+peak allocation — freed pages aren't returned to the OS — so treat them
+comparatively.
 
 Generated tables carry `genMeta` provenance (generating host + ICU version).
 The live-Intl equivalence tests skip with a warning when the executing

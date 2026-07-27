@@ -81,18 +81,28 @@ until `04-live-intl` ships no generated data at all.
 | `04-live-intl` | fully live — no generated data to trust | 44.1 | 1.4 | 27.6 | 7.6 |
 
 Full-list `getTimeZonesAt()`, measured on chrome-headless-shell (the primary
-target) via `bun run bench`. `cold` is the first call; `miss` an hour-bucket
-recompute; `hit` (not shown) is ~0.01-0.03µs on cache repeats. `bundle` is
-minified, not gzipped (`07`/`10` carry the [1995+ history eras](#historical-coverage-1995);
-gzip roughly halves them: `07` ≈ 12.1KB).
+target) via `bun run bench`. `cold` is the first call (median over several fresh
+page contexts); `miss` an hour-bucket recompute (median over time-budgeted
+samples); `hit` (not shown) is a memoized repeat, single-digit nanoseconds once
+the loop is at its optimized tier. `bundle` is minified, not gzipped (`07`/`10`
+carry the [1995+ history eras](#historical-coverage-1995); gzip roughly halves
+them: `07` ≈ 12.1KB).
 
 ### Single-zone lookups
 
 `getTimeZoneAt(name, timestamp)` resolves one zone without building the full
 list — the single-zone / many-timestamps counterpart. Same ordering; each
-column is the total wall time to sweep `America/New_York` across 10,000
-timestamps (6h step), once in a current (projected) year and once in a
-historical one:
+column is the wall time to sweep `America/New_York` across 10,000 timestamps
+(6h step), once in a current (projected) year and once in a historical one,
+taking the fastest of several repeated passes. The repeats matter: a single
+pass measures the engine's JIT ramp as much as the impl, which read the baked
+sweeps 4-5x high under V8 (and up to 25x under JSC), because the ramp's roughly
+fixed cost swamps a sweep this cheap.
+
+_The two timing columns below still carry that ramp — they were captured before
+the repeated-pass fix landed. Re-run `bun run bench` on an idle machine to
+refresh them; expect the baked rows to drop severalfold and the live rows,
+whose own work dominates, to stay put._
 
 | impl | 10k cur ms | 10k hist ms | formatters |
 |---|--:|--:|--:|
@@ -101,11 +111,11 @@ historical one:
 | `08-verified-sharing` | 34.1 | 32.1 | 1 |
 | `04-live-intl` | 35.1 | 33.4 | 1 |
 
-Baked history costs `07` little extra — a few ms for the whole 10k-instant
-sweep whether the instants are past or present. On a Temporal runtime `10`
-resolves the past live (Temporal is authoritative for history), hence its
-heavier historical sweep (17.0ms vs 2.7ms); the live impls build one formatter
-for the zone and reuse it across the whole sweep either way.
+Baked history costs `07` little extra — the whole 10k-instant sweep runs in a
+couple of ms whether the instants are past or present. On a Temporal runtime
+`10` resolves the past live (Temporal is authoritative for history), hence its
+much heavier historical sweep; the live impls build one formatter for the zone
+and reuse it across the whole sweep either way.
 
 ### Schedule-only route (`getTimeZones()` / `getTimeZone()`)
 

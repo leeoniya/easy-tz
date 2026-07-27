@@ -52,6 +52,8 @@
     "test": "bun test && bun tools/test-chrome.ts",
     "test:tz": "TZ=UTC bun test && TZ=America/Chicago bun test && TZ=Pacific/Kiritimati bun test",
     "bench": "bun tools/bench-all.ts",
+    "bench:libs": "bun tools/bench-all.ts --libs",
+    "bench:all": "bun tools/bench-all.ts --libs --bun",
     "bench:luxon": "bun bench/luxon-format.ts",
     "bench:luxon-upstream": "node bench/luxon-upstream.ts",
     "bench:luxon-upstream:bun": "bun bench/luxon-upstream.ts",
