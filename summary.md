@@ -136,7 +136,7 @@ in-Chrome vs-04 sweeps are the tripwire that makes table staleness loud.
   global Intl.DateTimeFormat constructor (`shared/intl-count.ts`), so
   library-internal formatters are measured too. Sample counts are
   time-budgeted rather than fixed: miss/hist take 25 samples when cheap and
-  as few as 5 at ~100ms/call (reported in the `n` column), and cold is the
+  as few as 5 at ~100ms/call (the range is stated in the report header), and cold is the
   median over 5 fresh pages, or 3 for an impl whose single first call blows
   the budget. The aggregate loops (single-zone sweeps, `hit`) instead report
   the fastest of 3-8 repeated passes: engines allocate type feedback per call

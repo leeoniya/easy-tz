@@ -73,7 +73,7 @@ bun run bench    # PERFORMANCE ONLY (~5s): chrome benchmark (the primary
                  # slow impl costs a bounded amount instead of a fixed one:
                  #   miss/hist  25 samples for anything cheap, fewer for a
                  #              slow impl (the median is no more stable at
-                 #              25 than at 5) — the `n` column reports which
+                 #              25 than at 5) — the header states the range
                  #   cold       median of 5 fresh pages, or 3 once a single
                  #              sample exceeds the budget; never 4, so the
                  #              median stays a true middle element

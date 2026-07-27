@@ -205,7 +205,7 @@ try {
       // e.g. a comparison library whose bundle is browser-incompatible —
       // report the row as failed rather than aborting the whole bench
       console.error(`${id}: failed in-browser (${(e as Error).message.split('\n')[0]!.slice(0, 80)})`);
-      results.push({ id, zones: 0, coldMs: NaN, hitUs: NaN, missMedMs: NaN, histMedMs: NaN, missSamples: 0, formatters: 0, rendererMB: null });
+      results.push({ id, zones: 0, coldMs: NaN, hitMs: NaN, missMedMs: NaN, histMedMs: NaN, formatters: 0, rendererMB: null });
     }
   }
 
@@ -218,21 +218,19 @@ try {
   );
   console.log(`cold: median of ${COLD_SAMPLES.min}-${COLD_SAMPLES.max} fresh pages, ${SAMPLING_NOTE}\n`);
 
-  // hit, miss and hist are medians over the sampling loops (hist = a miss in
-  // a historical year, routing 07/10 through the era resolver). `n` is how many
-  // samples the budget allowed — cheap impls take all 25, a ~100ms/call library
-  // stops at 5, which costs it no accuracy (see MISS_SAMPLES in bench-config).
+  // miss and hist are medians over the sampling loops (hist = a miss in a
+  // historical year, routing 07/10 through the era resolver); how many samples
+  // the budget allowed is described by SAMPLING_NOTE in the header. hit is a
+  // memoized repeat, single-digit ns and so 0.0 at this scale — everything but a
+  // cold start or a bucket miss is free.
   printTable(
-    ['impl', 'cold ms', 'hit µs', 'miss ms', 'hist ms', 'n', 'formatters', 'rss MB', 'bundle KB'],
+    ['impl', 'cold ms', 'hit ms', 'miss ms', 'hist ms', 'formatters', 'rss MB', 'bundle KB'],
     results.map((r) => [
       r.id,
       Number.isNaN(r.coldMs) ? 'err' : r.coldMs.toFixed(1),
-      // 3 decimals: a memoized hit is single-digit ns once the loop is at its
-      // optimized tier, which 2 decimals rounded to 0.00
-      Number.isNaN(r.hitUs) ? 'err' : r.hitUs.toFixed(3),
+      Number.isNaN(r.hitMs) ? 'err' : r.hitMs.toFixed(1),
       Number.isNaN(r.missMedMs) ? 'err' : r.missMedMs.toFixed(1),
       Number.isNaN(r.histMedMs) ? 'err' : r.histMedMs.toFixed(1),
-      r.missSamples === 0 ? '-' : String(r.missSamples),
       Number.isNaN(r.coldMs) ? '-' : String(r.formatters),
       r.rendererMB === null ? 'n/a' : r.rendererMB.toFixed(2),
       ((sizes.get(r.id) ?? 0) / 1024).toFixed(1),

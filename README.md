@@ -83,8 +83,8 @@ until `04-live-intl` ships no generated data at all.
 Full-list `getTimeZonesAt()`, measured on chrome-headless-shell (the primary
 target) via `bun run bench`. `cold` is the first call (median over several fresh
 page contexts); `miss` an hour-bucket recompute (median over time-budgeted
-samples); `hit` (not shown) is a memoized repeat, single-digit nanoseconds once
-the loop is at its optimized tier. `bundle` is minified, not gzipped (`07`/`10`
+samples); `hit` (not shown) is a memoized repeat and free at this scale — single-digit
+nanoseconds, i.e. 0.0ms. `bundle` is minified, not gzipped (`07`/`10`
 carry the [1995+ history eras](#historical-coverage-1995); gzip roughly halves
 them: `07` ≈ 12.1KB).
 

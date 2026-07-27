@@ -29,9 +29,9 @@ import {
 } from './bench-config.ts';
 
 // 200k rather than 50k because Chrome coarsens performance.now() to ~100µs: at
-// single-digit ns/hit a 50k pass spans only ~4 ticks, quantizing the result to
-// ±25%. 200k costs ~1.6ms per pass — nothing next to the sweeps — and buys 4x
-// the resolution.
+// single-digit ns/hit a 50k pass spans only ~4 ticks. The reported column is
+// milliseconds and so rounds to 0.0 regardless, but the underlying figure stays
+// meaningful for anyone reading it at finer precision.
 const HIT_CALLS = 200_000;
 const HOUR_MS = 3_600_000;
 const BASE_TS = Date.UTC(2026, 5, 1, 12, 0);
@@ -46,10 +46,9 @@ export interface BenchResult {
   id: string;
   zones: number;
   coldMs: number;
-  hitUs: number;
+  hitMs: number; // per memoized hit; single-digit ns, so it reports as 0.0
   missMedMs: number; // median over the miss loop (current year)
   histMedMs: number; // median over the miss loop anchored in a historical year
-  missSamples: number; // samples the budget allowed (see MISS_SAMPLES)
   // Intl.DateTimeFormat constructions, counted via a global constructor
   // proxy so library-internal formatters are measured too. Each impl is
   // benched in a fresh page, so the count attributes to that impl alone.
@@ -136,7 +135,7 @@ export function installKernel(
       return performance.now() - h0;
     };
 
-    const hitUs = (steadyState(hitSweep, SWEEP_PASSES).ms / HIT_CALLS) * 1000;
+    const hitMs = steadyState(hitSweep, SWEEP_PASSES).ms / HIT_CALLS;
 
     if (hitSink < 0) throw new Error('unreachable');
 
@@ -159,10 +158,9 @@ export function installKernel(
       id: implId,
       zones: zones.length,
       coldMs,
-      hitUs,
+      hitMs,
       missMedMs: median(missTimes),
       histMedMs: median(histTimes),
-      missSamples: missTimes.length,
       formatters: intlConstructCount(),
     };
   };

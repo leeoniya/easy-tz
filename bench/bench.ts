@@ -49,10 +49,9 @@ const hitTimestamps = Array.from({ length: HIT_ITERATIONS }, (_, i) => BASE_TS +
 interface Row {
   id: string;
   coldMs: string;
-  hitMedUs: string;
+  hitMedMs: string;
   missMedMs: string;
   histMedMs: string;
-  missSamples: string;
   formatters: string;
   rssMB: string;
 }
@@ -90,10 +89,9 @@ for (const impl of benchImpls) {
   rows.push({
     id: impl.id,
     coldMs: '-',
-    hitMedUs: (median(hitTimes) * 1000).toFixed(1),
+    hitMedMs: median(hitTimes).toFixed(1),
     missMedMs: median(missTimes).toFixed(1),
     histMedMs: median(histTimes).toFixed(1),
-    missSamples: String(missTimes.length),
     formatters: '-',
     rssMB: '-',
   });
@@ -155,20 +153,21 @@ if (!genMeta.host.startsWith('bun')) {
 }
 
 // hit, miss and hist are medians over the sampling loops (hist = a miss in a
-// historical year, routing 07/10 through the era resolver); `n` is how many
-// samples MISS_SAMPLES' budget allowed. correctness lives in `bun run test`
-// (bun suite + chrome correctness), not here. rss MB is the subprocess's delta
-// across first call + that same run of misses (mirrors the chrome bench's
-// per-page semantics; excludes the memoized-result-only baseline).
+// historical year, routing 07/10 through the era resolver); how many samples
+// MISS_SAMPLES' budget allowed is described by SAMPLING_NOTE in the header. hit
+// is a memoized repeat, far below a tenth of a ms and so 0.0 here. correctness
+// lives in `bun run test` (bun suite + chrome correctness), not here. rss MB is
+// the subprocess's delta across first call + that same run of misses (mirrors
+// the chrome bench's per-page semantics; excludes the memoized-result-only
+// baseline).
 printTable(
-  ['impl', 'cold ms', 'hit µs', 'miss ms', 'hist ms', 'n', 'formatters', 'rss MB', 'bundle KB'],
+  ['impl', 'cold ms', 'hit ms', 'miss ms', 'hist ms', 'formatters', 'rss MB', 'bundle KB'],
   rows.map((r) => [
     r.id,
     r.coldMs,
-    r.hitMedUs,
+    r.hitMedMs,
     r.missMedMs,
     r.histMedMs,
-    r.missSamples,
     r.formatters,
     r.rssMB,
     ((sizes.get(r.id) ?? 0) / 1024).toFixed(1),
