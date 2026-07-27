@@ -125,3 +125,17 @@ export const SAMPLING_NOTE = `miss samples: ${MISS_SAMPLES.min}-${MISS_SAMPLES.m
 export const SWEEP_NOTE =
   `sweeps: fastest of ${SWEEP_PASSES.min}-${SWEEP_PASSES.max} passes ` +
   `(${SWEEP_PASSES.budgetMs}ms budget/era), discarding the JIT ramp`;
+
+// The single-zone table's heading and columns. Shared so the bun pass
+// (bench/bench.ts) and the Chrome pass (tools/bench-chrome.ts) print two tables
+// that can be read side by side, which is the only reason to run both — the
+// rows themselves stay with each pass, since they report different things about
+// an unsupported impl.
+export const GETONE_COLUMNS = ['impl', '10k cur ms', '10k hist ms', 'passes', 'formatters'];
+
+export function printGetOneHeading(): void {
+  console.log(
+    `\nsingle-zone getTimeZoneAt(): ${GETONE_ZONE}, ${GETONE_CALLS} timestamps/sweep (${GETONE_STEP_HOURS}h step)`
+  );
+  console.log(`${SWEEP_NOTE}\n`);
+}

@@ -27,7 +27,7 @@
 import { scanChanges, strideSteps } from './step-scan.ts';
 import { runtimeZones as zones } from '../shared/zones.ts';
 import { abbrOverrides, zoneAliases, zoneAbbrOverrides } from '../shared/abbrs.ts';
-import { fmtCache, formatOffset, initialsAbbr, compactGmt } from '../shared/fmt.ts';
+import { fmtCache, formatOffset, initialsAbbr, compactGmt, readZoneSample, WALL_CLOCK_FIELDS, type ZoneSample } from '../shared/fmt.ts';
 import {
   ruleInstant,
   resolveClass,
@@ -92,35 +92,19 @@ export interface Verification {
   mismatches: Mismatch[];
 }
 
-const partsFmt = fmtCache({
-  year: 'numeric',
-  month: 'numeric',
-  day: 'numeric',
-  hour: 'numeric',
-  minute: 'numeric',
-  hourCycle: 'h23',
-  timeZoneName: 'long',
-});
+const partsFmt = fmtCache(WALL_CLOCK_FIELDS);
 
-// "longName|offsetMin" at a given instant
+// reused across the millions of probes a full generation makes
+const sample: ZoneSample = { longName: '', offMin: 0 };
+
+// "longName|offsetMin" at a given instant. Shares its wall-clock reading with
+// the shipped live path (shared/fmt.ts) so a probe and a runtime lookup of the
+// same instant can't disagree. Every instant probed here is minute-aligned,
+// hence no `second` in the formatter above.
 function probe(zone: string, ts: number): string {
-  let year = 0, month = 0, day = 0, hour = 0, minute = 0;
-  let longName = '';
+  readZoneSample(partsFmt(zone), ts, sample);
 
-  for (const p of partsFmt(zone).formatToParts(ts)) {
-    switch (p.type) {
-      case 'year': year = +p.value; break;
-      case 'month': month = +p.value; break;
-      case 'day': day = +p.value; break;
-      case 'hour': hour = +p.value; break;
-      case 'minute': minute = +p.value; break;
-      case 'timeZoneName': longName = p.value; break;
-    }
-  }
-
-  const offsetMin = Math.round((Date.UTC(year, month - 1, day, hour, minute) - ts) / 60_000);
-
-  return `${longName}|${offsetMin}`;
+  return `${sample.longName}|${sample.offMin}`;
 }
 
 interface Seg {

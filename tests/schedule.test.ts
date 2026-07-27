@@ -5,8 +5,7 @@ import { scheduleClasses, genMeta } from '../shared/schedule.ts';
 import { alignedWith } from './aligned.ts';
 import { zones, runtimeZones } from '../shared/zones.ts';
 import { fixtures } from '../shared/fixtures.ts';
-
-const YEAR = 2026;
+import { BAKE_YEAR as YEAR, TRANSITIONS } from './transitions.ts';
 
 // equivalence against live Intl is only meaningful when this runtime's ICU
 // matches the one the tables were generated from (see genMeta provenance);
@@ -88,16 +87,7 @@ describe('07-baked-rules equivalence with 04 baseline', () => {
   });
 
   testIfAligned('identical output to 04 around 2026 US/EU/AU transition instants', () => {
-    const transitions = [
-      Date.UTC(YEAR, 2, 8, 7), // US spring-forward
-      Date.UTC(YEAR, 2, 29, 1), // EU spring-forward
-      Date.UTC(YEAR, 3, 4, 16), // Sydney fall-back
-      Date.UTC(YEAR, 9, 3, 16), // Sydney spring-forward
-      Date.UTC(YEAR, 9, 25, 1), // EU fall-back
-      Date.UTC(YEAR, 10, 1, 6), // US fall-back
-    ];
-
-    for (const t of transitions) {
+    for (const t of TRANSITIONS) {
       for (const delta of [-60_000, 0, 60_000]) {
         const [a, b] = both(t + delta);
         expect(a).toEqual(b);

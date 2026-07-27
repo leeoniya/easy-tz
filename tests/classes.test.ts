@@ -3,8 +3,7 @@ import { classGroups, genMeta } from '../shared/classes.ts';
 import { alignedWith } from './aligned.ts';
 import { zones } from '../shared/zones.ts';
 import { liveParts } from '../shared/live.ts';
-
-const YEAR = 2026;
+import { BAKE_YEAR as YEAR, TRANSITIONS } from './transitions.ts';
 
 // the class table is impl 08's grouping-hint source: members of a group must
 // produce identical live-Intl output to their representative all year.
@@ -42,15 +41,7 @@ describe('class table (impl 08 grouping hints)', () => {
       for (const d of [1, 15]) instants.push(Date.UTC(YEAR, m, d, 12));
     }
 
-    // 2026 US/EU/AU transition edges
-    for (const t of [
-      Date.UTC(YEAR, 2, 8, 7),
-      Date.UTC(YEAR, 2, 29, 1),
-      Date.UTC(YEAR, 3, 4, 16),
-      Date.UTC(YEAR, 9, 3, 16),
-      Date.UTC(YEAR, 9, 25, 1),
-      Date.UTC(YEAR, 10, 1, 6),
-    ]) {
+    for (const t of TRANSITIONS) {
       instants.push(t - 60_000, t + 60_000);
     }
 

@@ -21,13 +21,8 @@
 // Exits 1 on any disagreement.
 
 import { inChromePage } from './chrome-harness.ts';
-import { generateTables, generateHistory } from './gen-core.ts';
-import { auditTableSet, type AbbrFixResult } from './abbrfix-core.ts';
-
-interface Pair {
-  scanned: AbbrFixResult;
-  seeded: AbbrFixResult;
-}
+import { auditBothWays, type EquivPair as Pair } from './abbrfix-equiv-core.ts';
+import type { AbbrFixResult } from './abbrfix-core.ts';
 
 // every correction as a flat, zone-qualified line, so a disagreement names the
 // zone and span rather than just a count
@@ -42,15 +37,6 @@ function describe(r: AbbrFixResult): string[] {
     .toSorted();
 }
 
-function runLocal(): Pair {
-  const tables = generateTables();
-  const history = generateHistory(tables);
-
-  const audit = (boundaries: Record<string, number[]> | null) => auditTableSet(tables, history, boundaries);
-
-  return { scanned: audit(null), seeded: audit(history.boundaries) };
-}
-
 async function runChrome(): Promise<Pair> {
   return inChromePage(
     new URL('./abbrfix-equiv-browser-entry.ts', import.meta.url).pathname,
@@ -61,9 +47,9 @@ async function runChrome(): Promise<Pair> {
 
 const local = process.argv.includes('--local');
 const runtimes: [string, () => Pair | Promise<Pair>][] = local
-  ? [[`bun ${Bun.version}`, runLocal]]
+  ? [[`bun ${Bun.version}`, auditBothWays]]
   : [
-      [`bun ${Bun.version}`, runLocal],
+      [`bun ${Bun.version}`, auditBothWays],
       ['chrome-headless-shell', runChrome],
     ];
 

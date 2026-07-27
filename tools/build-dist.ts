@@ -13,6 +13,7 @@ import { rmSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { impls } from '../impls/registry.ts';
+import type { TimeZoneInfo } from '../shared/types.ts';
 import { selectTables } from './use-tables.ts';
 import { activeVariant } from './table-files.ts';
 import { printTable } from './print-table.ts';
@@ -120,6 +121,29 @@ export declare function clearCache(): void;
  */
 export declare function formatOffset(minutes: number): string;
 `;
+
+// The published TimeZoneInfo above is hand-written rather than derived from
+// shared/types.ts, because consumers deserve docs written for them rather than
+// this repo's internal notes. The cost is that the two can drift, and a .d.ts
+// that omits a field is a lie the type checker tells every consumer — so the
+// shapes are reconciled here instead.
+//
+// The Record turns "TimeZoneInfo gained a field" into a compile error, and the
+// comparison turns "the .d.ts describes a field that no longer exists" into a
+// failed build.
+const infoFields: Record<keyof TimeZoneInfo, true> = { name: true, abbr: true, offset: true, aliasOf: true };
+
+const declaredFields = [...dtsSource.matchAll(/^ {2}(\w+)\??:/gm)].map((m) => m[1]!).toSorted();
+const actualFields = Object.keys(infoFields).toSorted();
+
+if (declaredFields.join(',') !== actualFields.join(',')) {
+  console.error(
+    `dist .d.ts is out of sync with shared/types.ts TimeZoneInfo:\n` +
+      `  declared in .d.ts: ${declaredFields.join(', ')}\n` +
+      `  actual type:       ${actualFields.join(', ')}`
+  );
+  process.exit(1);
+}
 
 const previousVariant = activeVariant() ?? 'bun';
 

@@ -11,18 +11,11 @@
 import type { TimeZoneInfo } from './types.ts';
 import { abbrOverrides, zoneAliases, zoneAbbrOverrides } from './abbrs.ts';
 import { makeInfo } from './zoneLinks.ts';
-import { fmtCache, initialsAbbr, compactGmt } from './fmt.ts';
+import { fmtCache, initialsAbbr, compactGmt, readZoneSample, WALL_CLOCK_FIELDS, type ZoneSample } from './fmt.ts';
 
-const partsFmt = fmtCache({
-  year: 'numeric',
-  month: 'numeric',
-  day: 'numeric',
-  hour: 'numeric',
-  minute: 'numeric',
-  second: 'numeric',
-  hourCycle: 'h23',
-  timeZoneName: 'long',
-});
+// seconds on top of the shared fields: this path serves arbitrary timestamps,
+// where the zone-local seconds have to be carried through the offset subtraction
+const partsFmt = fmtCache({ ...WALL_CLOCK_FIELDS, second: 'numeric' });
 
 const abbrCache = new Map<string, string>();
 
@@ -37,33 +30,18 @@ function resolveAbbr(longName: string): string {
   return abbr;
 }
 
+// reused across calls; readZoneSample fills it and we read it out immediately,
+// so nothing can observe it between the two
+const sample: ZoneSample = { longName: '', offMin: 0 };
+
 // parses `fmtZone`'s live Intl output at an instant: resolved abbr + offset in
 // signed minutes. callers sharing one fmtZone across grouped zones (impl 08)
 // memoize this result per call and apply per-zone overrides themselves.
 // formatToParts accepts the epoch-ms directly, so no Date is allocated.
 export function liveParts(fmtZone: string, timestamp: number): { abbr: string; offset: number } {
-  const parts = partsFmt(fmtZone).formatToParts(timestamp);
+  readZoneSample(partsFmt(fmtZone), timestamp, sample);
 
-  let year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;
-  let longName = '';
-
-  for (const p of parts) {
-    switch (p.type) {
-      case 'year': year = +p.value; break;
-      case 'month': month = +p.value; break;
-      case 'day': day = +p.value; break;
-      case 'hour': hour = +p.value; break;
-      case 'minute': minute = +p.value; break;
-      case 'second': second = +p.value; break;
-      case 'timeZoneName': longName = p.value; break;
-    }
-  }
-
-  const asUTC = Date.UTC(year, month - 1, day, hour, minute, second);
-  // round to whole minutes; sub-second remainder of `timestamp` cancels out
-  const offsetMin = Math.round((asUTC - timestamp) / 60_000);
-
-  return { abbr: resolveAbbr(longName), offset: offsetMin };
+  return { abbr: resolveAbbr(sample.longName), offset: sample.offMin };
 }
 
 // full live resolution for one zone, applying the curated metazone alias

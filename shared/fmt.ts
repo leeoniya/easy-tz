@@ -26,6 +26,63 @@ export function tzNameFromFormat(formatted: string): string {
   return formatted.slice(formatted.indexOf(', ') + 2);
 }
 
+// The formatter readZoneSample() below expects: a full zone-local wall clock on
+// a 24-hour cycle, plus the CLDR long name. Shared with the options so the two
+// halves of that contract can't drift — a caller that dropped `hourCycle`, say,
+// would silently read midnight as hour 24 and land a day off.
+//
+// `second` is left to the caller (see readZoneSample).
+export const WALL_CLOCK_FIELDS: Omit<Intl.DateTimeFormatOptions, 'timeZone'> = {
+  year: 'numeric',
+  month: 'numeric',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: 'numeric',
+  hourCycle: 'h23',
+  timeZoneName: 'long',
+};
+
+export interface ZoneSample {
+  longName: string; // CLDR long name, e.g. "Eastern Standard Time"
+  offMin: number; // UTC offset in signed minutes
+}
+
+// Reads one instant's zone-local wall clock out of `fmt` and reduces it to the
+// only two things anyone wants from it: the CLDR long name and the offset,
+// derived arithmetically from the difference between the wall clock and the
+// instant. Both callers — shared/live.ts (the shipped live path) and
+// tools/gen-core.ts (the generator's probe) — must agree on this to the minute
+// or the baked tables disagree with the runtime they were generated from.
+//
+// Writes into a caller-owned `out` because gen-core probes millions of times
+// and this is its innermost loop.
+//
+// `second` is read only if the formatter asked for it, which is what lets the
+// two callers keep different formatter options: gen-core probes minute-aligned
+// instants and omits the field, leaving it 0. The live path serves arbitrary
+// timestamps, where the zone-local seconds have to be carried through so the
+// subtraction cancels the sub-minute remainder of `timestamp` instead of
+// rounding it into the offset.
+export function readZoneSample(fmt: Intl.DateTimeFormat, timestamp: number, out: ZoneSample): void {
+  let year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;
+  let longName = '';
+
+  for (const p of fmt.formatToParts(timestamp)) {
+    switch (p.type) {
+      case 'year': year = +p.value; break;
+      case 'month': month = +p.value; break;
+      case 'day': day = +p.value; break;
+      case 'hour': hour = +p.value; break;
+      case 'minute': minute = +p.value; break;
+      case 'second': second = +p.value; break;
+      case 'timeZoneName': longName = p.value; break;
+    }
+  }
+
+  out.longName = longName;
+  out.offMin = Math.round((Date.UTC(year, month - 1, day, hour, minute, second) - timestamp) / 60_000);
+}
+
 // "GMT+05:30" -> "+05:30", "GMT-04:00" -> "-04:00", "GMT" -> "+00:00"
 export function isoOffsetFromLongOffset(longOffset: string): string {
   return longOffset.length === 3 ? '+00:00' : longOffset.slice(3);

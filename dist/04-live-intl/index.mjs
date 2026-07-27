@@ -260,54 +260,19 @@ function fmtCache(options) {
     return fmt;
   };
 }
-function formatOffset(minutes) {
-  const sign = minutes < 0 ? "-" : "+";
-  const abs = minutes < 0 ? -minutes : minutes;
-  const hh = String(abs / 60 | 0).padStart(2, "0");
-  const mm = String(abs % 60).padStart(2, "0");
-  return `${sign}${hh}:${mm}`;
-}
-function initialsAbbr(longName) {
-  if (longName.startsWith("GMT"))
-    return null;
-  let abbr = "";
-  for (const word of longName.split(/[\s\-&’.]+/)) {
-    const c = word.charAt(0);
-    if (c >= "A" && c <= "Z")
-      abbr += c;
-  }
-  return abbr.length >= 2 ? abbr : null;
-}
-function compactGmt(longName) {
-  const out = longName.replace(/([+-])0?(\d+):00/, "$1$2").replace(/([+-])0?(\d+):(\d+)/, "$1$2:$3");
-  return out === "GMT+0" || out === "GMT-0" ? "GMT" : out;
-}
-
-// shared/live.ts
-var partsFmt = fmtCache({
+var WALL_CLOCK_FIELDS = {
   year: "numeric",
   month: "numeric",
   day: "numeric",
   hour: "numeric",
   minute: "numeric",
-  second: "numeric",
   hourCycle: "h23",
   timeZoneName: "long"
-});
-var abbrCache = new Map;
-function resolveAbbr(longName) {
-  let abbr = abbrCache.get(longName);
-  if (abbr == null) {
-    abbr = abbrOverrides[longName] ?? initialsAbbr(longName) ?? compactGmt(longName);
-    abbrCache.set(longName, abbr);
-  }
-  return abbr;
-}
-function liveParts(fmtZone, timestamp) {
-  const parts = partsFmt(fmtZone).formatToParts(timestamp);
+};
+function readZoneSample(fmt, timestamp, out) {
   let year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;
   let longName = "";
-  for (const p of parts) {
+  for (const p of fmt.formatToParts(timestamp)) {
     switch (p.type) {
       case "year":
         year = +p.value;
@@ -332,9 +297,47 @@ function liveParts(fmtZone, timestamp) {
         break;
     }
   }
-  const asUTC = Date.UTC(year, month - 1, day, hour, minute, second);
-  const offsetMin = Math.round((asUTC - timestamp) / 60000);
-  return { abbr: resolveAbbr(longName), offset: offsetMin };
+  out.longName = longName;
+  out.offMin = Math.round((Date.UTC(year, month - 1, day, hour, minute, second) - timestamp) / 60000);
+}
+function formatOffset(minutes) {
+  const sign = minutes < 0 ? "-" : "+";
+  const abs = minutes < 0 ? -minutes : minutes;
+  const hh = String(abs / 60 | 0).padStart(2, "0");
+  const mm = String(abs % 60).padStart(2, "0");
+  return `${sign}${hh}:${mm}`;
+}
+function initialsAbbr(longName) {
+  if (longName.startsWith("GMT"))
+    return null;
+  let abbr = "";
+  for (const word of longName.split(/[\s\-&’.]+/)) {
+    const c = word.charAt(0);
+    if (c >= "A" && c <= "Z")
+      abbr += c;
+  }
+  return abbr.length >= 2 ? abbr : null;
+}
+function compactGmt(longName) {
+  const out = longName.replace(/([+-])0?(\d+):00/, "$1$2").replace(/([+-])0?(\d+):(\d+)/, "$1$2:$3");
+  return out === "GMT+0" || out === "GMT-0" ? "GMT" : out;
+}
+
+// shared/live.ts
+var partsFmt = fmtCache({ ...WALL_CLOCK_FIELDS, second: "numeric" });
+var abbrCache = new Map;
+function resolveAbbr(longName) {
+  let abbr = abbrCache.get(longName);
+  if (abbr == null) {
+    abbr = abbrOverrides[longName] ?? initialsAbbr(longName) ?? compactGmt(longName);
+    abbrCache.set(longName, abbr);
+  }
+  return abbr;
+}
+var sample = { longName: "", offMin: 0 };
+function liveParts(fmtZone, timestamp) {
+  readZoneSample(partsFmt(fmtZone), timestamp, sample);
+  return { abbr: resolveAbbr(sample.longName), offset: sample.offMin };
 }
 function liveZoneInfo(name, timestamp) {
   const r = liveParts(zoneAliases[name] ?? name, timestamp);

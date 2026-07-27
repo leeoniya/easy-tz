@@ -13,13 +13,13 @@ import {
   GETONE_ZONE,
   GETONE_CALLS,
   GETONE_STEP_MS,
-  GETONE_STEP_HOURS,
   GETONE_CUR_BASE,
   GETONE_HIST_BASE,
   MISS_SAMPLES,
   WARMUP_SAMPLES,
   SAMPLING_NOTE,
-  SWEEP_NOTE,
+  printGetOneHeading,
+  GETONE_COLUMNS,
   sampleTimes,
   median,
 } from '../tools/bench-config.ts';
@@ -247,15 +247,14 @@ for (const impl of impls) {
   });
 }
 
-console.log(`\nsingle-zone getTimeZoneAt(): ${GETONE_ZONE}, ${GETONE_CALLS} timestamps/sweep (${GETONE_STEP_HOURS}h step)`);
-console.log(`${SWEEP_NOTE}\n`);
+printGetOneHeading();
 
 // 10k ms are the wall time of the fastest pass over each sweep (hist routes
 // 07/10 through the baked era resolver — bun has no Temporal). passes: how many
 // the budget allowed, cur/hist. formatters: one per zone for the live-Intl
 // impls, none for the baked ones.
 printTable(
-  ['impl', '10k cur ms', '10k hist ms', 'passes', 'formatters'],
+  GETONE_COLUMNS,
   oneRows.map((r) => [r.id, r.curMs, r.histMs, r.passes, r.formatters])
 );
 

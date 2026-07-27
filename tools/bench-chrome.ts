@@ -23,7 +23,7 @@ import { impls } from '../impls/registry.ts';
 import { minifiedSizes } from '../bench/size.ts';
 import { bundleBrowserEntry, bundleSingleLibEntry, launchChrome } from './chrome-harness.ts';
 import { printTable } from './print-table.ts';
-import { GETONE_ZONE, GETONE_CALLS, GETONE_STEP_HOURS, SAMPLING_NOTE, SWEEP_NOTE, median, type SampleBudget } from './bench-config.ts';
+import { SAMPLING_NOTE, median, printGetOneHeading, GETONE_COLUMNS, type SampleBudget } from './bench-config.ts';
 import { withLibs } from './bench-opts.ts';
 import type { BenchResult, BenchOneResult } from './bench-browser-entry.ts';
 
@@ -253,15 +253,14 @@ try {
     }
   }
 
-  console.log(`\nsingle-zone getTimeZoneAt(): ${GETONE_ZONE}, ${GETONE_CALLS} timestamps/sweep (${GETONE_STEP_HOURS}h step)`);
-  console.log(`${SWEEP_NOTE}\n`);
+  printGetOneHeading();
 
   // 10k ms are the wall time of the fastest pass over each sweep. hist routes 07
   // through the baked era resolver and (on this Temporal runtime) 10 through live
   // Temporal. passes: how many the budget allowed, cur/hist. formatters: one per
   // zone for the live-Intl impls, none baked.
   printTable(
-    ['impl', '10k cur ms', '10k hist ms', 'passes', 'formatters'],
+    GETONE_COLUMNS,
     oneResults.map((r) => [
       r.id,
       r.curMs.toFixed(2),
