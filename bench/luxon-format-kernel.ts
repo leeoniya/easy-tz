@@ -23,6 +23,7 @@ import type { TimeZoneInfo } from '../shared/types.ts';
 import { zones } from '../shared/zones.ts';
 import { classIdx } from '../shared/bakedSchedule.ts';
 import { scheduleClasses } from '../shared/schedule.ts';
+import { median } from '../tools/bench-config.ts';
 
 // Locale is pinned so luxon's ZZZZ token and moment's z token are compared on
 // equal terms and the run is reproducible regardless of host locale.
@@ -101,13 +102,13 @@ export function makeEasyZoneClass(Base: typeof IANAZone) {
   };
 }
 
-export const EasyTZZone = makeEasyZoneClass(IANAZone);
+const EasyTZZone = makeEasyZoneClass(IANAZone);
 
 // mirrors luxon's own ianaZoneCache: constructing an IANAZone runs
 // isValidZone(), which builds an Intl.DateTimeFormat, so instances are reused
 const easyZoneCache = new Map<string, InstanceType<typeof EasyTZZone>>();
 
-export function easyZoneFor(name: string): InstanceType<typeof EasyTZZone> {
+function easyZoneFor(name: string): InstanceType<typeof EasyTZZone> {
   let zone = easyZoneCache.get(name);
 
   if (zone === undefined) {
@@ -118,7 +119,7 @@ export function easyZoneFor(name: string): InstanceType<typeof EasyTZZone> {
 }
 
 /** The host zone, resolved once — luxon's SystemZone#name rebuilds a formatter on every access. */
-export const hostZoneName = new Intl.DateTimeFormat().resolvedOptions().timeZone;
+const hostZoneName = new Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 /**
  * The same treatment for the host zone. luxon's SystemZone already gets its
@@ -132,7 +133,7 @@ export const hostZoneName = new Intl.DateTimeFormat().resolvedOptions().timeZone
  * from this runtime's ICU, but a process that mutates TZ mid-run would need
  * this instance discarded — the same caveat as luxon's own zone caches.
  */
-export class EasySystemZone extends SystemZone {
+class EasySystemZone extends SystemZone {
   readonly #at = zoneMemo(hostZoneName);
 
   override offsetName(ts: number, opts: OffsetNameOpts): string | null {
@@ -142,7 +143,7 @@ export class EasySystemZone extends SystemZone {
 
 let easySystem: EasySystemZone | undefined;
 
-export function easySystemZone(): EasySystemZone {
+function easySystemZone(): EasySystemZone {
   return (easySystem ??= new EasySystemZone());
 }
 
@@ -309,4 +310,39 @@ export function timeLoop(format: (ts: number) => string, base: number, step: num
   }
 
   return { ms: performance.now() - t0, checksum };
+}
+
+// Times every entry `reps` times INTERLEAVED — one pass of each per round,
+// rather than all of one entry's passes back to back — and reports the median
+// pass per entry. Interleaving is what makes the numbers comparable: ambient
+// drift over the run gets spread across the variants instead of landing on
+// whichever happened to go last.
+//
+// Shared by both luxon benches (luxon-format.ts, luxon-upstream.ts), which had
+// a copy each. A driver that drifted out of interleaving would still print a
+// full table of plausible numbers — the failure mode is silent, so the loop is
+// worth having in one place.
+//
+// The summed checksum comes back so the caller can keep feeding its sink and
+// stop the engine eliding the formatting.
+export function interleavedMedians<K>(
+  entries: { key: K; format: (ts: number) => string }[],
+  base: number,
+  step: number,
+  n: number,
+  reps: number
+): { medians: Map<K, number>; checksum: number } {
+  const times = new Map<K, number[]>(entries.map((e) => [e.key, []]));
+  let checksum = 0;
+
+  for (let r = 0; r < reps; r++) {
+    for (const { key, format } of entries) {
+      const run = timeLoop(format, base, step, n);
+
+      checksum += run.checksum;
+      times.get(key)!.push(run.ms);
+    }
+  }
+
+  return { medians: new Map([...times].map(([k, xs]) => [k, median(xs)])), checksum };
 }

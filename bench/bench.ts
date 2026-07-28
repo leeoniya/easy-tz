@@ -249,10 +249,8 @@ for (const impl of impls) {
 
 printGetOneHeading();
 
-// 10k ms are the wall time of the fastest pass over each sweep (hist routes
-// 07/10 through the baked era resolver — bun has no Temporal). passes: how many
-// the budget allowed, cur/hist. formatters: one per zone for the live-Intl
-// impls, none for the baked ones.
+// bun has no Temporal, so the historical sweep routes both 07 and 10 through
+// the baked era resolver (see GETONE_COLUMNS for what each column is)
 printTable(
   GETONE_COLUMNS,
   oneRows.map((r) => [r.id, r.curMs, r.histMs, r.passes, r.formatters])

@@ -16,7 +16,7 @@ export const NO_TEMPORAL_IDS = ['08-verified-sharing', '10-audited-rules'];
 export const KILL_TEMPORAL = 'globalThis.Temporal = undefined; delete globalThis.Temporal;';
 
 // bundles an entry for in-page evaluation (iife so page.evaluate can run it)
-export async function bundleForBrowser(entryPath: string): Promise<string> {
+async function bundleForBrowser(entryPath: string): Promise<string> {
   const result = await Bun.build({
     entrypoints: [entryPath],
     target: 'browser',

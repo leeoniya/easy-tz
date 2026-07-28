@@ -255,10 +255,9 @@ try {
 
   printGetOneHeading();
 
-  // 10k ms are the wall time of the fastest pass over each sweep. hist routes 07
-  // through the baked era resolver and (on this Temporal runtime) 10 through live
-  // Temporal. passes: how many the budget allowed, cur/hist. formatters: one per
-  // zone for the live-Intl impls, none baked.
+  // this runtime has Temporal, so the historical sweep routes 07 through the
+  // baked era resolver but 10 through live Temporal (see GETONE_COLUMNS for what
+  // each column is)
   printTable(
     GETONE_COLUMNS,
     oneResults.map((r) => [

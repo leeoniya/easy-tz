@@ -20,6 +20,40 @@ interface Vs04 {
   mismatches: string[];
 }
 
+// Every check below is a Vs04 tally per impl, and they all get summarized and
+// reported the same two ways. Six copies of the reporting loop is how a check
+// quietly stops failing the suite while still printing a reassuring count.
+type Tallies = Iterable<readonly [string, Vs04]>;
+
+function totals(tallies: Tallies): { passed: number; checked: number } {
+  let checked = 0;
+  let bad = 0;
+
+  for (const [, t] of tallies) {
+    checked += t.checked;
+    bad += t.mismatchCount;
+  }
+
+  return { passed: checked - bad, checked };
+}
+
+// `what` names the check; it's appended to each impl's label, and empty when
+// the label already says what was checked.
+function reportFailures(what: string, tallies: Tallies): boolean {
+  let failed = false;
+
+  for (const [label, t] of tallies) {
+    if (t.mismatchCount === 0) continue;
+
+    failed = true;
+    console.error(`\nFAIL ${label}${what}: ${t.mismatchCount}/${t.checked} mismatched (first ${t.mismatches.length}):`);
+
+    for (const m of t.mismatches) console.error(`  ${m}`);
+  }
+
+  return failed;
+}
+
 const VS04_IDS = ['08-verified-sharing', '10-audited-rules', '07-baked-rules'];
 
 const code = await bundleBrowserEntry();
@@ -108,24 +142,21 @@ try {
 
   // current-instant pair (getTimeZone vs getTimeZones); on a Temporal runtime
   // this is the only place impl 10's live-recovered zones get exercised
-  const curChecked = [...currentApis.values()].reduce((n, c) => n + c.checked, 0);
-  const curBad = [...currentApis.values()].reduce((n, c) => n + c.mismatchCount, 0);
+  const cur = totals(currentApis);
 
-  console.log(`current-instant APIs: ${curChecked - curBad}/${curChecked} getTimeZone() results match getTimeZones()`);
+  console.log(`current-instant APIs: ${cur.passed}/${cur.checked} getTimeZone() results match getTimeZones()`);
 
   // fixed-offset ids Chrome accepts but never enumerates (Etc/GMT±N, UTC):
   // derived arithmetically by the baked impls, checked against live Intl
-  const fixChecked = [...fixedOffsets.values()].reduce((n, c) => n + c.checked, 0);
-  const fixBad = [...fixedOffsets.values()].reduce((n, c) => n + c.mismatchCount, 0);
+  const fix = totals(fixedOffsets);
 
-  console.log(`fixed-offset ids: ${fixChecked - fixBad}/${fixChecked} Etc/GMT±N + UTC single-zone lookups match live 04`);
+  console.log(`fixed-offset ids: ${fix.passed}/${fix.checked} Etc/GMT±N + UTC single-zone lookups match live 04`);
 
   // withAliases = false: here the canonical survivors are often the spelling
   // Chrome's ICU never enumerated, so they exercise the zoneLinks bridge
-  const canChecked = [...canonicalOnly.values()].reduce((n, c) => n + c.checked, 0);
-  const canBad = [...canonicalOnly.values()].reduce((n, c) => n + c.mismatchCount, 0);
+  const can = totals(canonicalOnly);
 
-  console.log(`canonical-only: ${canChecked - canBad}/${canChecked} withAliases=false list drops + substitutions correct`);
+  console.log(`canonical-only: ${can.passed}/${can.checked} withAliases=false list drops + substitutions correct`);
 
   if (init08) {
     console.log(
@@ -162,58 +193,17 @@ try {
     }
   }
 
-  for (const [label, f] of [['10 rollover audit', future10], ['07 rollover rules', future07]] as const) {
-    if (f.mismatchCount > 0) {
-      failed = true;
-      console.error(`\nFAIL ${label}: ${f.mismatchCount}/${f.checked} mismatched (first ${f.mismatches.length}):`);
+  const checks: [string, Tallies][] = [
+    ['', [['10 rollover audit', future10], ['07 rollover rules', future07]]],
+    [' vs 04', vs04],
+    [' alias pairs', aliasPairs],
+    [' current-instant APIs', currentApis],
+    [' fixed-offset ids', fixedOffsets],
+    [' canonical-only', canonicalOnly],
+  ];
 
-      for (const m of f.mismatches) console.error(`  ${m}`);
-    }
-  }
-
-  for (const [label, eq] of vs04) {
-    if (eq.mismatchCount > 0) {
-      failed = true;
-      console.error(`\nFAIL ${label} vs 04: ${eq.mismatchCount}/${eq.checked} mismatched (first ${eq.mismatches.length}):`);
-
-      for (const m of eq.mismatches) console.error(`  ${m}`);
-    }
-  }
-
-  for (const [label, ap] of aliasPairs) {
-    if (ap.mismatchCount > 0) {
-      failed = true;
-      console.error(`\nFAIL ${label} alias pairs: ${ap.mismatchCount}/${ap.checked} mismatched (first ${ap.mismatches.length}):`);
-
-      for (const m of ap.mismatches) console.error(`  ${m}`);
-    }
-  }
-
-  for (const [label, c] of currentApis) {
-    if (c.mismatchCount > 0) {
-      failed = true;
-      console.error(`\nFAIL ${label} current-instant APIs: ${c.mismatchCount}/${c.checked} mismatched (first ${c.mismatches.length}):`);
-
-      for (const m of c.mismatches) console.error(`  ${m}`);
-    }
-  }
-
-  for (const [label, f] of fixedOffsets) {
-    if (f.mismatchCount > 0) {
-      failed = true;
-      console.error(`\nFAIL ${label} fixed-offset ids: ${f.mismatchCount}/${f.checked} mismatched (first ${f.mismatches.length}):`);
-
-      for (const m of f.mismatches) console.error(`  ${m}`);
-    }
-  }
-
-  for (const [label, c] of canonicalOnly) {
-    if (c.mismatchCount > 0) {
-      failed = true;
-      console.error(`\nFAIL ${label} canonical-only: ${c.mismatchCount}/${c.checked} mismatched (first ${c.mismatches.length}):`);
-
-      for (const m of c.mismatches) console.error(`  ${m}`);
-    }
+  for (const [what, tallies] of checks) {
+    if (reportFailures(what, tallies)) failed = true;
   }
 
   if (failed) process.exit(1);

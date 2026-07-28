@@ -101,6 +101,48 @@ function tally() {
   };
 }
 
+// Deep output-equality of two impls' full responses across a set of instants —
+// the comparison behind both the vs-04 check below and the rollover check in
+// tools/bench-browser-entry.ts, down to the message the host prints. They ran
+// as separate copies of this loop, where a difference in what counts as a
+// mismatch would make one check quietly weaker than the other.
+//
+// `skip` opts a zone out and counts it separately rather than passing it: impl
+// 07's irregular classes are clamped by design past their generated year.
+export function compareResponses(
+  baseline: Impl,
+  other: Impl,
+  implId: string,
+  instants: number[],
+  skip?: (zone: string) => boolean
+): Vs04 & { skipped: number } {
+  const t = tally();
+  let skipped = 0;
+
+  for (const ts of instants) {
+    const a = baseline.getTimeZonesAt(ts);
+    const b = other.getTimeZonesAt(ts);
+
+    for (let k = 0; k < a.length; k++) {
+      const x = a[k]!;
+      const y = b[k]!;
+
+      if (skip?.(x.name) === true) {
+        skipped++;
+        continue;
+      }
+
+      t.check();
+
+      if (x.name !== y.name || x.abbr !== y.abbr || x.offset !== y.offset) {
+        t.fail(`${x.name} @ ${new Date(ts).toISOString()}: 04=${x.abbr} ${x.offset} vs ${implId}=${y.abbr} ${y.offset}`);
+      }
+    }
+  }
+
+  return { ...t.result(), skipped };
+}
+
 export function installKernel(
   list: Impl[],
   baseline: Impl,
@@ -453,24 +495,6 @@ export function installKernel(
       instants.push(edge - 60_000, edge + 60_000);
     }
 
-    const t = tally();
-
-    for (const ts of instants) {
-      const a = baseline.getTimeZonesAt(ts);
-      const b = other.getTimeZonesAt(ts);
-
-      for (let k = 0; k < a.length; k++) {
-        t.check();
-
-        const x = a[k]!;
-        const y = b[k]!;
-
-        if (x.name !== y.name || x.abbr !== y.abbr || x.offset !== y.offset) {
-          t.fail(`${x.name} @ ${new Date(ts).toISOString()}: 04=${x.abbr} ${x.offset} vs ${implId}=${y.abbr} ${y.offset}`);
-        }
-      }
-    }
-
-    return t.result();
+    return compareResponses(baseline, other, implId, instants);
   };
 }

@@ -139,7 +139,7 @@ export const scheduleClasses = decodeSchedule(P, S, R, I);
 // is NOT the order scheduleClasses arrives in here, so it can't be read off the
 // live array — `t.scheduleClasses.flatMap((c) => c.zones)` disagrees with the
 // runtime in ~90% of positions. Every sidecar emitter must index through this.
-export function scheduleZoneOrder(t: GeneratedTables): string[] {
+function scheduleZoneOrder(t: GeneratedTables): string[] {
   return [0, 1, 2].flatMap((k) => t.scheduleClasses.filter((c) => c.kind === k)).flatMap((c) => c.zones);
 }
 

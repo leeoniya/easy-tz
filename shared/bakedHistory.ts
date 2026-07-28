@@ -47,7 +47,7 @@ export const histIdx = /*@__PURE__*/ buildScheduleIndex(zones, historyClasses);
 // zones-list order -> abbreviation-correction class index (-1 = this zone's
 // historical labels are already right, which is 392 of 464 zones). Same
 // /*@__PURE__*/ reasoning as histIdx above.
-export const fixIdx = /*@__PURE__*/ buildScheduleIndex(zones, abbrFixClasses);
+const fixIdx = /*@__PURE__*/ buildScheduleIndex(zones, abbrFixClasses);
 
 // UTC start of the bake year: `ts < HISTORY_TO_MS` is exactly `year < HISTORY_TO`
 // (the timestamp falls before Jan 1 of the bake year) but with no Date

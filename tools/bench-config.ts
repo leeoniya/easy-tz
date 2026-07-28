@@ -14,7 +14,7 @@ const HOUR_MS = 3_600_000;
 export const GETONE_ZONE = 'America/New_York';
 export const GETONE_CALLS = 10_000;
 export const GETONE_STEP_MS = 6 * HOUR_MS; // 10000 * 6h ≈ 6.8 years per sweep
-export const GETONE_STEP_HOURS = GETONE_STEP_MS / HOUR_MS;
+const GETONE_STEP_HOURS = GETONE_STEP_MS / HOUR_MS;
 export const GETONE_CUR_BASE = Date.UTC(2026, 0, 1); // bake year onward
 export const GETONE_HIST_BASE = Date.UTC(2000, 0, 1); // within the 1995+ era window
 
@@ -122,7 +122,7 @@ export function steadyState(pass: () => number, budget: SampleBudget): { ms: num
 
 // how the sample counts are described in the report headers
 export const SAMPLING_NOTE = `miss samples: ${MISS_SAMPLES.min}-${MISS_SAMPLES.max} (${MISS_SAMPLES.budgetMs}ms budget/loop)`;
-export const SWEEP_NOTE =
+const SWEEP_NOTE =
   `sweeps: fastest of ${SWEEP_PASSES.min}-${SWEEP_PASSES.max} passes ` +
   `(${SWEEP_PASSES.budgetMs}ms budget/era), discarding the JIT ramp`;
 
@@ -131,6 +131,12 @@ export const SWEEP_NOTE =
 // that can be read side by side, which is the only reason to run both — the
 // rows themselves stay with each pass, since they report different things about
 // an unsupported impl.
+// What the columns mean, kept with their definition rather than restated above
+// each printTable: "10k cur ms" / "10k hist ms" are the wall time of the FASTEST
+// pass over each sweep, "passes" is how many the budget allowed as cur/hist, and
+// "formatters" is one per zone for the live-Intl impls and none for the baked
+// ones. Where the historical sweep actually goes differs by runtime, so each
+// pass notes that for itself.
 export const GETONE_COLUMNS = ['impl', '10k cur ms', '10k hist ms', 'passes', 'formatters'];
 
 export function printGetOneHeading(): void {

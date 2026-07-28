@@ -40,7 +40,7 @@ const STRIDE = 6 * 96;
 // vague GMT±N, which is honest, and correcting those too (option B+) costs
 // roughly 3x the bytes for labels nobody is currently being misled by.
 // Flip to true to ship B+.
-export const INCLUDE_VAGUE = false;
+const INCLUDE_VAGUE = false;
 
 export interface FixSpan {
   from: number; // 15-min steps since Jan 1 of fromYear

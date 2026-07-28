@@ -13,7 +13,7 @@ import { impls } from '../impls/registry.ts';
 import { getInitInfo } from '../impls/08-verified-sharing/index.ts';
 import { scheduleClasses } from '../shared/schedule.ts';
 import { irregularZones } from '../shared/rules.ts';
-import { installKernel } from './browser-kernel.ts';
+import { installKernel, compareResponses } from './browser-kernel.ts';
 
 export type { BenchResult, BenchOneResult, ValidateResult, Vs04 } from './browser-kernel.ts';
 
@@ -40,35 +40,5 @@ installKernel(impls, impl04, (id) => (id === '08-verified-sharing' ? getInitInfo
     Date.UTC(2027, 2, 28, 2),
   ];
 
-  let checked = 0;
-  let skipped = 0;
-  let mismatchCount = 0;
-  const mismatches: string[] = [];
-
-  for (const ts of instants) {
-    const a = impl04.getTimeZonesAt(ts);
-    const b = other.getTimeZonesAt(ts);
-
-    for (let k = 0; k < a.length; k++) {
-      const x = a[k]!;
-      const y = b[k]!;
-
-      if (skipIrregular && irregular.has(x.name)) {
-        skipped++;
-        continue;
-      }
-
-      checked++;
-
-      if (x.name !== y.name || x.abbr !== y.abbr || x.offset !== y.offset) {
-        mismatchCount++;
-
-        if (mismatches.length < 10) {
-          mismatches.push(`${x.name} @ ${new Date(ts).toISOString()}: 04=${x.abbr} ${x.offset} vs ${implId}=${y.abbr} ${y.offset}`);
-        }
-      }
-    }
-  }
-
-  return { checked, skipped, mismatchCount, mismatches };
+  return compareResponses(impl04, other, implId, instants, skipIrregular ? (z) => irregular.has(z) : undefined);
 };

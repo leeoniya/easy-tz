@@ -26,7 +26,6 @@
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { printTable } from '../tools/print-table.ts';
-import { median } from '../tools/bench-config.ts';
 import { genMeta, YEAR_START } from '../shared/schedule.ts';
 import { loadLuxon, patchWhat, type LuxonModule, type PatchKey } from './luxon-patches.ts';
 import {
@@ -37,6 +36,7 @@ import {
   makeFormatter,
   patternFor,
   timeLoop,
+  interleavedMedians,
   type FormatKey,
 } from './luxon-format-kernel.ts';
 
@@ -183,20 +183,14 @@ async function measureAll(fmt: FormatKey): Promise<Map<string, number>> {
   for (const path of paths) {
     const format = await path.make(fmt);
     sink += timeLoop(format, BASE_TS - WARMUP * STEP_MS, STEP_MS, WARMUP).checksum;
-    built.push({ id: path.id, format });
+    built.push({ key: path.id, format });
   }
 
-  const times = new Map<string, number[]>(built.map((b) => [b.id, []]));
+  const { medians, checksum } = interleavedMedians(built, BASE_TS, STEP_MS, N, REPS);
 
-  for (let r = 0; r < REPS; r++) {
-    for (const { id, format } of built) {
-      const run = timeLoop(format, BASE_TS, STEP_MS, N);
-      sink += run.checksum;
-      times.get(id)!.push(run.ms);
-    }
-  }
+  sink += checksum;
 
-  return new Map([...times].map(([id, xs]) => [id, median(xs)]));
+  return medians;
 }
 
 console.log(`luxon ${await pkgVersion('luxon')} vs moment ${await pkgVersion('moment')}`);

@@ -18,7 +18,6 @@
 
 import moment from 'moment-timezone';
 import { printTable } from '../tools/print-table.ts';
-import { median } from '../tools/bench-config.ts';
 import { genMeta, YEAR_START } from '../shared/schedule.ts';
 import { zones } from '../shared/zones.ts';
 import {
@@ -28,6 +27,7 @@ import {
   makeFormatter,
   patternFor,
   timeLoop,
+  interleavedMedians,
   variantAvailable,
   variantIds,
   easyTZCanResolve,
@@ -81,20 +81,14 @@ function measureRow(zone: string, fmt: FormatKey, step: number): Map<VariantId, 
     const format = makeFormatter(variant, zone, fmt);
     sink += timeLoop(format, BASE_TS - WARMUP * step, step, WARMUP).checksum;
 
-    return { variant, format };
+    return { key: variant, format };
   });
 
-  const times = new Map<VariantId, number[]>(runnable.map((v) => [v, []]));
+  const { medians, checksum } = interleavedMedians(formatters, BASE_TS, step, N, REPS);
 
-  for (let r = 0; r < REPS; r++) {
-    for (const { variant, format } of formatters) {
-      const run = timeLoop(format, BASE_TS, step, N);
-      sink += run.checksum;
-      times.get(variant)!.push(run.ms);
-    }
-  }
+  sink += checksum;
 
-  return new Map([...times].map(([v, xs]) => [v, median(xs)]));
+  return medians;
 }
 
 console.log(

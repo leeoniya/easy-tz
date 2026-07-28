@@ -133,7 +133,7 @@ type TemporalApi = NonNullable<typeof Temporal>;
 
 const temporal: TemporalApi | null = typeof Temporal === 'undefined' ? null : Temporal;
 
-export const PROBE_STRATEGY: 'temporal' | 'stride' = temporal !== null ? 'temporal' : 'stride';
+const PROBE_STRATEGY: 'temporal' | 'stride' = temporal !== null ? 'temporal' : 'stride';
 
 // Fallback strides. scanAt() resolves any number of changes between two
 // samples, so a stride does NOT have to be narrow enough to isolate them —
