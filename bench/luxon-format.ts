@@ -17,8 +17,14 @@
 // opt-in: with --verify the last two sections re-format the same values and
 // report where the paths disagree.
 //
-// Run: bun run bench:luxon           (timings only, ~13s)
-//      bun run bench:luxon:verify    (+ the output comparisons, ~17s)
+// Overlaps bench/luxon-upstream.ts on one cell by design — the New_York row is the
+// same three paths that file's table opens with, and citing the same number under
+// two engines is the point. What is only here is the zone coverage (the local and
+// fixed-offset paths, which cost differently, and ~460 zones in the agreement
+// sections), and the Intl traffic counts that explain every timing in both files.
+//
+// Run: bun run bench:luxon           (timings only, ~6s)
+//      bun run bench:luxon:verify    (+ the output comparisons, ~10s)
 
 import moment from 'moment-timezone';
 import { printTable } from '../tools/print-table.ts';
@@ -70,6 +76,9 @@ const BASE_TS = Date.UTC(BAKE_YEAR, 0, 1);
 // or a time-series axis actually produces
 const STEP_MS = MIN_MS;
 
+// Zones the agreement section compares. Kept wide because that is where zones
+// differ from each other: CLDR gives London and Kolkata a "GMT+1"-style short
+// name where tzdata gives BST and IST, and Lord_Howe disagrees three ways.
 const BENCH_ZONES = [
   SYSTEM,
   UTC,
@@ -78,6 +87,16 @@ const BENCH_ZONES = [
   'Asia/Kolkata',
   'Australia/Lord_Howe', // 30-minute DST shift
 ];
+
+// Zones the timing tables report, which is a shorter list than the above for the
+// opposite reason: all four named zones came out flat within ~6% in absolute ms
+// on every path, so the rest of them were rows spent re-establishing that the
+// cost does not depend on which IANA zone it is. What does not survive the cut is
+// the pair that takes a different code path — the local zone, and a fixed-offset
+// zone whose `abbr` cost is a twentieth of a named zone's because there is no
+// per-value name lookup to pay. New_York is also the zone
+// bench/luxon-upstream.ts times, so it cross-references.
+const TIMING_ZONES = [SYSTEM, UTC, 'America/New_York', 'Australia/Lord_Howe'];
 
 let sink = 0;
 
@@ -144,36 +163,20 @@ function timingRow(label: string, ms: Map<VariantId, number>): string[] {
 const TIMING_HEADERS = ['', 'moment', 'luxon', 'luxon+easytz', 'luxon', 'luxon+easytz'];
 
 for (const fmt of formatKeys) {
-  const rows = BENCH_ZONES.map((zone) => timingRow(zone, measureRow(zone, fmt, STEP_MS)));
+  const rows = TIMING_ZONES.map((zone) => timingRow(zone, measureRow(zone, fmt, STEP_MS)));
 
   console.log(`${fmt} format (${patternFor('moment', fmt)}) — ms per ${N} values, ratio vs moment\n`);
   printTable(['zone', ...TIMING_HEADERS.slice(1)], rows);
   console.log();
 }
 
-// ---- column density ------------------------------------------------------
-// moment-timezone binary-searches a packed table and easy-tz evaluates rules, so
-// both could in principle be sensitive to how far apart adjacent values are,
-// whereas stock luxon's per-value Intl call is not. A cache keyed on anything
-// coarser than the exact instant (an hour bucket, say) would fall apart here.
-
-{
-  const zone = 'America/New_York';
-  const densities: [string, number][] = [
-    ['1 min', MIN_MS],
-    ['15 min', 15 * MIN_MS],
-    ['1 hour', HOUR_MS],
-    ['1 day', DAY_MS],
-  ];
-
-  for (const fmt of formatKeys) {
-    const rows = densities.map(([label, step]) => timingRow(label, measureRow(zone, fmt, step)));
-
-    console.log(`column density, ${zone}, ${fmt} format — ms per ${N} values, ratio vs moment\n`);
-    printTable(['step', ...TIMING_HEADERS.slice(1)], rows);
-    console.log();
-  }
-}
+// A column-density sweep used to live here: the same zone timed at 1 min, 15 min,
+// 1 hour and 1 day between adjacent values, to catch a cache keyed on anything
+// coarser than the exact instant (an hour bucket, say) — moment binary-searches a
+// packed table and easy-tz evaluates rules, so either could in principle care how
+// far apart the values are. All four steps came out identical within noise on
+// every path, and eight rows re-establishing that each run is eight rows too
+// many. Restore it if either implementation's lookup gains a bucketed cache.
 
 console.log(`passes taken per cell: ${[...passCounts].sort((a, b) => a - b).join(', ')}\n`);
 
@@ -271,7 +274,8 @@ if (scaledVariants.size > 0) {
 
 if (!withVerify) {
   console.log(
-    `output agreement and cross-zone fidelity skipped — pass --verify to run them (~4s).\n` +
+    `output agreement and cross-zone fidelity skipped — pass --verify to run them (~4s, and they are\n` +
+      `most of what this file has that bench/luxon-upstream.ts does not).\n` +
       `The timings above are only a result if the three paths agree, so run them before quoting any.\n`
   );
 }
