@@ -22,9 +22,9 @@
 //   upstream  four patches to luxon itself, all pure memoization or provable
 //             short-circuits (see bench/luxon-patches.ts)
 //
-// Run: bun run bench:luxon-upstream            (timings only, ~18s under node)
-//      bun run bench:luxon-upstream:verify     (+ the parity scan, ~25s)
-//      bun run bench:luxon-upstream:bun        (the same under bun/JSC, ~20s)
+// Run: bun run bench:luxon-upstream            (timings only, ~14s under node)
+//      bun run bench:luxon-upstream:verify     (+ the parity scan, ~21s)
+//      bun run bench:luxon-upstream:bun        (the same under bun/JSC, ~17s)
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { printTable } from '../tools/print-table.ts';
@@ -66,9 +66,9 @@ const PASSES: SampleBudget = { min: 3, max: 5, budgetMs: 200 };
 // single patches worth 10-15%: measured against a budget that also caught the
 // ladder rungs, the control rows went from ~1% to ~3-9% and the patch ranking
 // reshuffled. Everything from `luxon C` down (a full pass costs ~380ms) stays
-// at the full N. What it does cut is the unpatched abbr path at ~2.1s per pass
-// — with its control, a quarter of this benchmark's runtime spent
-// re-establishing the one number nobody disputes.
+// at the full N. What it does cut is the unpatched abbr path, which at ~2.1s per
+// pass would otherwise spend a third of this benchmark's runtime re-establishing
+// the one number nobody disputes.
 const PASS_BUDGET_MS = 400;
 
 const BAKE_YEAR = new Date(YEAR_START).getUTCFullYear();
@@ -83,8 +83,10 @@ const CORE: PatchKey[] = ['numFast', 'parseFormatCache', 'zoneInfoCache', 'local
 const LATER: PatchKey[] = ['tokenLoop', 'intRoundTo', 'padStart2', 'tsToObjMath'];
 const CACHES: PatchKey[] = [...CORE, ...LATER];
 const ALL_PATCHES: PatchKey[] = [...CACHES, 'compileFormat'];
-// J and K are the zone lookup rather than the formatter, so they only appear on
-// the stock-zone rows: the easy-tz rows override offset() and never reach them.
+// J and K are the zone lookup rather than the formatter, so the per-patch easy-tz
+// rows leave them out: that zone overrides the offset() they patch and would time
+// them as noise. The one easy-tz row that does carry them is the A-K one, where
+// the point is what the full upstream build leaves easy-tz to win.
 // K anchors on J's fast path, so the order here is also the apply order.
 const OFFSET: PatchKey[] = ['offsetScan', 'offsetInterval'];
 const UPSTREAM: PatchKey[] = [...ALL_PATCHES, ...OFFSET];
@@ -111,8 +113,6 @@ const LADDER: Rung[] = [
   { id: 'all 11 (A-K)', keys: UPSTREAM },
 ].map((r) => ({ id: `luxon ${r.id}`, keys: r.keys as PatchKey[] }));
 
-const LAST_RUNG = LADDER[LADDER.length - 1]!.id;
-
 // ---- paths under test ----------------------------------------------------
 
 interface Path {
@@ -121,7 +121,7 @@ interface Path {
   patches: readonly PatchKey[];
   /** false when the zone still comes from Intl */
   easyZone: boolean;
-  /** id of the row this one is an increment over, for the savings column */
+  /** id of the build this one is an increment over, for the savings the findings quote */
   base: string | undefined;
   make: (fmt: FormatKey) => Promise<(ts: number) => string>;
 }
@@ -160,11 +160,12 @@ const paths: Path[] = [
     make: (fmt) => Promise.resolve(makeFormatter('moment', ZONE, fmt)),
   },
   luxonPath('luxon (stock)', [], false, undefined),
-  // Control: the same unpatched module measured a second time, so its "saved"
-  // figure is pure measurement noise and calibrates the rest of the column.
-  luxonPath('luxon (stock, control)', [], false, 'luxon (stock)'),
+  // No control for stock, deliberately. A control is the same configuration
+  // measured twice, and this configuration is the unpatched abbr path at ~2s a
+  // pass — a tenth of the whole benchmark to produce one noise-floor percentage,
+  // at the timing scale where relative noise matters least. The two controls
+  // below sit where the margins are thin enough to argue about.
   ...LADDER.map((rung, i) => luxonPath(rung.id, rung.keys, false, LADDER[i - 1]?.id ?? 'luxon (stock)')),
-  luxonPath(`${LAST_RUNG} (control)`, UPSTREAM, false, LAST_RUNG),
   // The formatter effort on its own, for contrast with the C+J+K rung: it is
   // the larger diff by far and the smaller win on both formats.
   luxonPath('luxon ABCDEFGHI (formatter only)', ALL_PATCHES, false, 'luxon (stock)'),
@@ -175,12 +176,17 @@ const paths: Path[] = [
   ),
   luxonPath('easytz ABCDEFGH (caches)', CACHES, true, 'easytz zone'),
   luxonPath('easytz ABCDEFGHI (all)', ALL_PATCHES, true, 'easytz ABCDEFGH (caches)'),
-  // second control, at the scale of the fastest luxon rows: relative noise is
+  // the control at the scale of the fastest rows: relative noise is
   // larger down here than it is at the stock row's ~10x slower timings, so the
   // B/E redundancy question below has to be judged against this, not against the
   // control up top
   luxonPath('easytz ABCDEFGHI (control)', ALL_PATCHES, true, 'easytz ABCDEFGHI (all)'),
   luxonPath('easytz ACDFGHI (no B/E)', NO_B_OR_E, true, 'easytz ABCDEFGHI (all)'),
+  // The question the report ends on: if all eleven land upstream, is the easy-tz
+  // zone still worth binding? It carries J and K even though its zone overrides
+  // the offset() they patch, so this row landing on top of A-I + easy-tz is the
+  // measurement of that, rather than a claim that they cannot matter here.
+  luxonPath('luxon A-K + easytz', UPSTREAM, true, 'easytz zone'),
   {
     id: 'easytz fast path',
     patches: [],
@@ -255,81 +261,65 @@ printTable(
 );
 console.log();
 
-// ---- timing per format ---------------------------------------------------
+// ---- results -------------------------------------------------------------
+// One table for the whole benchmark. Both formats side by side, because they are
+// two different problems: the zone-less pattern is bounded by offset() and the
+// abbreviated one by the zone name lookup, so a rung that transforms one can do
+// nothing at all for the other, and that only reads at a glance on one row.
+//
+// Raw ms only, with both baselines carrying a row of their own. A ratio against
+// either of them is a division the reader can do off those two rows, so columns
+// for them were four more numbers saying what these two already say. The
+// findings below still quote ratios, since prose cannot ask for a division.
+//
+// Everything in `paths` is measured; these are the builds worth a row. The rest —
+// one build per individual patch, and the controls that repeat a configuration —
+// exist for the findings section's ranking and noise floor, and printing every
+// one of them buried the handful that answer the question.
 
 const results = new Map<FormatKey, Map<string, number>>();
 
-for (const fmt of formatKeys) {
-  const ms = await measureAll(fmt);
-  results.set(fmt, ms);
+for (const fmt of formatKeys) results.set(fmt, await measureAll(fmt));
 
-  const base = ms.get('moment')!;
+{
+  const named = (id: string, label = id) => ({ id, label });
 
-  const rows = paths.map((p) => {
-    const t = ms.get(p.id)!;
-    const over = p.base === undefined ? undefined : ms.get(p.base)!;
+  // The ladder keeps only its letters, since the group it sits in is all luxon
+  // builds; the group below it mixes luxon and easy-tz, so those keep the prefix.
+  const groups = [
+    [named('moment'), named('luxon (stock)', 'luxon')],
+    LADDER.map((r) => named(r.id, r.id.replace('luxon ', ''))),
+    // What binding easy-tz's offset() and offsetName() to luxon is worth, before
+    // and after the patches: the same two zone methods either way, so the pair
+    // isolates the zone from the formatter.
+    [named('easytz zone', 'luxon + easy-tz'), named('luxon A-K + easytz', 'luxon (A-K) + easy-tz')],
+  ];
 
-    return [
-      p.id,
-      t.toFixed(1),
-      `${(t / base).toFixed(2)}×`,
-      over === undefined ? '—' : `${(((over - t) / over) * 100).toFixed(0)}%`,
-      p.base ?? '—',
-    ];
-  });
+  const rows: (string[] | null)[] = [];
 
-  console.log(`${fmt} format (${patternFor('moment', fmt)}) — ms per ${N} values\n`);
-  printTable(['path', 'ms', 'vs moment', 'saved', 'over'], rows);
-  console.log();
+  for (const group of groups) {
+    if (rows.length > 0) rows.push(null);
+
+    for (const { id, label } of group) {
+      const ms = formatKeys.map((fmt) => results.get(fmt)!.get(id)!);
+
+      rows.push([label, ...ms.map((t) => t.toFixed(1))]);
+    }
+  }
+
+  console.log(`the ladder in the middle adds one patch per rung to the one above it\n`);
+  printTable(['build', ...formatKeys.map((fmt) => `${fmt} ms`)], rows);
+  console.log(`\n${formatKeys.map((fmt) => `${fmt}: ${patternFor('moment', fmt)}`).join('   ')}`);
+  console.log(`passes taken per format: ${[...passCounts].sort((a, b) => a - b).join(', ')}\n`);
 }
-
-console.log(`passes taken per format: ${[...passCounts].sort((a, b) => a - b).join(', ')}\n`);
 
 if (scaledPaths.size > 0) {
   console.log(
-    `note: ${scaledPaths.size} of ${paths.length} paths cost enough per value that timing ${N} of them takes ~2s a pass,\n` +
-      `or ~${(2 * PASSES.min * scaledPaths.size).toFixed(0)}s of this benchmark across their passes. Those are timed over fewer values and scaled\n` +
-      `to ${N}; their per-value cost is flat in the pass length, so the ratios stand. Every other path is\n` +
-      `timed over the full ${N}, and each control row is measured exactly like the row it controls.\n`
+    `note: ${scaledPaths.size} of the ${paths.length} builds measured cost enough per value that timing ${N} of them takes\n` +
+      `~2s a pass, or ~${(2 * PASSES.min * scaledPaths.size).toFixed(0)}s of this benchmark across their passes. Those are timed over fewer\n` +
+      `values and scaled to ${N}; their per-value cost is flat in the pass length, so the ratios stand.\n` +
+      `Every other build is timed over the full ${N}, and each control exactly like what it controls.\n`
   );
-}
-
-// ---- the ladder ----------------------------------------------------------
-// The four patches worth arguing for, stacked one at a time. Both formats side
-// by side, because they are two different problems: the zone-less pattern is
-// bounded by offset() and the abbreviated one by the zone name lookup, so a
-// rung that transforms one can do nothing at all for the other.
-
-{
-  const cols = formatKeys.flatMap((fmt) => {
-    const ms = results.get(fmt)!;
-    const moment = ms.get('moment')!;
-    const stock = ms.get('luxon (stock)')!;
-
-    return [
-      { fmt, label: 'ms', of: (t: number) => t.toFixed(1) },
-      // both ratios are cost against a fixed baseline, so the whole table reads
-      // in one direction and the two columns are comparable with each other
-      { fmt, label: 'vs moment', of: (t: number) => `${(t / moment).toFixed(2)}×` },
-      { fmt, label: 'vs stock', of: (t: number) => `${(t / stock).toFixed(2)}×` },
-    ];
-  });
-
-  const rows = ['luxon (stock)', ...LADDER.map((r) => r.id)].map((id) => [
-    id.replace('luxon ', ''),
-    ...cols.map((c) => c.of(results.get(c.fmt)!.get(id)!)),
-  ]);
-
-  console.log(`cumulative — each rung adds one patch to the one above it`);
-  console.log(`both ratios are cost relative to that baseline — lower is better, 1.00× is parity\n`);
-  printTable(['build', ...cols.map((c) => `${c.fmt} ${c.label}`)], rows);
-  console.log(`\n${patchLegend()}`);
-}
-
-function patchLegend(): string {
-  const keys: PatchKey[] = ['zoneInfoCache', 'offsetScan', 'offsetInterval', 'compileFormat'];
-
-  return keys.map((k) => `${LETTER.get(k)!}  ${patchWhat.get(k)!}`).join('\n');
 }
 
 // ---- agreement ----------------------------------------------------------
@@ -409,46 +399,12 @@ if (withVerify) {
   );
 }
 
-// ---- summary ------------------------------------------------------------
-
-{
-  const rows = formatKeys.map((fmt) => {
-    const ms = results.get(fmt)!;
-    const base = ms.get('moment')!;
-    const cell = (id: string) => `${(ms.get(id)! / base).toFixed(2)}×`;
-
-    return [
-      patternFor('moment', fmt),
-      cell('luxon (stock)'),
-      cell('easytz zone'),
-      cell('luxon ABCDEFGHI (formatter only)'),
-      cell('luxon all 11 (A-K)'),
-      cell('easytz ABCDEFGHI (all)'),
-      cell('easytz fast path'),
-    ];
-  });
-
-  console.log(`\nsummary — ratio vs moment (lower is better)\n`);
-  printTable(
-    [
-      'format',
-      'stock luxon',
-      'easytz zone',
-      'upstream A-I',
-      'upstream A-K',
-      'easytz + upstream',
-      'external fast path',
-    ],
-    rows
-  );
-}
-
 // ---- findings ------------------------------------------------------------
 
 {
   const abbr = results.get('abbr')!;
   const num = results.get('numeric')!;
-  /** saving of a row over its own baseline row, as the table reports it */
+  /** what a build saves over the one it was an increment over (Path.base) */
   const saved = (ms: Map<string, number>, id: string) => {
     const over = ms.get(paths.find((p) => p.id === id)!.base!)!;
 
@@ -487,22 +443,22 @@ if (withVerify) {
 
     return lines.join('\n');
   }
-  const noise = noiseBetween('luxon (stock)', 'luxon (stock, control)');
   const noiseMid = noiseBetween('easytz zone', 'easytz zone (control)');
   const noiseFast = noiseBetween('easytz ABCDEFGHI (all)', 'easytz ABCDEFGHI (control)');
 
   const ratio = (ms: Map<string, number>, id: string) => (ms.get(id)! / ms.get('moment')!).toFixed(2);
 
-  // ladder rows are always quoted the same two ways as the ladder table: a
-  // percentage against stock, and this rung's own contribution in ms
+  // ladder rungs are always quoted the same two ways below: a percentage against
+  // stock, and this rung's own contribution in ms
   const rungs = ['luxon (stock)', ...LADDER.map((r) => r.id)];
   const cum = (ms: Map<string, number>, id: string) => pct(1 - ms.get(id)! / ms.get('luxon (stock)')!);
   const step = (ms: Map<string, number>, id: string) =>
     (ms.get(rungs[rungs.indexOf(id) - 1]!)! - ms.get(id)!).toFixed(0);
 
   console.log(`
-findings (noise floor from the three control rows, fastest rows being the
-noisiest: ~${pct(noise)} at the stock timings, ~${pct(noiseMid)} at the easy-tz zone, ~${pct(noiseFast)} at the fully patched)
+findings (noise floor from two configurations measured twice each, which the table
+above does not report: ~${pct(noiseMid)} at the easy-tz zone and ~${pct(noiseFast)} at the fully patched — the
+two timing scales where a patch's margin is close enough to the floor to matter)
 
 C is the one that matters and is barely an optimization: parseZoneInfo built a
 fresh Intl.DateTimeFormat per value, so any pattern containing a zone name paid
@@ -526,7 +482,7 @@ with a ~${pct(noiseMid)} noise floor:
 ${tiers()}
 
 I should also make B and E redundant by construction, since it parses each pattern
-once and folds punctuation into literal runs. The ACDFGHI row supports that:
+once and folds punctuation into literal runs. Building ACDFGHI supports that:
 dropping both moves numeric by ${saved(num, 'easytz ACDFGHI (no B/E)')} (positive meaning faster without them), against
 ~${pct(noiseFast)} noise at that timing scale, and the sign is not stable across runs. Keep B
 if it is already written; do not write it for I's sake.
@@ -576,17 +532,20 @@ in all of tzdata is 6.92 days (America/Cambridge_Bay, Oct-Nov 2000) across all
 mode if tzdata ever tightened past it is a stale offset rather than a crash.
 J has no such precondition and is worth filing regardless.
 
-Stacked, all of it takes the easy-tz path from ${ratio(num, 'easytz zone')}× moment to ${ratio(num, 'easytz ABCDEFGHI (all)')}× and stock
+Stacked, all of it takes the easy-tz path from ${ratio(num, 'easytz zone')}× moment to ${ratio(num, 'luxon A-K + easytz')}× and stock
 luxon from ${ratio(num, 'luxon (stock)')}× to ${ratio(num, 'luxon all 11 (A-K)')}×, without touching a public API or changing a byte
 of output — verified across every token in the switch, all macro tokens, four
 zones and four locales including a non-gregory calendar with non-latn digits.
 
-That reverses the case for easy-tz depending on the pattern. On numeric, the
-full upstream build (${ratio(num, 'luxon all 11 (A-K)')}×) now edges out easy-tz plus A-I (${ratio(num, 'easytz ABCDEFGHI (all)')}×), so a luxon
-that carried J and K would leave easy-tz nothing to win on zone-less patterns.
-On abbreviations easy-tz is still ahead by an order of magnitude (${ratio(abbr, 'easytz ABCDEFGHI (all)')}× vs ${ratio(abbr, 'luxon all 11 (A-K)')}×),
-and skipping the Formatter entirely for known patterns is a further ${(num.get('easytz ABCDEFGHI (all)')! / num.get('easytz fast path')!).toFixed(1)}× beyond
-even that.
+That reverses the case for easy-tz depending on the pattern, which is what the
+last two rows of the table are for: same patches on both sides, so the only
+difference is where the zone comes from. On numeric the full upstream build
+(${ratio(num, 'luxon all 11 (A-K)')}×) now edges out that build with easy-tz bound to it (${ratio(num, 'luxon A-K + easytz')}×), so a luxon
+carrying J and K would leave easy-tz nothing to win on zone-less patterns. On
+abbreviations easy-tz is still ahead by an order of magnitude (${ratio(abbr, 'luxon A-K + easytz')}× vs ${ratio(abbr, 'luxon all 11 (A-K)')}×),
+because no patch removes the zone name lookup itself. Skipping the Formatter
+entirely for the patterns a value formatter emits in bulk — easy-tz's own fast
+path, measured but not tabulated — is a further ${(num.get('luxon A-K + easytz')! / num.get('easytz fast path')!).toFixed(1)}× beyond even that.
 
 Recommended to file, in order: C and J first — both are self-contained, neither
 needs a design argument, and between them they take stock luxon from ${ratio(num, 'luxon (stock)')}× to
