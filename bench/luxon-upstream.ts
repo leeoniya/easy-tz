@@ -22,10 +22,14 @@
 //   upstream  four patches to luxon itself, all pure memoization or provable
 //             short-circuits (see bench/luxon-patches.ts)
 //
-// Run: bun bench/luxon-upstream.ts
+// Run: bun run bench:luxon-upstream            (timings only, ~18s under node)
+//      bun run bench:luxon-upstream:verify     (+ the parity scan, ~25s)
+//      bun run bench:luxon-upstream:bun        (the same under bun/JSC, ~20s)
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { printTable } from '../tools/print-table.ts';
+import { withVerify } from '../tools/bench-opts.ts';
+import type { SampleBudget } from '../tools/bench-config.ts';
 import { genMeta, YEAR_START } from '../shared/schedule.ts';
 import { loadLuxon, patchWhat, type LuxonModule, type PatchKey } from './luxon-patches.ts';
 import {
@@ -35,15 +39,37 @@ import {
   makeFastFormatter,
   makeFormatter,
   patternFor,
-  timeLoop,
-  interleavedMedians,
+  interleavedBest,
   type FormatKey,
 } from './luxon-format-kernel.ts';
 
-const N = 20_000;
-const REPS = 7;
-const WARMUP = 2_000;
+const N = 20_000; // values the timings are reported per
 const STEP_MS = 60_000;
+
+// Interleaved passes per path, budgeted like the Chrome sweeps in
+// tools/bench-config.ts. Was a fixed 7 with a median; three with a minimum
+// resolves as finely, because a minimum needs one clean pass rather than enough
+// samples to place a middle. On a host that thermally throttles, cutting the
+// window from ~40s to ~18s is itself precision — a median over seven passes
+// spanning a throttling episode tracks the episode, which is exactly the drift
+// the control rows kept reporting.
+//
+// The budget is against the AVERAGE path's timed ms, not the slowest: most paths
+// here are well inside the pass ceiling (15-170ms against PASS_BUDGET_MS's 400),
+// so a budget set by the stock rows would never bind and every format would take
+// `max`. 200 stops at `min` while still letting a format whose paths are all
+// cheap take a fourth.
+const PASSES: SampleBudget = { min: 3, max: 5, budgetMs: 200 };
+
+// Per-pass wall-time budget handed to the kernel's pass sizing. Deliberately
+// loose, because shortening a pass costs resolution and this bench attributes
+// single patches worth 10-15%: measured against a budget that also caught the
+// ladder rungs, the control rows went from ~1% to ~3-9% and the patch ranking
+// reshuffled. Everything from `luxon C` down (a full pass costs ~380ms) stays
+// at the full N. What it does cut is the unpatched abbr path at ~2.1s per pass
+// — with its control, a quarter of this benchmark's runtime spent
+// re-establishing the one number nobody disputes.
+const PASS_BUDGET_MS = 400;
 
 const BAKE_YEAR = new Date(YEAR_START).getUTCFullYear();
 const BASE_TS = Date.UTC(BAKE_YEAR, 0, 1);
@@ -176,26 +202,31 @@ const paths: Path[] = [
 
 let sink = 0;
 
+// paths the kernel timed over fewer than N values and scaled up
+const scaledPaths = new Set<string>();
+const passCounts = new Set<number>();
+
 /** All paths for one format, timed round-robin so drift lands on everyone equally. */
 async function measureAll(fmt: FormatKey): Promise<Map<string, number>> {
   const built = [];
 
   for (const path of paths) {
-    const format = await path.make(fmt);
-    sink += timeLoop(format, BASE_TS - WARMUP * STEP_MS, STEP_MS, WARMUP).checksum;
-    built.push({ key: path.id, format });
+    built.push({ key: path.id, format: await path.make(fmt) });
   }
 
-  const { medians, checksum } = interleavedMedians(built, BASE_TS, STEP_MS, N, REPS);
+  const { best, checksum, scaled, passes } = interleavedBest(built, BASE_TS, STEP_MS, N, PASSES, PASS_BUDGET_MS);
 
   sink += checksum;
+  passCounts.add(passes);
 
-  return medians;
+  for (const id of scaled) scaledPaths.add(id);
+
+  return best;
 }
 
 console.log(`luxon ${await pkgVersion('luxon')} vs moment ${await pkgVersion('moment')}`);
 console.log(`runtime: ${runtime()}, tables: ${genMeta.host}, host ICU ${process.versions.icu ?? '?'}`);
-console.log(`${ZONE}, ${N} values/pass, median of ${REPS} interleaved passes\n`);
+console.log(`${ZONE}, ms per ${N} values, fastest of ${PASSES.min}-${PASSES.max} interleaved passes\n`);
 
 async function pkgVersion(name: string): Promise<string> {
   const path = new URL(`../node_modules/${name}/package.json`, import.meta.url);
@@ -252,6 +283,17 @@ for (const fmt of formatKeys) {
   console.log();
 }
 
+console.log(`passes taken per format: ${[...passCounts].sort((a, b) => a - b).join(', ')}\n`);
+
+if (scaledPaths.size > 0) {
+  console.log(
+    `note: ${scaledPaths.size} of ${paths.length} paths cost enough per value that timing ${N} of them takes ~2s a pass,\n` +
+      `or ~${(2 * PASSES.min * scaledPaths.size).toFixed(0)}s of this benchmark across their passes. Those are timed over fewer values and scaled\n` +
+      `to ${N}; their per-value cost is flat in the pass length, so the ratios stand. Every other path is\n` +
+      `timed over the full ${N}, and each control row is measured exactly like the row it controls.\n`
+  );
+}
+
 // ---- the ladder ----------------------------------------------------------
 // The four patches worth arguing for, stacked one at a time. Both formats side
 // by side, because they are two different problems: the zone-less pattern is
@@ -296,8 +338,29 @@ function patchLegend(): string {
 // on abbreviations (easy-tz supplies a tzdata-style abbreviation where ICU
 // returns a "GMT-5" fallback — established in bench/luxon-format.ts), so those
 // rows are informational rather than a pass/fail.
+//
+// Opt-in (--verify): 20k values per path per format, which the timings do not
+// need. It is still the only check that covers all 11 patches — the unit suite
+// covers the two offset ones — so it has to pass before any of them is argued
+// for upstream. See tools/bench-opts.ts.
+//
+// Every hour is compared here, unlike the agreement scan in bench/luxon-format.ts
+// which samples runs of constant offset and abbreviation. That shortcut is sound
+// for three unpatched implementations reading a table and unsound here: most of
+// these patches are caches, so what a path answers depends on which instants it
+// was asked about before, and the dense walk in instant order IS the stimulus.
+// Sampling it every twelfth hour would exercise a different sequence of cache
+// states than any real formatting loop, so a narrow wrong answer could hide in
+// the values never asked for.
 
-{
+if (!withVerify) {
+  console.log(
+    `output parity vs stock luxon skipped — pass --verify to run it (~7s, near enough the same on\n` +
+      `both engines now that the reference strings are derived once instead of per path).\n`
+  );
+}
+
+if (withVerify) {
   const PARITY_N = 20_000;
   const PARITY_STEP = 3_600_000;
   const rows: (string[] | null)[] = [];
@@ -306,16 +369,24 @@ function patchLegend(): string {
   for (const fmt of formatKeys) {
     const reference = await luxonPath('ref', [], false).make(fmt);
 
+    // Materialized once rather than called inside each path's loop. It is stock
+    // luxon, the slowest formatter here by 20x on `abbr`, and re-deriving the
+    // same 20k strings for all 23 paths was the single largest cost in this
+    // benchmark — more than every timed pass put together.
+    const expect = Array.from({ length: PARITY_N }, (_, i) => reference(BASE_TS + i * PARITY_STEP));
+
     for (const path of paths) {
-      if (path.id === 'luxon (stock)' || path.id === 'luxon (stock, control)') continue;
+      // Control rows exist to put a noise floor under the TIMING columns by
+      // measuring one configuration twice. Same module, same patch set, so
+      // their output is the row they control's output and comparing it again
+      // only costs a fifth of this section.
+      if (path.id === 'luxon (stock)' || path.id.includes('control')) continue;
 
       const format = await path.make(fmt);
       let diff = 0;
 
       for (let i = 0; i < PARITY_N; i++) {
-        const ts = BASE_TS + i * PARITY_STEP;
-
-        if (format(ts) !== reference(ts)) diff++;
+        if (format(BASE_TS + i * PARITY_STEP) !== expect[i]) diff++;
       }
 
       const expected = path.easyZone && fmt === 'abbr' ? 'by design' : 'must be 0';

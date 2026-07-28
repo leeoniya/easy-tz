@@ -23,7 +23,7 @@ import type { TimeZoneInfo } from '../shared/types.ts';
 import { zones } from '../shared/zones.ts';
 import { classIdx } from '../shared/bakedSchedule.ts';
 import { scheduleClasses } from '../shared/schedule.ts';
-import { median } from '../tools/bench-config.ts';
+import type { SampleBudget } from '../tools/bench-config.ts';
 
 // Locale is pinned so luxon's ZZZZ token and moment's z token are compared on
 // equal terms and the run is reproducible regardless of host locale.
@@ -312,37 +312,172 @@ export function timeLoop(format: (ts: number) => string, base: number, step: num
   return { ms: performance.now() - t0, checksum };
 }
 
-// Times every entry `reps` times INTERLEAVED — one pass of each per round,
-// rather than all of one entry's passes back to back — and reports the median
-// pass per entry. Interleaving is what makes the numbers comparable: ambient
-// drift over the run gets spread across the variants instead of landing on
-// whichever happened to go last.
+// Default wall-time budget for ONE timed pass. Paths here span a 20x cost range
+// — stock luxon on an abbreviation format constructs an Intl.DateTimeFormat per
+// value at ~100µs, against ~5µs for everything else — so timing them all over
+// the same value count spends almost the whole benchmark inside the slowest
+// column, which is also the column whose number nobody is surprised by. Each
+// entry instead gets the number of values that fits this budget, and its result
+// is scaled back to `report` values.
+//
+// This is a resolution knob, not just a speed one: a path whose full pass fits
+// under the budget is timed in full, and shortening a pass costs precision.
+// Set it above a full pass of everything the caller needs to resolve finely and
+// only the outliers get shortened. The default clears a full 10k-value pass on
+// the ~5µs/value paths.
+const DEFAULT_BUDGET_MS = 75;
+
+// Floor on a timed pass regardless of cost. Below a few hundred values the
+// timing is dominated by whatever else the engine is doing: at n=250 the stock
+// abbr path reads ~40% high, at n=500 it is back in line with n=2000.
+const MIN_PASS = 500;
+
+// Floor on how long a timed pass should RUN, which is the same concern in the
+// other direction. The cheapest paths here get through `report` values in
+// 10-20ms, and at that scale scheduling jitter rivals the signal — those were
+// the rows whose control disagreed by ~11% while the expensive ones sat at 1-2%.
+// A path that cheap is given more than `report` values so its pass reaches this
+// floor, and the result is scaled back down the same way a shortened pass is
+// scaled up. Unlike shortening, this only buys precision: it costs a few hundred
+// ms across a whole bench, and the rows it lengthens are the ones that were
+// least trustworthy.
+const MIN_PASS_MS = 40;
+
+// How long a calibration sample has to run before its rate is worth using. Only
+// needs to be right to within a factor that would change the chosen n
+// materially, and 4ms is ~40x the clock's resolution — at 8ms the doubling ran
+// one extra round per entry, which across both benches' cells cost more than
+// the sizing saved.
+const CALIBRATE_MS = 4;
+
+// How many values to time `format` over: what it gets through in `budgetMs`,
+// bounded below by MIN_PASS and above by `report` — or by whatever exceeds
+// `report` if a full pass would be too quick to time (MIN_PASS_MS). Grows a
+// sample until it is long enough to extrapolate from, so a cheap path is never
+// made to run a long pass just to be measured.
+//
+// The first sample is thrown away. Read cold it is worthless — first-call costs
+// alone put a ~4µs/value path over the threshold, which sizes it like a ~60µs
+// one — and by the time the doubling reaches a usable sample the formatter has
+// run a few thousand values, which is the warm-up the drivers used to do by
+// hand. The best of two samples is taken at the end for the same reason timing
+// noise is one-sided: a slow reading is interference, a fast one is not.
+function passSize(
+  format: (ts: number) => string,
+  base: number,
+  step: number,
+  report: number,
+  budgetMs: number
+): { n: number; checksum: number } {
+  let n = 256;
+  let checksum = timeLoop(format, base, step, n).checksum;
+  let run = timeLoop(format, base, step, n);
+
+  checksum += run.checksum;
+
+  while (run.ms < CALIBRATE_MS && n < report) {
+    n *= 2;
+    run = timeLoop(format, base, step, n);
+    checksum += run.checksum;
+  }
+
+  const again = timeLoop(format, base, step, n);
+  const ms = Math.min(run.ms, again.ms);
+
+  checksum += again.checksum;
+
+  const perValue = ms / n;
+  const ceiling = Math.max(report, Math.round(MIN_PASS_MS / perValue)); // `report`, or more if that is too quick to time
+  const wanted = Math.min(Math.round(budgetMs / perValue), ceiling);
+
+  return { n: Math.max(MIN_PASS, wanted), checksum };
+}
+
+// Repeatedly times every entry INTERLEAVED — one pass of each per round, rather
+// than all of one entry's passes back to back — and reports each entry's
+// FASTEST pass, normalized to `report` values.
+//
+// Fastest, not median, for the reason tools/bench-config.ts already gives for
+// the single-zone sweeps: the slow passes are JIT ramp and ambient interference,
+// and both only ever add time. That matters more than usual here, because these
+// benches run long enough on a thermally limited host to throttle partway
+// through — under which a median tracks the throttling and a minimum does not.
+// It is also what lets the pass count come down: a median needs enough samples
+// to place a middle, whereas a minimum needs only one clean pass, so three
+// passes buy what seven did.
+//
+// Interleaving still earns its keep alongside the minimum. It spreads each
+// entry's passes across the whole measurement window, so a cool moment early or
+// a throttled stretch late is offered to every entry rather than to whichever
+// happened to be running — and since the reported number is a ratio between
+// entries, systematic drift across them is the one error that does not cancel.
 //
 // Shared by both luxon benches (luxon-format.ts, luxon-upstream.ts), which had
 // a copy each. A driver that drifted out of interleaving would still print a
 // full table of plausible numbers — the failure mode is silent, so the loop is
 // worth having in one place.
 //
+// There is no separate warm-up pass. bench-config.ts documents why one barely
+// helps — both engines allocate type feedback per CALL SITE, so a warm-up loop
+// trains different slots than the timed loop, and only re-running the timed loop
+// itself tiers it up. The pass sizing above already runs a few thousand values
+// per entry getting its rate, which covers what a warm-up would have.
+//
+// `scaled` names the entries measured over fewer than `report` values, so the
+// caller can say so rather than implying every column was timed identically.
+// `passes` reports how many rounds the budget allowed, for the same reason the
+// Chrome bench prints its own pass count: it is the reader's check that a row
+// was not measured once and believed.
 // The summed checksum comes back so the caller can keep feeding its sink and
 // stop the engine eliding the formatting.
-export function interleavedMedians<K>(
+export function interleavedBest<K>(
   entries: { key: K; format: (ts: number) => string }[],
   base: number,
   step: number,
-  n: number,
-  reps: number
-): { medians: Map<K, number>; checksum: number } {
-  const times = new Map<K, number[]>(entries.map((e) => [e.key, []]));
+  report: number,
+  passBudget: SampleBudget,
+  budgetMs = DEFAULT_BUDGET_MS
+): { best: Map<K, number>; checksum: number; scaled: K[]; passes: number } {
+  const best = new Map<K, number>();
+  const scaled: K[] = [];
   let checksum = 0;
 
-  for (let r = 0; r < reps; r++) {
-    for (const { key, format } of entries) {
+  const sized = entries.map(({ key, format }) => {
+    const sample = passSize(format, base, step, report, budgetMs);
+    const n = sample.n;
+
+    checksum += sample.checksum;
+
+    if (n < report) scaled.push(key);
+
+    return { key, format, n };
+  });
+
+  let passes = 0;
+  let spent = 0; // per-entry timed ms, which the sizing has made roughly equal
+
+  while (passes < passBudget.max) {
+    let round = 0;
+
+    for (const { key, format, n } of sized) {
       const run = timeLoop(format, base, step, n);
 
       checksum += run.checksum;
-      times.get(key)!.push(run.ms);
+      round += run.ms;
+
+      // per-value cost is flat across n for every path here (the expensive one
+      // does the same fixed work per value), so this is a unit conversion
+      const ms = (run.ms * report) / n;
+      const prev = best.get(key);
+
+      if (prev === undefined || ms < prev) best.set(key, ms);
     }
+
+    passes++;
+    spent += round / sized.length;
+
+    if (passes >= passBudget.min && spent >= passBudget.budgetMs) break;
   }
 
-  return { medians: new Map([...times].map(([k, xs]) => [k, median(xs)])), checksum };
+  return { best, checksum, scaled, passes };
 }

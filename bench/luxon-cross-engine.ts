@@ -9,7 +9,8 @@
 // pitch than one that helps both, and one that hurts JSC is weaker still.
 //
 // The two runs are sequential, never concurrent — they are timing each other's
-// workload otherwise. Budget ~4 minutes.
+// workload otherwise. Budget ~40 seconds. Neither run is given --verify: this
+// compares timings across engines, and the parity scan is engine-independent.
 
 import { spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
