@@ -11,16 +11,16 @@
 //
 // Guarantees on Temporal runtimes: never a wrong offset (audited or live),
 // at worst a generic label for the few recovered zones until regeneration.
-// Without Temporal (Safari, bun, Node built without the Temporal component):
-// the audit is skipped and this is exactly 07 (pure baked schedule + baked
-// history; unknown names return undefined from the single-zone APIs).
+// Without Temporal (Safari and runtimes built without the component), the
+// audit is skipped and this is exactly 07 (pure baked schedule + baked history;
+// unknown names return undefined from the single-zone APIs).
 //
 // History: for timestamps before the bake year, a Temporal runtime resolves
 // every zone live (Temporal is authoritative for the past; the baked history
 // eras are only gen-time-validated, so live keeps the never-wrong-offset
-// guarantee) with the same schedule-abbr-reuse labels as impl 07. Without
-// Temporal, historical years come from the shared baked resolver's eras,
-// identical to 07.
+// guarantee) with impl 07's historical abbreviation corrections applied to the
+// live offset. Without Temporal, historical years come from the shared baked
+// resolver's eras, identical to 07.
 //
 // vs 09-guarded-hybrid: same staleness protection on Temporal runtimes, but
 // verification is amortized to init instead of per-call (misses ~0.05ms vs
@@ -36,12 +36,12 @@
 import type { TimeZoneInfo } from '../../shared/types.ts';
 import { zones } from '../../shared/zones.ts';
 import { scheduleClasses, YEAR_START, STEP_MS } from '../../shared/schedule.ts';
-import { resolveClass, ruleInstant, historyAbbr, type ScheduleClass } from '../../shared/rules.ts';
+import { resolveClass, ruleInstant, type ScheduleClass } from '../../shared/rules.ts';
 import { gmtLabel } from '../../shared/fmt.ts';
 import { lazyList, listAt, clearList } from '../../shared/listApi.ts';
 import { makeInfo, canonicalZone } from '../../shared/zoneLinks.ts';
 import { computeSchedule, scheduleZoneInfo, scheduleGetTimeZoneAt, classIdx, zoneIndexOf } from '../../shared/bakedSchedule.ts';
-import { computeBaked, getTimeZoneAt as bakedGetTimeZoneAt, HISTORY_TO_MS } from '../../shared/bakedHistory.ts';
+import { computeBaked, getTimeZoneAt as bakedGetTimeZoneAt, historyLabel, HISTORY_TO_MS } from '../../shared/bakedHistory.ts';
 
 const hasTemporal = typeof Temporal !== 'undefined';
 
@@ -54,15 +54,13 @@ function parseOffset(offset: string): number {
   return sign * (+offset.slice(1, 3) * 60 + +offset.slice(4, 6));
 }
 
-// exact live offset from Temporal for one zone; the label reuses the schedule
-// class's abbr when the live offset matches one of its states (matching 07's
-// baked-history labels), else a generic GMT label. Shared by the historical
-// all-zones loop and the single-zone getTimeZoneAt().
-function liveInfo(name: string, ci: number, instant: TZInstant): TimeZoneInfo {
+// Exact live offset from Temporal for one zone, labelled through the same
+// historical correction overlay as impl 07. Shared by the historical all-zones
+// loop and the single-zone getTimeZoneAt().
+function liveInfo(name: string, z: number, ci: number, timestamp: number, instant: TZInstant): TimeZoneInfo {
   const offMin = parseOffset(instant.toZonedDateTimeISO(name).offset);
-  const abbr = ci < 0 ? gmtLabel(offMin) : historyAbbr(scheduleClasses[ci]!, offMin);
 
-  return makeInfo(name, abbr, offMin);
+  return makeInfo(name, historyLabel(z, ci, timestamp, offMin), offMin);
 }
 
 // exact live offset from Temporal for a session-recovered zone (failed the
@@ -173,7 +171,7 @@ function compute(timestamp: number): TimeZoneInfo[] {
     const instant = Temporal.Instant.fromEpochMilliseconds(timestamp);
     const out: TimeZoneInfo[] = new Array(zones.length);
 
-    for (let z = 0; z < zones.length; z++) out[z] = liveInfo(zones[z]!, classIdx[z]!, instant);
+    for (let z = 0; z < zones.length; z++) out[z] = liveInfo(zones[z]!, z, classIdx[z]!, timestamp, instant);
 
     return out;
   }
@@ -196,9 +194,9 @@ function computeOne(name: string, timestamp: number): TimeZoneInfo | undefined {
   // would make Temporal throw), identical to impl 07
   if (z === -1) return bakedGetTimeZoneAt(name, timestamp);
 
-  // Temporal runtime + before the bake year: exact live past, schedule label
+  // Temporal runtime + before the bake year: exact live past, corrected label
   if (hasTemporal && timestamp < HISTORY_TO_MS) {
-    return liveInfo(name, classIdx[z]!, Temporal.Instant.fromEpochMilliseconds(timestamp));
+    return liveInfo(name, z, classIdx[z]!, timestamp, Temporal.Instant.fromEpochMilliseconds(timestamp));
   }
 
   // current/future recovered zone on a Temporal runtime: live offset, GMT label

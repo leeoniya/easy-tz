@@ -25,8 +25,8 @@ runner, and no-Temporal (Safari) fallback proxy.
   every zone on earth except religious-calendar rules (Morocco, Palestine —
   4 zones). Probing 3 consecutive years lets the generator fit these rules,
   making baked tables survive year rollover.
-- Temporal (Chrome/Firefox and official Node >= 26; not Safari, bun, or
-  Node builds lacking the optional Temporal component) enables cheap exactness: offset
+- Temporal (Chrome/Firefox, current Bun 1.4, and official Node >= 26 builds
+  that include the component; not Safari) enables cheap exactness: offset
   queries without formatters, and exact transition-walk verification of
   grouping hints (~2-5ms for all zones).
 - Runtimes genuinely disagree: bun (ICU 75) vs Chrome 150 differ in zone
@@ -66,7 +66,7 @@ tzdata never inflates our impls' cold readings.
   failures (stale table, unknown zones) are recovered for the session with
   live Temporal offsets + generic GMT labels; the rest runs pure baked at
   07's miss cost. Never a wrong offset on Temporal runtimes. Without
-  Temporal (Safari, bun, Temporal-less Node builds): identical to 07. (Superseded 09-guarded-hybrid: same protection
+  Temporal (Safari and runtimes built without the component): identical to 07. (Superseded 09-guarded-hybrid: same protection
   via per-call guard + bundled live-Intl fallback, ~0.8ms misses, 15.1KB.)
 - **07-baked-rules** — zero Intl: static states + nth-weekday rules resolved
   by pure date math (irregular zones clamp outside the generated year).

@@ -10,8 +10,8 @@
 //
 // Two modes:
 //   local (default) — sweeps the ACTIVE table variant against this host's
-//     ICU. Runs under node or bun (both currently lack Temporal, so the
-//     baseline is the Intl 'longOffset' formatter — same ICU data).
+//     ICU. Runs under node or bun, using Temporal when the host provides it
+//     and otherwise an Intl 'longOffset' formatter over the same ICU data.
 //   --chrome — bundles the core against the CHROME table variant and runs it
 //     inside chrome-headless-shell (bun-only host; needs the browser once:
 //     bun run browsers:install). Chrome ships native Temporal, so the

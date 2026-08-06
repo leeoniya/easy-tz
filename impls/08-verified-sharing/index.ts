@@ -15,8 +15,9 @@
 // WITHOUT an offset change passes offset verification and shares the wrong
 // name until tables are regenerated (rare: grouped zones share a metazone).
 //
-// Without Temporal (Safari, bun, Temporal-less Node builds): hints are
-// ignored entirely and every zone formats itself — identical behavior and cost to impl 04.
+// Without Temporal (Safari and runtimes built without the component), hints
+// are ignored entirely and every zone formats itself — identical behavior and
+// cost to impl 04.
 
 import type { TimeZoneInfo } from '../../shared/types.ts';
 import { zones } from '../../shared/zones.ts';

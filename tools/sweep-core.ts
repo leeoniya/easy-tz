@@ -8,8 +8,7 @@
 //
 // Baseline: Temporal (toZonedDateTimeISO().offset — exact ICU data) when the
 // host ships it (Chrome does), else an Intl.DateTimeFormat 'longOffset'
-// formatter (the SAME ICU data through a slower API — node 26 builds without
-// the Temporal component and bun 1.4).
+// formatter (the SAME ICU data through a slower API).
 //
 // Weekly sampling is sufficient for rule-day drift: a projected transition
 // that lands one week off the real one opens a disagreement window of

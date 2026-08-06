@@ -479,6 +479,9 @@ function fixedAbbr(z, timestamp, offMin) {
   const fi = fixIdx[z];
   return fi === -1 ? null : resolveAbbrFix(abbrFixClasses[fi], timestamp, yearFromMs(timestamp), offMin);
 }
+function historyLabel(z, ci, timestamp, offMin) {
+  return fixedAbbr(z, timestamp, offMin) ?? (ci < 0 ? gmtLabel(offMin) : historyAbbr(scheduleClasses[ci], offMin));
+}
 function bakedZoneInfo(name, ci, hi, timestamp, historical, schedCache, histCache, z = -1) {
   if (historical && hi !== -1) {
     let off = histCache != null ? histCache[hi] : undefined;
@@ -488,8 +491,7 @@ function bakedZoneInfo(name, ci, hi, timestamp, historical, schedCache, histCach
         histCache[hi] = off;
     }
     if (off !== null) {
-      const abbr = fixedAbbr(z, timestamp, off) ?? (ci < 0 ? gmtLabel(off) : historyAbbr(scheduleClasses[ci], off));
-      return makeInfo(name, abbr, off);
+      return makeInfo(name, historyLabel(z, ci, timestamp, off), off);
     }
   }
   const info = scheduleZoneInfo(name, ci, timestamp, schedCache, z);

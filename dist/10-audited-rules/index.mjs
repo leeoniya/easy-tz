@@ -511,6 +511,9 @@ function fixedAbbr(z, timestamp, offMin) {
   const fi = fixIdx[z];
   return fi === -1 ? null : resolveAbbrFix(abbrFixClasses[fi], timestamp, yearFromMs(timestamp), offMin);
 }
+function historyLabel(z, ci, timestamp, offMin) {
+  return fixedAbbr(z, timestamp, offMin) ?? (ci < 0 ? gmtLabel(offMin) : historyAbbr(scheduleClasses[ci], offMin));
+}
 function bakedZoneInfo(name, ci, hi, timestamp, historical, schedCache, histCache, z = -1) {
   if (historical && hi !== -1) {
     let off = histCache != null ? histCache[hi] : undefined;
@@ -520,8 +523,7 @@ function bakedZoneInfo(name, ci, hi, timestamp, historical, schedCache, histCach
         histCache[hi] = off;
     }
     if (off !== null) {
-      const abbr = fixedAbbr(z, timestamp, off) ?? (ci < 0 ? gmtLabel(off) : historyAbbr(scheduleClasses[ci], off));
-      return makeInfo(name, abbr, off);
+      return makeInfo(name, historyLabel(z, ci, timestamp, off), off);
     }
   }
   const info = scheduleZoneInfo(name, ci, timestamp, schedCache, z);
@@ -608,10 +610,9 @@ function parseOffset(offset) {
   const sign = offset[0] === "-" ? -1 : 1;
   return sign * (+offset.slice(1, 3) * 60 + +offset.slice(4, 6));
 }
-function liveInfo(name, ci, instant) {
+function liveInfo(name, z, ci, timestamp, instant) {
   const offMin = parseOffset(instant.toZonedDateTimeISO(name).offset);
-  const abbr = ci < 0 ? gmtLabel(offMin) : historyAbbr(scheduleClasses[ci], offMin);
-  return makeInfo(name, abbr, offMin);
+  return makeInfo(name, historyLabel(z, ci, timestamp, offMin), offMin);
 }
 function liveRecovered(name, instant) {
   const offMin = parseOffset(instant.toZonedDateTimeISO(name).offset);
@@ -684,7 +685,7 @@ function compute(timestamp) {
     const instant = Temporal.Instant.fromEpochMilliseconds(timestamp);
     const out = new Array(zones.length);
     for (let z = 0;z < zones.length; z++)
-      out[z] = liveInfo(zones[z], classIdx[z], instant);
+      out[z] = liveInfo(zones[z], z, classIdx[z], timestamp, instant);
     return out;
   }
   return applyRecovered(computeBaked(timestamp), timestamp);
@@ -696,7 +697,7 @@ function computeOne(name, timestamp) {
   if (z === -1)
     return getTimeZoneAt(name, timestamp);
   if (hasTemporal && timestamp < HISTORY_TO_MS) {
-    return liveInfo(name, classIdx[z], Temporal.Instant.fromEpochMilliseconds(timestamp));
+    return liveInfo(name, z, classIdx[z], timestamp, Temporal.Instant.fromEpochMilliseconds(timestamp));
   }
   if (recovered.size > 0 && recovered.has(z)) {
     return liveRecovered(name, Temporal.Instant.fromEpochMilliseconds(timestamp));

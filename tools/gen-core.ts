@@ -273,12 +273,10 @@ function signature(zone: string, start: number, end: number, strideDays: number)
 
 // ---- strategy equivalence (tools/probe-equiv.ts) ----
 //
-// Which strategy a table was built with is an accident of the runtime that
-// built it: the chrome variant comes off Temporal, the bun variant off the
-// stride scan. Both are meant to be the same tzdata seen two ways, so a
-// disagreement means one of them is wrong — most likely a stride that steps
-// over a transition. This measures that, on any runtime that has both
-// (Chrome; bun can only run the stride side).
+// Which strategy a table was built with depends on whether its generating
+// runtime provided Temporal. Both are meant to describe the same tzdata, so a
+// disagreement means one is wrong — most likely a stride that steps over a
+// transition. This measures that on any runtime that has both APIs.
 
 export interface StrategyDiff {
   key: string; // "zone|year"

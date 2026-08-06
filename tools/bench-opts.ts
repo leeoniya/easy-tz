@@ -14,10 +14,8 @@ export const withLibs: boolean = process.argv.includes('--libs');
 
 // Whether to run the supplementary bun pass (bench/bench.ts) alongside the
 // Chrome one. Off by default for the same reason: Chrome is the deployment
-// target and the primary report, whereas the bun pass exists as a fast proxy
-// for the no-Temporal (Safari) fallback paths — useful, but a third of the
-// default run's wall time for numbers that are JSC's rather than a browser's.
-// Correctness of those fallback paths is covered by `bun run test` regardless.
+// target and the primary report, whereas the bun pass adds JSC-specific numbers
+// at roughly a third of the default run's wall time.
 // Only read by tools/bench-all.ts; running bench/bench.ts directly always
 // performs the pass.
 export const withBun: boolean = process.argv.includes('--bun');

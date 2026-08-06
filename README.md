@@ -201,7 +201,7 @@ a policy change in a stale table, unknown zones, irregular zones outside
 their generated year — are recovered for the session with live Temporal
 offsets and generic GMT-style labels; everything else runs pure baked at
 07's miss cost. Never a wrong offset on Temporal runtimes; without Temporal
-(Safari, bun, Temporal-less Node builds) it degrades to exactly 07. (It
+(Safari and runtimes built without the component) it degrades to exactly 07. (It
 superseded `09-guarded-hybrid`, which achieved the same protection with a
 per-call guard and a bundled live-Intl fallback: ~0.8ms misses and +3.4KB
 for curated-quality recovery labels.)

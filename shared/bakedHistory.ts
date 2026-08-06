@@ -84,6 +84,13 @@ function fixedAbbr(z: number, timestamp: number, offMin: number): string | null 
   return fi === -1 ? null : resolveAbbrFix(abbrFixClasses[fi]!, timestamp, yearFromMs(timestamp), offMin);
 }
 
+// Historical label for a resolved offset. Exported for impl 10's live-Temporal
+// history path: Temporal supplies the authoritative offset there, while this
+// applies the same identity corrections as the baked resolver.
+export function historyLabel(z: number, ci: number, timestamp: number, offMin: number): string {
+  return fixedAbbr(z, timestamp, offMin) ?? (ci < 0 ? gmtLabel(offMin) : historyAbbr(scheduleClasses[ci]!, offMin));
+}
+
 function bakedZoneInfo(
   name: string,
   ci: number,
@@ -106,8 +113,7 @@ function bakedZoneInfo(
     }
 
     if (off !== null) {
-      const abbr = fixedAbbr(z, timestamp, off) ?? (ci < 0 ? gmtLabel(off) : historyAbbr(scheduleClasses[ci]!, off));
-      return makeInfo(name, abbr, off);
+      return makeInfo(name, historyLabel(z, ci, timestamp, off), off);
     }
   }
 

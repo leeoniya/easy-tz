@@ -1,17 +1,15 @@
 // Asserts that gen-core's two probe strategies produce IDENTICAL zone-year
 // signatures.
 //
-// Why this needs asserting: which strategy builds a table is an accident of
-// the runtime doing the building — the chrome variant comes off Temporal, the
-// bun variant off the stride scan — and the two are compared against each
-// other as though they were the same tzdata seen twice. That only holds while
-// the strategies agree; a disagreement means the stride stepped over a
-// transition Temporal enumerates.
+// Why this needs asserting: which strategy builds a table depends on whether
+// its runtime provides Temporal, while the generated variants are compared as
+// though they were the same tzdata seen twice. That only holds while the
+// strategies agree; a disagreement means the stride stepped over a transition
+// Temporal enumerates.
 //
-// The comparison has to run somewhere that HAS both: Chrome ships native
-// Temporal alongside the same Intl the fallback scan uses. bun and node
-// (built without the Temporal component) can only run the stride side, so
-// this is a Chrome-hosted check by default.
+// The comparison has to run somewhere that HAS both Temporal and Intl. It is
+// Chrome-hosted by default for stable target-runtime coverage; --local also
+// works on current Bun and any Node build that includes Temporal.
 //
 // Run:
 //   bun tools/probe-equiv.ts [fromYear] [toYear] [--stride N] [--local]

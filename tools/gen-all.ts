@@ -1,8 +1,8 @@
 // Unified table generation: Chrome is the primary target (tables verified
 // in-browser, the shippable artifact in shared/tables/chrome/), and the
-// bun-aligned variant is regenerated behind the scenes so the fast local
-// test suite (bun, which also exercises the no-Temporal/Safari fallback
-// paths) can run its live-Intl equivalence checks fully.
+// bun-aligned variant is regenerated behind the scenes so the fast local test
+// suite can run its live-Intl equivalence checks fully. The forced no-Temporal
+// browser pass in tools/test-chrome.ts covers Safari-style fallback paths.
 //
 // Leaves the active selector on the bun variant: that's the dev/test state;
 // what ships is shared/tables/chrome/ regardless of local selection.

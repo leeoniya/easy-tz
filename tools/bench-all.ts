@@ -3,8 +3,7 @@
 // more wall time than the information moves:
 //   --libs  the third-party comparison libraries (their numbers only change
 //           when package.json is bumped)
-//   --bun   a supplementary bun pass, the fast proxy for the no-Temporal
-//           (Safari) fallback paths — its absolute numbers are JSC's, not a
+//   --bun   a supplementary JSC/Bun pass; its absolute numbers are not a
 //           browser prediction
 //
 // Run: bun run bench          (this repo's impls, Chrome only, ~5s)
@@ -32,7 +31,7 @@ function run(label: string, script: string): number {
 const chrome = run('chrome-headless-shell (primary target)', './bench-chrome.ts');
 
 const bun = withBun
-  ? run('bun — supplementary: no-Temporal (Safari) fallback paths, JSC timings', '../bench/bench.ts')
+  ? run('bun — supplementary JSC timings', '../bench/bench.ts')
   : 0;
 
 if (!withBun) console.log('supplementary bun pass skipped — pass --bun to include it\n');

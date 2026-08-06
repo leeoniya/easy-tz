@@ -249,8 +249,8 @@ for (const impl of impls) {
 
 printGetOneHeading();
 
-// bun has no Temporal, so the historical sweep routes both 07 and 10 through
-// the baked era resolver (see GETONE_COLUMNS for what each column is)
+// On current Bun, impl 10's historical sweep uses live Temporal offsets plus
+// the baked abbreviation corrections; impl 07 uses the baked era resolver.
 printTable(
   GETONE_COLUMNS,
   oneRows.map((r) => [r.id, r.curMs, r.histMs, r.passes, r.formatters])
