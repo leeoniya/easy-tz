@@ -34,37 +34,3 @@ export function installIntlCounter(): void {
 }
 
 export const intlConstructCount = (): number => constructions;
-
-// ---- formatToParts call counter -----------------------------------------
-// Constructions alone don't separate "builds one formatter, then calls it per
-// value" (luxon's IANAZone.offset) from "builds a formatter per value"
-// (luxon's parseZoneInfo, behind offsetName) — the first is invisible to the
-// counter above once the formatter is cached. Patching the prototype method
-// counts the per-value Intl work directly. formatToParts is a plain method, so
-// a straight assignment is enough; `format` is an accessor and is left alone
-// (nothing measured here routes through it).
-
-let partsCalls = 0;
-let partsInstalled = false;
-
-export function installIntlPartsCounter(): void {
-  if (partsInstalled) {
-    return;
-  }
-
-  partsInstalled = true;
-
-  const proto = Intl.DateTimeFormat.prototype;
-  // read through the descriptor rather than `proto.formatToParts` so the
-  // original is never referenced as an unbound method
-  const original = Object.getOwnPropertyDescriptor(proto, 'formatToParts')!.value as typeof proto.formatToParts;
-
-  proto.formatToParts = new Proxy(original, {
-    apply(target, thisArg, args): Intl.DateTimeFormatPart[] {
-      partsCalls++;
-      return Reflect.apply(target, thisArg, args as Parameters<typeof original>);
-    },
-  });
-}
-
-export const intlPartsCount = (): number => partsCalls;

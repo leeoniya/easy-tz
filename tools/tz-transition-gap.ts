@@ -3,12 +3,9 @@
 // This number is load-bearing wherever the code samples a zone at a fixed
 // spacing and treats "two probes agree" as proof that nothing happened in
 // between: a window narrower than the tightest gap holds at most one change,
-// and one change necessarily changes the value. Two consumers ask slightly
-// different questions, so both bounds are measured:
+// and one change necessarily changes the value. Two views are reported:
 //
-// - bench/luxon-patches.ts (offsetInterval) caches luxon's numeric offset
-//   across a span two agreeing probes prove transition-free. Bounded by the
-//   tightest gap between OFFSET transitions.
+// - Exact Temporal OFFSET transitions provide a transition and off-grid census.
 // - tools/gen-core.ts scans zone-years at a fixed stride when the runtime has
 //   no Temporal. What it tracks is the (CLDR long name, offset) SIGNATURE, so
 //   its bound is the tightest gap between signature changes — the stricter of
@@ -21,8 +18,8 @@
 // names move. Offset transitions come from Temporal, so this is Chrome-hosted
 // by default — the same runtime that generates the shipped table variant.
 //
-// Both spacings are asserted below; if the tightest gap ever drops to meet one,
-// that consumer needs a tighter spacing or needs dropping.
+// Both generator spacings are asserted below; if the tightest gap ever drops
+// to meet one, that consumer needs a tighter spacing.
 //
 // Run:
 //   bun tools/tz-transition-gap.ts [fromYear] [toYear] [--local]
@@ -115,30 +112,27 @@ console.log(
   `\nscanned in ${(result.offsetMs / 1000).toFixed(2)}s (offsets) + ${(result.signatureMs / 1000).toFixed(2)}s (signatures)`
 );
 
-// widest era holds every transition the narrower ones do, so its gap is the min
-const offsetBound = result.offsetEras[0]!;
 const signatureBound = result.signature;
 
-const spacings: [label: string, days: number, bound: GapEra][] = [
-  ['offsetInterval probe spacing', 2, offsetBound],
-  ['gen-core schedule stride', SCHEDULE_STRIDE_DAYS, signatureBound],
-  ['gen-core history stride', HISTORY_STRIDE_DAYS, signatureBound],
+const spacings: [label: string, days: number][] = [
+  ['gen-core schedule stride', SCHEDULE_STRIDE_DAYS],
+  ['gen-core history stride', HISTORY_STRIDE_DAYS],
 ];
 
 console.log('');
 printTable(
   ['consumer', 'spacing', 'bounded by', 'change-and-return', 'margin', 'ok'],
-  spacings.map(([label, days, bound]) => [
+  spacings.map(([label, days]) => [
     label,
     `${days}d`,
-    bound === signatureBound ? 'signature' : 'offset',
-    `${(bound.returnMs / DAY).toFixed(2)}d`,
-    `${(bound.returnMs / DAY / days).toFixed(1)}×`,
-    bound.returnMs / DAY > days ? 'yes' : 'NO',
+    'signature',
+    `${(signatureBound.returnMs / DAY).toFixed(2)}d`,
+    `${(signatureBound.returnMs / DAY / days).toFixed(1)}×`,
+    signatureBound.returnMs / DAY > days ? 'yes' : 'NO',
   ])
 );
 
-const failed = spacings.filter(([, days, bound]) => bound.returnMs / DAY <= days);
+const failed = spacings.filter(([, days]) => signatureBound.returnMs / DAY <= days);
 
 if (failed.length > 0) {
   console.error(`\nFAIL: tightest gap no longer exceeds: ${failed.map(([l]) => l).join(', ')}`);

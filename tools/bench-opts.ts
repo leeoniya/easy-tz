@@ -21,17 +21,3 @@ export const withLibs: boolean = process.argv.includes('--libs');
 // Only read by tools/bench-all.ts; running bench/bench.ts directly always
 // performs the pass.
 export const withBun: boolean = process.argv.includes('--bun');
-
-// Whether the luxon benches (bench/luxon-format.ts, bench/luxon-upstream.ts)
-// run their output-comparison sections as well as their timings. Off by default
-// on the same trade: they cover ~460 zones and every patched formatting path,
-// and the answer does not move unless luxon, moment's tzdata, or the host ICU
-// changes. Cheap enough now (~4s on top of luxon-format's ~13s) that the reason
-// to keep it opt-in is the dev loop's latency rather than the cost itself.
-//
-// Worth running deliberately rather than never. luxon-format's agreement tables
-// are what license the speed claims (a fast formatter that prints the wrong
-// abbreviation is not a result), and luxon-upstream's parity scan is the only
-// place all 11 candidate patches are checked for behavior preservation —
-// tests/luxon-offset-patches.test.ts covers just the two offset ones.
-export const withVerify: boolean = process.argv.includes('--verify');

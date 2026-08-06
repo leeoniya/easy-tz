@@ -358,12 +358,10 @@ export function compareProbeStrategies(
 // How close together do two consecutive changes ever get? A sampling window
 // narrower than the tightest gap holds at most one change, and one change
 // necessarily changes the value — which is what lets a probe pair prove the
-// span between it is quiet. Two different quantities are measured because two
-// consumers ask different questions of the same data:
+// span between it is quiet. Two views of the runtime data are reported:
 //
-// - OFFSET transitions bound bench/luxon-patches.ts (offsetInterval), which
-//   caches luxon's numeric offset across a span two agreeing probes prove
-//   transition-free.
+// - OFFSET transitions provide an exact Temporal-based transition and off-grid
+//   census.
 // - SIGNATURE changes — the (CLDR long name, offset) pair scanAt() actually
 //   tracks — bound the fallback stride above. This is the stricter of the two
 //   and the one the stride genuinely needs: CLDR renames zones without moving
