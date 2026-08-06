@@ -46,7 +46,7 @@ describe('getTimeZoneAt agrees with getTimeZonesAt for every zone', () => {
         expect(byName.size).toBe(zones.length);
 
         for (const name of zones) {
-          expect(one(name, ts)).toEqual(byName.get(name)!);
+          expect(one(name, ts)).toEqual(byName.get(name));
         }
       }
     });
@@ -60,9 +60,9 @@ describe('TimeZoneInfo objects are interned and frozen (no per-call allocation)'
   // are distinct objects, and that the full-response and single-zone APIs hand
   // back the very same instance.
   test('same (zone, state) reuses one frozen instance; distinct states differ', () => {
-    const summer1 = one07('America/New_York', Date.UTC(2026, 6, 15, 12));
-    const summer2 = one07('America/New_York', Date.UTC(2026, 7, 20, 3, 45)); // different ts, still EDT
-    const winter = one07('America/New_York', Date.UTC(2026, 0, 15, 12)); // EST
+    const summer1 = one07('America/New_York', Date.UTC(2026, 6, 15, 12))!;
+    const summer2 = one07('America/New_York', Date.UTC(2026, 7, 20, 3, 45))!; // different ts, still EDT
+    const winter = one07('America/New_York', Date.UTC(2026, 0, 15, 12))!; // EST
 
     expect(summer1).toBe(summer2); // identical object, not just equal
     expect(Object.isFrozen(summer1)).toBe(true);
@@ -82,18 +82,17 @@ describe('TimeZoneInfo objects are interned and frozen (no per-call allocation)'
   });
 });
 
-describe('getTimeZoneAt on the baked impls (07/10) handles unknown zones gracefully', () => {
-  // the full response omits unknown zones; the single-zone baked resolvers
-  // answer the UTC sentinel instead of throwing (07 always; 10 on this
-  // no-Temporal runtime takes 07's baked path)
+describe('getTimeZoneAt returns undefined for unknown zones', () => {
+  // The full response omits unknown zones; every single-zone resolver mirrors
+  // that absence instead of throwing or inventing a UTC result.
   for (const { id, one } of [
+    { id: '04-live-intl', one: one04 },
     { id: '07-baked-rules', one: one07 },
+    { id: '08-verified-sharing', one: one08 },
     { id: '10-audited-rules', one: one10 },
   ]) {
     test(id, () => {
-      const info = one('Not/AZone', Date.UTC(2026, 6, 15, 12));
-
-      expect(info).toEqual({ name: 'Not/AZone', abbr: 'UTC', offset: 0 });
+      expect(one('Not/AZone', Date.UTC(2026, 6, 15, 12))).toBeUndefined();
     });
   }
 });

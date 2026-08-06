@@ -109,7 +109,7 @@ describe('derived values match this runtime\'s live Intl output', () => {
   // independent oracle for both the offsets and the GMT±N labels
   test('etcZoneInfo() agrees with live Intl for every fixed-offset id', () => {
     for (const [name] of [...fixed, ['UTC'], ['Etc/UTC']] as const) {
-      expect(etcZoneInfo(name)).toEqual(one04(name, ts));
+      expect(etcZoneInfo(name)).toEqual(one04(name, ts)!);
     }
   });
 
@@ -124,8 +124,8 @@ describe('derived values match this runtime\'s live Intl output', () => {
 
   test('getTimeZone() resolves them at the current instant', () => {
     for (const [name, offset] of fixed) {
-      expect(now07(name).offset).toBe(offset);
-      expect(now10(name).offset).toBe(offset);
+      expect(now07(name)!.offset).toBe(offset);
+      expect(now10(name)!.offset).toBe(offset);
     }
   });
 });

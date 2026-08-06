@@ -11,9 +11,9 @@
 //
 // Guarantees on Temporal runtimes: never a wrong offset (audited or live),
 // at worst a generic label for the few recovered zones until regeneration.
-// Without Temporal (Safari, bun, Node built without the Temporal component): the audit is skipped and this is
-// exactly 07 (pure baked schedule + baked history, unknown zones get a UTC
-// sentinel).
+// Without Temporal (Safari, bun, Node built without the Temporal component):
+// the audit is skipped and this is exactly 07 (pure baked schedule + baked
+// history; unknown names return undefined from the single-zone APIs).
 //
 // History: for timestamps before the bake year, a Temporal runtime resolves
 // every zone live (Temporal is authoritative for the past; the baked history
@@ -40,7 +40,7 @@ import { resolveClass, ruleInstant, historyAbbr, type ScheduleClass } from '../.
 import { gmtLabel } from '../../shared/fmt.ts';
 import { lazyList, listAt, clearList } from '../../shared/listApi.ts';
 import { makeInfo, canonicalZone } from '../../shared/zoneLinks.ts';
-import { computeSchedule, scheduleZoneInfo, classIdx, zoneIndexOf } from '../../shared/bakedSchedule.ts';
+import { computeSchedule, scheduleZoneInfo, scheduleGetTimeZoneAt, classIdx, zoneIndexOf } from '../../shared/bakedSchedule.ts';
 import { computeBaked, getTimeZoneAt as bakedGetTimeZoneAt, HISTORY_TO_MS } from '../../shared/bakedHistory.ts';
 
 const hasTemporal = typeof Temporal !== 'undefined';
@@ -187,12 +187,12 @@ function compute(timestamp: number): TimeZoneInfo[] {
 // values getTimeZonesAt() would return at this index), without building the
 // full response. Reuses the shared baked single-zone resolver for the baked
 // path and the same live-Temporal helpers as the all-zones loop.
-function computeOne(name: string, timestamp: number): TimeZoneInfo {
+function computeOne(name: string, timestamp: number): TimeZoneInfo | undefined {
   if (recovered === null) init();
 
   const z = zoneIndexOf(name);
 
-  // unknown zone: UTC sentinel via the baked resolver (never live — a bad name
+  // unknown zone: undefined via the baked resolver (never live — a bad name
   // would make Temporal throw), identical to impl 07
   if (z === -1) return bakedGetTimeZoneAt(name, timestamp);
 
@@ -226,14 +226,14 @@ function computeCurrent(timestamp: number): TimeZoneInfo[] {
 // baked schedule) resolved for one zone. Like computeCurrent() it never
 // references computeBaked/bakedGetTimeZoneAt, so importing only the
 // current-instant APIs tree-shakes the history eras out.
-function computeOneCurrent(name: string, timestamp: number): TimeZoneInfo {
+function computeOneCurrent(name: string, timestamp: number): TimeZoneInfo | undefined {
   if (recovered === null) init();
 
   const z = zoneIndexOf(name);
 
-  // unknown zone: UTC sentinel (never live — a bad name would make Temporal
-  // throw), the same answer the history-capable computeOne() gives
-  if (z === -1) return scheduleZoneInfo(name, -1, timestamp);
+  // unknown zone: undefined (never live — a bad name would make Temporal
+  // throw), while uncovered fixed-offset Etc ids remain supported
+  if (z === -1) return scheduleGetTimeZoneAt(name, timestamp);
 
   if (recovered!.has(z)) return liveRecovered(name, Temporal.Instant.fromEpochMilliseconds(timestamp));
 
@@ -258,11 +258,11 @@ export function getTimeZones(withAliases = true): TimeZoneInfo[] {
 // the canonical substitution happens out here rather than inside computeOne /
 // computeOneCurrent: both spellings share a schedule class and audit outcome,
 // so swapping the name up front changes only the label on the result
-export function getTimeZoneAt(name: string, timestamp: number, withAliases = true): TimeZoneInfo {
+export function getTimeZoneAt(name: string, timestamp: number, withAliases = true): TimeZoneInfo | undefined {
   return computeOne(withAliases ? name : canonicalZone(name), timestamp);
 }
 
-export function getTimeZone(name: string, withAliases = true): TimeZoneInfo {
+export function getTimeZone(name: string, withAliases = true): TimeZoneInfo | undefined {
   return computeOneCurrent(withAliases ? name : canonicalZone(name), Date.now());
 }
 

@@ -106,9 +106,9 @@ export function canonicalView(): CanonicalView {
 // eviction.
 const internPool = new Map<string, Map<number, Map<string, Readonly<TimeZoneInfo>>>>();
 
-// getTimeZonesAt() only ever asks for the fixed zone list, but getTimeZoneAt()
-// takes a caller-supplied name and answers a UTC sentinel for unknown ones —
-// so the pool's outer key is untrusted input. Cap the number of distinct names
+// getTimeZonesAt() only ever asks for the fixed zone list, but the live
+// getTimeZoneAt() implementations accept any runtime-supported caller-supplied
+// name, so the pool's outer key is untrusted input. Cap the number of names
 // well above every real IANA spelling (~900); past it, results are still built
 // and frozen, just not retained, so a flood of junk names can't grow the pool
 // without bound. Real zones are always pooled.

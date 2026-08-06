@@ -110,11 +110,11 @@ export function scheduleZoneInfo(
 // current instant (always the bake year or later, so there is no history to
 // consult). Living HERE rather than in bakedHistory.ts is what lets a consumer
 // importing only the current-instant APIs drop the baked eras. Unknown names
-// resolve to the same UTC sentinel the history-capable resolver answers.
-export function scheduleGetTimeZoneAt(name: string, timestamp: number): TimeZoneInfo {
+// return undefined; uncovered fixed-offset Etc ids are still resolved.
+export function scheduleGetTimeZoneAt(name: string, timestamp: number): TimeZoneInfo | undefined {
   const z = zoneIndexOf(name);
 
-  return scheduleZoneInfo(name, z === -1 ? -1 : classIdx[z]!, timestamp, undefined, z);
+  return z === -1 ? etcZoneInfo(name) ?? undefined : scheduleZoneInfo(name, classIdx[z]!, timestamp, undefined, z);
 }
 
 // full schedule-only response at `timestamp` (no history). Importing only this

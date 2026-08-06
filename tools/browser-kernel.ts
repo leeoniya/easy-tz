@@ -248,7 +248,7 @@ export function installKernel(
     const sweep = (base: number, calls: number): number => {
       const t0 = performance.now();
 
-      for (let i = 0; i < calls; i++) sink += Math.abs(one(GETONE_ZONE, base + i * GETONE_STEP_MS).offset);
+      for (let i = 0; i < calls; i++) sink += Math.abs(one(GETONE_ZONE, base + i * GETONE_STEP_MS)!.offset);
 
       return performance.now() - t0;
     };
@@ -388,6 +388,11 @@ export function installKernel(
         const x = baseOne(name, ts);
         const y = one(name, ts);
 
+        if (x == null || y == null) {
+          t.fail(`${name} @ ${new Date(ts).toISOString()}: unexpectedly unresolved`);
+          continue;
+        }
+
         if (x.abbr !== y.abbr || x.offset !== y.offset) {
           t.fail(`${name} @ ${new Date(ts).toISOString()}: 04=${x.abbr} ${x.offset} vs ${implId}=${y.abbr} ${y.offset}`);
         } else if (one(name, ts) !== y || !Object.isFrozen(y)) {
@@ -450,7 +455,7 @@ export function installKernel(
       const sub = one(alias, ts, false);
 
       if (sub !== kept) {
-        t.fail(`${alias} -> ${canonical}: substitution is ${sub.name} ${sub.abbr} ${sub.offset}, not the list instance`);
+        t.fail(`${alias} -> ${canonical}: substitution is ${sub == null ? 'missing' : `${sub.name} ${sub.abbr} ${sub.offset}`}, not the list instance`);
       }
     }
 
@@ -473,8 +478,8 @@ export function installKernel(
 
         const o = one(z.name);
 
-        if (o.name !== z.name || o.abbr !== z.abbr || o.offset !== z.offset) {
-          t.fail(`${z.name}: getTimeZone()=${o.abbr} ${o.offset} vs getTimeZones()=${z.abbr} ${z.offset}`);
+        if (o == null || o.name !== z.name || o.abbr !== z.abbr || o.offset !== z.offset) {
+          t.fail(`${z.name}: getTimeZone()=${o == null ? 'missing' : `${o.abbr} ${o.offset}`} vs getTimeZones()=${z.abbr} ${z.offset}`);
         }
       }
     }

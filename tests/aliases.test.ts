@@ -136,18 +136,18 @@ describe('the single-zone getters substitute the canonical zone', () => {
 
       for (const [canonical, alias] of zoneLinkPairs) {
         // default: the legacy spelling is answered as asked, with aliasOf
-        const asAlias = at(alias, TS);
+        const asAlias = at(alias, TS)!;
 
         expect(asAlias.name).toBe(alias);
         expect(asAlias.aliasOf).toBe(canonical);
 
         // opted out: the canonical zone, and — since makeInfo pools by name —
         // the very same interned instance that spelling would have produced
-        const asCanon = at(alias, TS, false);
+        const asCanon = at(alias, TS, false)!;
 
         expect(asCanon.name).toBe(canonical);
         expect(asCanon.aliasOf).toBeUndefined();
-        expect(asCanon).toBe(at(canonical, TS));
+        expect(asCanon).toBe(at(canonical, TS)!);
 
         // offset and abbr are the canonical zone's, which for a link pair are
         // the alias's too — the substitution changes only the label
@@ -155,7 +155,7 @@ describe('the single-zone getters substitute the canonical zone', () => {
 
         // current-instant twin
         expect(one(alias, false)).toBe(one(canonical));
-        expect(one(alias, false).name).toBe(canonical);
+        expect(one(alias, false)!.name).toBe(canonical);
       }
     });
   }
@@ -174,15 +174,18 @@ describe('the opt-out leaves non-alias names alone', () => {
   }
 });
 
-describe('unknown names still get the UTC sentinel when opted out', () => {
-  // canonicalZone() passes them through, so the sentinel keeps the name as given
+describe('unknown names still return undefined when opted out', () => {
+  // canonicalZone() passes them through, so alias filtering does not turn an
+  // unknown name into a result.
   for (const { id, at, one } of [
+    { id: '04-live-intl', at: at04, one: one04 },
     { id: '07-baked-rules', at: at07, one: one07 },
+    { id: '08-verified-sharing', at: at08, one: one08 },
     { id: '10-audited-rules', at: at10, one: one10 },
   ]) {
     test(id, () => {
-      expect(at('Not/AZone', TS, false)).toEqual({ name: 'Not/AZone', abbr: 'UTC', offset: 0 });
-      expect(one('Not/AZone', false)).toEqual({ name: 'Not/AZone', abbr: 'UTC', offset: 0 });
+      expect(at('Not/AZone', TS, false)).toBeUndefined();
+      expect(one('Not/AZone', false)).toBeUndefined();
     });
   }
 });
@@ -202,7 +205,7 @@ describe('the single-zone opt-out agrees with the filtered list', () => {
       }
 
       for (const [canonical, alias] of zoneLinkPairs) {
-        expect(at(alias, TS, false)).toBe(byName.get(canonical)!);
+        expect(at(alias, TS, false)).toBe(byName.get(canonical));
       }
     });
   }

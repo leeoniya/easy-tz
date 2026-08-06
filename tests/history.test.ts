@@ -54,9 +54,9 @@ const audited = (zone: string, ts: number) => rec(audited10, clear10, zone, ts);
 // the single-zone getters resolve through the same cores without building or
 // memoizing the whole response, so they're the ones to use when walking many
 // instants (single-zone.test.ts pins them to the list getters)
-const icuOff = (zone: string, ts: number) => baselineAt04(zone, ts).offset;
-const bakedOff = (zone: string, ts: number) => bakedAt07(zone, ts).offset;
-const auditedOff = (zone: string, ts: number) => auditedAt10(zone, ts).offset;
+const icuOff = (zone: string, ts: number) => baselineAt04(zone, ts)!.offset;
+const bakedOff = (zone: string, ts: number) => bakedAt07(zone, ts)!.offset;
+const auditedOff = (zone: string, ts: number) => auditedAt10(zone, ts)!.offset;
 
 // instants where 0.1.1's backward projection produced the WRONG offset
 const tricky: { label: string; zone: string; ts: number }[] = [
@@ -459,8 +459,8 @@ describe('corrected labels intern like any other TimeZoneInfo', () => {
   const CB_PLAIN = Date.UTC(2001, 3, 15, 12);
 
   test('a corrected and an uncorrected answer at one offset stay distinct', () => {
-    const fixed = bakedAt07(CB, CB_FIXED);
-    const plain = bakedAt07(CB, CB_PLAIN);
+    const fixed = bakedAt07(CB, CB_FIXED)!;
+    const plain = bakedAt07(CB, CB_PLAIN)!;
 
     expect(fixed.abbr).toBe('CST');
     expect(plain.abbr).toBe('MDT');

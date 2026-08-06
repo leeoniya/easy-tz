@@ -41,21 +41,21 @@ describe('getTimeZone() matches getTimeZones() for every zone', () => {
       expect(byName.size).toBe(zones.length);
 
       for (const name of zones) {
-        expect(one(name)).toEqual(byName.get(name)!);
+        expect(one(name)).toEqual(byName.get(name));
       }
     });
   }
 });
 
-describe('getTimeZone() on the baked impls (07/10) handles unknown zones gracefully', () => {
-  // same UTC sentinel the history-capable getTimeZoneAt() answers, rather than
-  // throwing on a name the runtime doesn't know
+describe('getTimeZone() returns undefined for unknown zones', () => {
   for (const { id, one } of [
+    { id: '04-live-intl', one: one04 },
     { id: '07-baked-rules', one: one07 },
+    { id: '08-verified-sharing', one: one08 },
     { id: '10-audited-rules', one: one10 },
   ]) {
     test(id, () => {
-      expect(one('Not/AZone')).toEqual({ name: 'Not/AZone', abbr: 'UTC', offset: 0 });
+      expect(one('Not/AZone')).toBeUndefined();
     });
   }
 });

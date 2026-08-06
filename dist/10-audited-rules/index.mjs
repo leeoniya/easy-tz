@@ -471,6 +471,10 @@ function scheduleZoneInfo(name, ci, timestamp, schedCache, z = -1) {
   }
   return z >= 0 && zones[z] === name ? zoneStateInfo(z, st) : makeInfo(name, st.abbr, st.offMin);
 }
+function scheduleGetTimeZoneAt(name, timestamp) {
+  const z = zoneIndexOf(name);
+  return z === -1 ? etcZoneInfo(name) ?? undefined : scheduleZoneInfo(name, classIdx[z], timestamp, undefined, z);
+}
 function computeSchedule(timestamp) {
   const schedCache = new Array(scheduleClasses.length);
   const out = new Array(zones.length);
@@ -530,9 +534,9 @@ function bakedZoneInfo(name, ci, hi, timestamp, historical, schedCache, histCach
 }
 function getTimeZoneAt(name, timestamp) {
   const z = zoneIndexOf(name);
-  const ci = z === -1 ? -1 : classIdx[z];
-  const hi = z === -1 ? -1 : histIdx[z];
-  return bakedZoneInfo(name, ci, hi, timestamp, timestamp < HISTORY_TO_MS, undefined, undefined, z);
+  if (z === -1)
+    return etcZoneInfo(name) ?? undefined;
+  return bakedZoneInfo(name, classIdx[z], histIdx[z], timestamp, timestamp < HISTORY_TO_MS, undefined, undefined, z);
 }
 function computeBaked(timestamp) {
   const historical = timestamp < HISTORY_TO_MS;
@@ -709,7 +713,7 @@ function computeOneCurrent(name, timestamp) {
     init();
   const z = zoneIndexOf(name);
   if (z === -1)
-    return scheduleZoneInfo(name, -1, timestamp);
+    return scheduleGetTimeZoneAt(name, timestamp);
   if (recovered.has(z))
     return liveRecovered(name, Temporal.Instant.fromEpochMilliseconds(timestamp));
   return scheduleZoneInfo(name, classIdx[z], timestamp);
@@ -733,10 +737,10 @@ function clearCache() {
   clearList(cur);
 }
 export {
-  getTimeZonesAt,
-  getTimeZones,
-  getTimeZoneAt2 as getTimeZoneAt,
-  getTimeZone,
+  clearCache,
   formatOffset,
-  clearCache
+  getTimeZone,
+  getTimeZoneAt2 as getTimeZoneAt,
+  getTimeZones,
+  getTimeZonesAt
 };

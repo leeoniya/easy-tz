@@ -53,7 +53,7 @@ export function getTimeZones(withAliases = true): TimeZoneInfo[] {
 }
 
 // single-zone / many-timestamps resolver (history-capable, same as getTimeZonesAt)
-export function getTimeZoneAt(name: string, timestamp: number, withAliases = true): TimeZoneInfo {
+export function getTimeZoneAt(name: string, timestamp: number, withAliases = true): TimeZoneInfo | undefined {
   return bakedGetTimeZoneAt(withAliases ? name : canonicalZone(name), timestamp);
 }
 
@@ -61,7 +61,7 @@ export function getTimeZoneAt(name: string, timestamp: number, withAliases = tru
 // single-zone counterpart to getTimeZones(); importing only the two of them
 // lets shared/history.ts tree-shake away. Nothing to memoize: the result is an
 // interned instance and the lookup is a map get plus the class's date math.
-export function getTimeZone(name: string, withAliases = true): TimeZoneInfo {
+export function getTimeZone(name: string, withAliases = true): TimeZoneInfo | undefined {
   return scheduleGetTimeZoneAt(withAliases ? name : canonicalZone(name), Date.now());
 }
 

@@ -335,6 +335,16 @@ function resolveAbbr(longName) {
   return abbr;
 }
 var sample = { longName: "", offMin: 0 };
+function liveZoneExists(name) {
+  try {
+    partsFmt(zoneAliases[name] ?? name);
+    return true;
+  } catch (err) {
+    if (err instanceof RangeError)
+      return false;
+    throw err;
+  }
+}
 function liveParts(fmtZone, timestamp) {
   readZoneSample(partsFmt(fmtZone), timestamp, sample);
   return { abbr: resolveAbbr(sample.longName), offset: sample.offMin };
@@ -408,16 +418,17 @@ function compute(timestamp) {
 var { getTimeZonesAt, clearCache } = liveListApi(compute);
 var getTimeZones = (withAliases = true) => getTimeZonesAt(Date.now(), withAliases);
 function getTimeZoneAt(name, timestamp, withAliases = true) {
-  return liveZoneInfo(withAliases ? name : canonicalZone(name), timestamp);
+  const zone = withAliases ? name : canonicalZone(name);
+  return liveZoneExists(zone) ? liveZoneInfo(zone, timestamp) : undefined;
 }
 function getTimeZone(name, withAliases = true) {
   return getTimeZoneAt(name, Date.now(), withAliases);
 }
 export {
-  getTimeZonesAt,
-  getTimeZones,
-  getTimeZoneAt,
-  getTimeZone,
+  clearCache,
   formatOffset2 as formatOffset,
-  clearCache
+  getTimeZone,
+  getTimeZoneAt,
+  getTimeZones,
+  getTimeZonesAt
 };

@@ -6,9 +6,9 @@ independent of the host timezone (`TZ`). Pre-1995 accuracy is a non-goal.
 
 ```ts
 function getTimeZonesAt(timestamp: number, withAliases?: boolean): TimeZoneInfo[];
-function getTimeZoneAt(name: string, timestamp: number, withAliases?: boolean): TimeZoneInfo; // one zone, many timestamps
+function getTimeZoneAt(name: string, timestamp: number, withAliases?: boolean): TimeZoneInfo | undefined; // one zone, many timestamps
 function getTimeZones(withAliases?: boolean): TimeZoneInfo[];           // all zones now; schedule-only, history tree-shakes out
-function getTimeZone(name: string, withAliases?: boolean): TimeZoneInfo; // one zone now;  schedule-only, history tree-shakes out
+function getTimeZone(name: string, withAliases?: boolean): TimeZoneInfo | undefined; // one zone now; schedule-only, history tree-shakes out
 function formatOffset(minutes: number): string; // -300 -> "-05:00"
 
 interface TimeZoneInfo {
@@ -284,7 +284,7 @@ const zones = getTimeZonesAt(Date.now());
 getTimeZones();
 
 // resolve a SINGLE zone — the one-zone / many-timestamps counterpart, with
-// no full-list allocation. Unknown names resolve to a UTC sentinel.
+// no full-list allocation. Unknown names return undefined.
 getTimeZoneAt('America/New_York', Date.now());
 // { name: 'America/New_York', abbr: 'EDT', offset: -240 }
 
@@ -352,7 +352,8 @@ getTimeZoneAt('Asia/Calcutta', ts, false);
 No result ever carries an `aliasOf` when the flag is off. Note the asymmetry
 the substitution implies: the returned `name` is the canonical spelling, not
 the one you passed, so don't use it to key a map by the requested id.
-Canonical, unknown and fixed-offset names are unaffected.
+Canonical and fixed-offset names are unaffected; unknown names return
+`undefined` with either flag value.
 
 Both paths are cheap enough to use freely. Dropping entries doesn't break the
 by-reference contract — the filtered array is derived once per hour bucket

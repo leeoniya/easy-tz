@@ -118,7 +118,7 @@ describe('answers do not depend on the order they were asked in', () => {
 
       for (const ts of oracleProbes) {
         const historical = ts < HISTORY_TO_MS;
-        const info = one07(name, ts);
+        const info = one07(name, ts)!;
 
         expect(`${name}@${ts} ${strip(`${info.abbr} ${info.offset}`, historical)}`).toBe(
           `${name}@${ts} ${strip(oracle.get(`${name}@${ts}`)!, historical)}`

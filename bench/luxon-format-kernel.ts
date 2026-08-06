@@ -64,7 +64,7 @@ function zoneMemo(name: string): (ts: number) => TimeZoneInfo {
   return (ts) => {
     if (info === undefined || ts !== at) {
       at = ts;
-      info = getTimeZoneAt(name, ts);
+      info = getTimeZoneAt(name, ts)!;
     }
 
     return info;
@@ -280,11 +280,11 @@ export function makeFastFormatter(zone: string, fmt: FormatKey): ((ts: number) =
   }
 
   if (fmt === 'numeric') {
-    return (ts) => formatCivil(ts + getTimeZoneAt(name, ts).offset * 60_000, null);
+    return (ts) => formatCivil(ts + getTimeZoneAt(name, ts)!.offset * 60_000, null);
   }
 
   return (ts) => {
-    const info = getTimeZoneAt(name, ts);
+    const info = getTimeZoneAt(name, ts)!;
 
     return formatCivil(ts + info.offset * 60_000, info.abbr);
   };

@@ -23,7 +23,7 @@ import { zones } from '../../shared/zones.ts';
 import { zoneAliases, zoneAbbrOverrides } from '../../shared/abbrs.ts';
 import { classGroups } from '../../shared/classes.ts';
 import { liveListApi } from '../../shared/listApi.ts';
-import { liveParts } from '../../shared/live.ts';
+import { liveParts, liveZoneExists } from '../../shared/live.ts';
 import { makeInfo, canonicalZone } from '../../shared/zoneLinks.ts';
 
 export interface InitInfo {
@@ -151,18 +151,22 @@ export { formatOffset } from '../../shared/offsetFormat.ts';
 // single-zone resolver (single-zone / many-timestamps use case): resolves just
 // `name` via the same representative + override logic the all-zones loop uses.
 // The formatter-sharing cache is a per-call all-zones optimization, so it isn't
-// needed here — one zone formats once.
-export function getTimeZoneAt(name: string, timestamp: number, withAliases = true): TimeZoneInfo {
+// needed here — one zone formats once. Unknown names return undefined.
+export function getTimeZoneAt(name: string, timestamp: number, withAliases = true): TimeZoneInfo | undefined {
   if (repOf === null) init();
 
   const zone = withAliases ? name : canonicalZone(name);
-  const res = liveParts(formatZoneOf(zone), timestamp);
+  const fmtZone = formatZoneOf(zone);
+
+  if (!liveZoneExists(fmtZone)) return undefined;
+
+  const res = liveParts(fmtZone, timestamp);
 
   return makeInfo(zone, zoneAbbrOverrides[zone] ?? res.abbr, res.offset);
 }
 
 // single zone at the current instant. 08 is live (no baked history), so — like
 // getTimeZones() vs getTimeZonesAt() — there's nothing to shed here.
-export function getTimeZone(name: string, withAliases = true): TimeZoneInfo {
+export function getTimeZone(name: string, withAliases = true): TimeZoneInfo | undefined {
   return getTimeZoneAt(name, Date.now(), withAliases);
 }

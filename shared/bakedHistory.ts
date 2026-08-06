@@ -38,6 +38,7 @@ import { resolveHistory, resolveAbbrFix, buildScheduleIndex, historyAbbr, yearFr
 import { gmtLabel } from './fmt.ts';
 import { makeInfo } from './zoneLinks.ts';
 import { classIdx, zoneIndexOf, scheduleZoneInfo } from './bakedSchedule.ts';
+import { etcZoneInfo } from './etcZones.ts';
 
 // zones-list order -> history class index (bridging spelling variants; -1 =
 // not covered). Resolved once. /*@__PURE__*/ so that if nothing references it
@@ -126,15 +127,15 @@ function bakedZoneInfo(
 
 // Single-zone resolver for the single-zone / many-timestamps use case: resolves
 // just `name` with no all-zones allocation, using the exact per-zone logic of
-// computeBaked(). Unknown names resolve to the UTC sentinel (as they do in the
-// full response). Not memoized — callers sweeping many distinct timestamps get
-// a fresh, allocation-light answer each call.
-export function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo {
+// computeBaked(). Unknown names return undefined; uncovered fixed-offset Etc ids
+// are still resolved. Not memoized — callers sweeping many distinct timestamps
+// get a fresh, allocation-light answer each call.
+export function getTimeZoneAt(name: string, timestamp: number): TimeZoneInfo | undefined {
   const z = zoneIndexOf(name);
-  const ci = z === -1 ? -1 : classIdx[z]!;
-  const hi = z === -1 ? -1 : histIdx[z]!;
 
-  return bakedZoneInfo(name, ci, hi, timestamp, timestamp < HISTORY_TO_MS, undefined, undefined, z);
+  if (z === -1) return etcZoneInfo(name) ?? undefined;
+
+  return bakedZoneInfo(name, classIdx[z]!, histIdx[z]!, timestamp, timestamp < HISTORY_TO_MS, undefined, undefined, z);
 }
 
 // full baked response at `timestamp`: schedule for the bake year onward,

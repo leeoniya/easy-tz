@@ -72,7 +72,7 @@ tzdata never inflates our impls' cold readings.
   by pure date math (irregular zones clamp outside the generated year).
   Fastest and leanest; wrong (coherently) for affected zones between a
   policy change and regeneration+redeploy. Zone-name skew bridged; unknown
-  zones return a UTC sentinel.
+  names return `undefined` from the single-zone APIs.
 
 The trust/perf asymmetry is the headline: 04→07 buys ~130x cold start while
 risk moves only from "none" to "low and bounded" (~1-4 tzdata events/year ×

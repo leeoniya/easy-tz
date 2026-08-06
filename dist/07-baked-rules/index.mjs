@@ -441,7 +441,7 @@ function scheduleZoneInfo(name, ci, timestamp, schedCache, z = -1) {
 }
 function scheduleGetTimeZoneAt(name, timestamp) {
   const z = zoneIndexOf(name);
-  return scheduleZoneInfo(name, z === -1 ? -1 : classIdx[z], timestamp, undefined, z);
+  return z === -1 ? etcZoneInfo(name) ?? undefined : scheduleZoneInfo(name, classIdx[z], timestamp, undefined, z);
 }
 function computeSchedule(timestamp) {
   const schedCache = new Array(scheduleClasses.length);
@@ -502,9 +502,9 @@ function bakedZoneInfo(name, ci, hi, timestamp, historical, schedCache, histCach
 }
 function getTimeZoneAt(name, timestamp) {
   const z = zoneIndexOf(name);
-  const ci = z === -1 ? -1 : classIdx[z];
-  const hi = z === -1 ? -1 : histIdx[z];
-  return bakedZoneInfo(name, ci, hi, timestamp, timestamp < HISTORY_TO_MS, undefined, undefined, z);
+  if (z === -1)
+    return etcZoneInfo(name) ?? undefined;
+  return bakedZoneInfo(name, classIdx[z], histIdx[z], timestamp, timestamp < HISTORY_TO_MS, undefined, undefined, z);
 }
 function computeBaked(timestamp) {
   const historical = timestamp < HISTORY_TO_MS;
@@ -622,10 +622,10 @@ function clearCache() {
   clearList(sched);
 }
 export {
-  getTimeZonesAt,
-  getTimeZones,
-  getTimeZoneAt2 as getTimeZoneAt,
-  getTimeZone,
+  clearCache,
   formatOffset,
-  clearCache
+  getTimeZone,
+  getTimeZoneAt2 as getTimeZoneAt,
+  getTimeZones,
+  getTimeZonesAt
 };

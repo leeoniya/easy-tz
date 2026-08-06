@@ -14,7 +14,7 @@
 import type { TimeZoneInfo } from '../../shared/types.ts';
 import { zones } from '../../shared/zones.ts';
 import { liveListApi } from '../../shared/listApi.ts';
-import { liveZoneInfo } from '../../shared/live.ts';
+import { liveZoneExists, liveZoneInfo } from '../../shared/live.ts';
 import { canonicalZone } from '../../shared/zoneLinks.ts';
 
 function compute(timestamp: number): TimeZoneInfo[] {
@@ -39,13 +39,17 @@ export { formatOffset } from '../../shared/offsetFormat.ts';
 
 // single-zone resolver (single-zone / many-timestamps use case): the same
 // per-zone live-Intl leaf getTimeZonesAt() loops, resolved directly for `name`.
-export function getTimeZoneAt(name: string, timestamp: number, withAliases = true): TimeZoneInfo {
-  return liveZoneInfo(withAliases ? name : canonicalZone(name), timestamp);
+// Intl rejects unknown names with a RangeError; expose that as undefined while
+// leaving timestamp validation to the normal formatter path.
+export function getTimeZoneAt(name: string, timestamp: number, withAliases = true): TimeZoneInfo | undefined {
+  const zone = withAliases ? name : canonicalZone(name);
+
+  return liveZoneExists(zone) ? liveZoneInfo(zone, timestamp) : undefined;
 }
 
 // single zone at the current instant. 04 is fully live, so — like getTimeZones()
 // vs getTimeZonesAt() — there's no history path to shed: this is exactly
 // getTimeZoneAt(name, Date.now()).
-export function getTimeZone(name: string, withAliases = true): TimeZoneInfo {
+export function getTimeZone(name: string, withAliases = true): TimeZoneInfo | undefined {
   return getTimeZoneAt(name, Date.now(), withAliases);
 }

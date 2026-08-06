@@ -34,6 +34,19 @@ function resolveAbbr(longName: string): string {
 // so nothing can observe it between the two
 const sample: ZoneSample = { longName: '', offMin: 0 };
 
+// Validate a caller-supplied zone without formatting a timestamp. Keeping this
+// separate lets the public single-zone APIs return undefined for unknown names
+// while preserving Intl's errors for invalid timestamps.
+export function liveZoneExists(name: string): boolean {
+  try {
+    partsFmt(zoneAliases[name] ?? name);
+    return true;
+  } catch (err) {
+    if (err instanceof RangeError) return false;
+    throw err;
+  }
+}
+
 // parses `fmtZone`'s live Intl output at an instant: resolved abbr + offset in
 // signed minutes. callers sharing one fmtZone across grouped zones (impl 08)
 // memoize this result per call and apply per-zone overrides themselves.

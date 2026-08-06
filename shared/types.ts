@@ -36,14 +36,15 @@ export type GetTimeZones = (withAliases?: boolean) => TimeZoneInfo[];
 
 // single-zone / many-timestamps counterpart to GetTimeZonesAt: resolves one
 // zone at one instant without building the full response. Exported by the
-// first-party impls (04, 07, 08, 10).
-export type GetTimeZoneAt = (name: string, timestamp: number, withAliases?: boolean) => TimeZoneInfo;
+// first-party impls (04, 07, 08, 10). Returns undefined for an unknown name.
+export type GetTimeZoneAt = (name: string, timestamp: number, withAliases?: boolean) => TimeZoneInfo | undefined;
 
 // single-zone counterpart to GetTimeZones (and current-instant counterpart to
 // GetTimeZoneAt): one zone at Date.now(). Takes the same schedule-only route as
 // GetTimeZones on the baked impls, so a consumer importing only the
-// current-instant APIs tree-shakes shared/history.ts out.
-export type GetTimeZone = (name: string, withAliases?: boolean) => TimeZoneInfo;
+// current-instant APIs tree-shakes shared/history.ts out. Returns undefined for
+// an unknown name.
+export type GetTimeZone = (name: string, withAliases?: boolean) => TimeZoneInfo | undefined;
 
 export interface Impl {
   id: string;
