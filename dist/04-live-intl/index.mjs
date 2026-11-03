@@ -202,6 +202,7 @@ var abbrOverrides = {
   "Sakhalin Standard Time": "SAKT",
   "Anadyr Standard Time": "ANAT",
   "Petropavlovsk-Kamchatski Standard Time": "PETT",
+  "Kamchatka Standard Time": "PETT",
   "Seychelles Time": "SCT",
   "Réunion Time": "RET",
   "Mauritius Standard Time": "MUT",

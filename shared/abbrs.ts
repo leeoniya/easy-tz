@@ -134,6 +134,8 @@ export const abbrOverrides: Record<string, string> = {
   'Sakhalin Standard Time': 'SAKT',
   'Anadyr Standard Time': 'ANAT',
   'Petropavlovsk-Kamchatski Standard Time': 'PETT',
+  // CLDR 48 (ICU 78) renamed the metazone; both spellings resolve to PETT
+  'Kamchatka Standard Time': 'PETT',
 
   // Indian Ocean
   'Seychelles Time': 'SCT',

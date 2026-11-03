@@ -5,8 +5,14 @@
 //   in the CURRENT year (impl 08's verified formatter-sharing hints);
 // - a year-independent schedule (impls 07/09): zones are fitted to static
 //   states or two-state nth-weekday-of-month rules that hold across all
-//   probed years; zones whose transitions don't fit a Gregorian rule (e.g.
-//   religious-calendar rules) fall back to current-year 'irregular' segments.
+//   probed years; anything else falls back to current-year 'irregular'
+//   segments. Those are either APPROXIMATE (religious-calendar rules: no
+//   Gregorian fit in any probed year, so the segments only ever describe
+//   the bake year) or SETTLING (a bake-year transition into an offset the
+//   zone then keeps in every later probed year, e.g. a province abolishing
+//   DST): for a settling zone the segments' forward clamp IS the right
+//   answer, and its pre-bake history is still rule-shaped, so only the
+//   approximate ones are excluded from the historical layer.
 //
 // Includes an in-runtime verification pass that replays the fitted schedule
 // through the SAME resolver the impls ship (shared/rules.ts) and compares it
@@ -65,6 +71,9 @@ export interface GeneratedTables {
   stepMs: number;
   classGroups: string[][];
   scheduleClasses: ScheduleClass[];
+  // kind-2 zones whose behavior fits no rule in ANY probed year (see header);
+  // the history/abbrfix layers and the verifier skip exactly these
+  approxZones: string[];
   stats: {
     zones: number;
     sigClasses: number;
@@ -676,6 +685,7 @@ export function generateTables(): GeneratedTables {
   // ---- schedule: fit static / rule / irregular per zone, group identical ----
   const byKey = new Map<string, ScheduleClass>();
   let staticClasses = 0, ruleClasses = 0, irregularClasses = 0, irregularZones = 0;
+  const approxZones: string[] = [];
 
   for (const zone of zones) {
     const perYear = YEARS.map((_, yi) => effectiveSegs(rawByYear[yi]!, zone));
@@ -710,8 +720,14 @@ export function generateTables(): GeneratedTables {
         make = () => ({ zones: [zone], kind: 1, states, rules });
         key = `R~${stateKey(states[0])}~${stateKey(states[1])}~${rules.map((r) => `${r.month},${r.nth},${r.dow},${r.atMin},${r.to}`).join('~')}`;
       } else {
-        // irregular: current-year segments only
+        // irregular: current-year segments only. Settling zones (static in
+        // every later probed year, on the segment they end the bake year on)
+        // keep full history; everything else is approximate (see header)
         const segs = perYear[0]!;
+        const last = segs[segs.length - 1]!;
+        const settles = perYear.slice(1).every((s) => s.length === 1 && sameState(s[0]!, last));
+
+        if (!settles) approxZones.push(zone);
 
         make = () => ({
           zones: [zone],
@@ -748,6 +764,7 @@ export function generateTables(): GeneratedTables {
     stepMs: STEP_MS,
     classGroups,
     scheduleClasses,
+    approxZones,
     stats: {
       zones: zones.length,
       sigClasses: bySig.size,
@@ -855,7 +872,7 @@ const encodeSig = (segs: Seg[]): string =>
 function matchesSchedule(cls: ScheduleClass, year: number, segs: OffSeg[]): boolean {
   if (cls.kind === 0) return segs.length === 1 && segs[0]!.off === cls.states[0].offMin;
 
-  if (cls.kind !== 1) return false; // irregular zones are excluded anyway
+  if (cls.kind !== 1) return false; // kind 2 never defers: its segments describe the bake year only
 
   if (segs.length !== 3) return false;
 
@@ -1055,16 +1072,15 @@ export function generateHistory(tables: GeneratedTables, fromYear: number = HIST
     return segs;
   };
 
-  // the irregular-class zones are excluded: their behavior isn't
-  // rule-expressible in ANY year, so history would be 31 raw years each
-  const irregular = new Set<string>();
+  // the approximate irregular zones are excluded: their behavior isn't
+  // rule-expressible in ANY year, so history would be 31 raw years each.
+  // Settling irregular zones stay in: matchesSchedule() never defers for a
+  // kind-2 class, so their pre-bake years are fitted like any other zone's
+  const irregular = new Set(tables.approxZones);
   const classOf = new Map<string, ScheduleClass>();
 
   for (const c of tables.scheduleClasses) {
-    for (const z of c.zones) {
-      if (c.kind === 2) irregular.add(z);
-      else classOf.set(z, c);
-    }
+    for (const z of c.zones) classOf.set(z, c);
   }
 
   const byKey = new Map<string, HistoryClass>();
@@ -1145,9 +1161,11 @@ export function generateHistory(tables: GeneratedTables, fromYear: number = HIST
 
 // Replays the fitted schedule through the shipped resolver and compares it
 // against live Intl for every zone at semi-monthly instants plus every
-// transition edge, across ALL probed years (irregular classes: current year
-// only — beyond it they clamp by design).
+// transition edge, across ALL probed years (approximate irregular classes:
+// current year only — beyond it they clamp by design; settling ones must
+// hold in the later years too, since the clamp is their answer there).
 export function verifyTables(tables: GeneratedTables): Verification {
+  const approx = new Set(tables.approxZones);
   const scheduleOf = new Map<string, ScheduleClass>();
 
   for (const c of tables.scheduleClasses) {
@@ -1215,7 +1233,7 @@ export function verifyTables(tables: GeneratedTables): Verification {
       for (const zone of zones) {
         const cls = scheduleOf.get(zone)!;
 
-        if (cls.kind === 2 && y !== tables.year) continue; // clamps by design
+        if (y !== tables.year && approx.has(zone)) continue; // clamps by design
 
         checks++;
 

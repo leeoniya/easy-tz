@@ -371,7 +371,9 @@ const identityDrift: { label: string; zone: string; ts: number; abbr: string }[]
   // pin it, since losing it would silently shrink the overlay again.
   { label: 'Europe/Astrakhan on Moscow time (2012, past a year-line era flip)', zone: 'Europe/Astrakhan', ts: Date.UTC(2012, 5, 15, 12), abbr: 'MSK' },
   { label: 'Europe/Ulyanovsk on Moscow time (2013, past a year-line era flip)', zone: 'Europe/Ulyanovsk', ts: Date.UTC(2013, 0, 15, 12), abbr: 'MSK' },
-  { label: 'Asia/Anadyr on Magadan time (2013, past a year-line era flip)', zone: 'Asia/Anadyr', ts: Date.UTC(2013, 5, 15, 12), abbr: 'MAGT' },
+  // CLDR 48 moved Anadyr into the Kamchatka metazone from its 2011 move to +12
+  // (older CLDR filed those years under Magadan); the test follows live ICU
+  { label: 'Asia/Anadyr on Kamchatka time (2013, past a year-line era flip)', zone: 'Asia/Anadyr', ts: Date.UTC(2013, 5, 15, 12), abbr: 'PETT' },
   // Chile's 2015 permanent-DST year, likewise invisible to a live-only walk
   { label: 'America/Punta_Arenas during permanent CLST (2015)', zone: 'America/Punta_Arenas', ts: Date.UTC(2015, 5, 15, 12), abbr: 'CLST' },
 ];
@@ -438,40 +440,76 @@ describe('labels stay vague where the offset matches no modern state', () => {
   });
 });
 
-// The four irregular-class zones are deliberately absent from history: Morocco
-// and Palestine suspend DST for Ramadan, which follows the lunar calendar, so
-// their behavior isn't expressible as a Gregorian rule in ANY year and baking
-// them would cost raw per-year segments end to end (tools/gen-core.ts: "the
-// irregular-class zones are excluded"). Historical instants therefore fall
-// through to the schedule class, which answers with the bake year's shape and
-// is knowingly wrong — Africa/Casablanca ran on WET until 2008, so it's off by
-// an hour in 244 of 372 monthly samples.
+// The approximate irregular-class zones are deliberately absent from history:
+// Palestine suspends DST for Ramadan, which follows the lunar calendar, so its
+// behavior isn't expressible as a Gregorian rule in ANY year and baking it
+// would cost raw per-year segments end to end (tools/gen-core.ts: approxZones).
+// Historical instants therefore fall through to the schedule class, which
+// answers with the bake year's shape and is knowingly wrong.
 //
 // The correction table has to honor the same exclusion. Labeling these spans
 // would put an authoritative name on an offset we already know is approximate,
-// which reads as MORE trustworthy than the GMT±N it replaced, and these four
-// zones alone were 15-19% of the payload. This block pins both halves so
-// re-including them anywhere has to be a deliberate act.
-const irregularZones = ['Africa/Casablanca', 'Africa/El_Aaiun', 'Asia/Gaza', 'Asia/Hebron'];
+// which reads as MORE trustworthy than the GMT±N it replaced. This block pins
+// both halves so re-including them anywhere has to be a deliberate act.
+//
+// The other kind-2 shape — a SETTLING zone whose bake-year transition lands on
+// an offset it then keeps in every later probed year — is the opposite case:
+// its forward clamp is exact, so its past deserves real eras (rule-shaped for
+// the 2026 Canadian provinces abolishing DST; raw Ramadan years for Morocco,
+// permanent +00 from 2026-09). Pinned here too, because the generator once
+// lumped these in with the Ramadan zones and silently answered every pre-bake
+// instant with the permanent offset.
+const approxZones = ['Asia/Gaza', 'Asia/Hebron'];
+const settlingDstZones = ['America/Edmonton', 'America/Inuvik', 'America/Vancouver', 'America/Winnipeg'];
+const settlingZones = [...settlingDstZones, 'Africa/Casablanca', 'Africa/El_Aaiun'];
 
-describe('irregular Ramadan-rule zones stay out of the historical layer', () => {
-  test('the schedule table still classes exactly these four as irregular', () => {
+describe('approximate irregular zones stay out of the historical layer', () => {
+  test('the schedule table classes exactly these as irregular', () => {
     const irregular = scheduleClasses.filter((c) => c.kind === 2).flatMap((c) => c.zones);
-    expect(irregular.toSorted()).toEqual(irregularZones.toSorted());
+    expect(irregular.toSorted()).toEqual([...approxZones, ...settlingZones].toSorted());
   });
 
-  test('no correction table entry touches them', () => {
+  test('no correction table entry touches the approximate ones', () => {
     const corrected = new Set(abbrFixClasses.flatMap((c) => c.zones));
-    expect(irregularZones.filter((z) => corrected.has(z))).toEqual([]);
+    expect(approxZones.filter((z) => corrected.has(z))).toEqual([]);
   });
 
-  for (const zone of irregularZones) {
+  for (const zone of approxZones) {
     test(`${zone} answers historical instants from the schedule projection`, () => {
       const ts = Date.UTC(2000, 5, 15, 12);
       // no history era, so the historical answer IS the year-independent one
       expect(baked(zone, ts).offset).toBe(legacyOffset(zone, ts));
     });
   }
+});
+
+describe('settling irregular zones keep their historical eras', () => {
+  const covered = new Set(historyClasses.flatMap((c) => c.zones));
+
+  for (const zone of settlingZones) {
+    test(`${zone} has eras`, () => {
+      expect(covered.has(zone)).toBe(true);
+    });
+  }
+
+  for (const zone of settlingDstZones) {
+    test(`${zone} observes its old DST cycle before the bake year, then stays on the former DST offset`, () => {
+      const winter = bakedAt07(zone, Date.UTC(2025, 0, 15, 12))!;
+      const summer = bakedAt07(zone, Date.UTC(2025, 6, 15, 12))!;
+      const settled = bakedAt07(zone, Date.UTC(2027, 11, 15, 12))!;
+
+      expect(summer.offset - winter.offset).toBe(60);
+      expect(settled.offset).toBe(summer.offset);
+      expect(settled.abbr).toBe(summer.abbr);
+    });
+  }
+
+  test('Africa/Casablanca keeps its Ramadan dip in history and settles on +00', () => {
+    expect(bakedAt07('Africa/Casablanca', Date.UTC(2025, 0, 15, 12))!.offset).toBe(60);
+    expect(bakedAt07('Africa/Casablanca', Date.UTC(2025, 2, 15, 12))!.offset).toBe(0); // Ramadan 2025
+    expect(bakedAt07('Africa/Casablanca', Date.UTC(2000, 5, 15, 12))!.offset).toBe(0); // WET until 2008
+    expect(bakedAt07('Africa/Casablanca', Date.UTC(2027, 5, 15, 12))!.offset).toBe(0);
+  });
 });
 
 // A corrected label reaches makeInfo() the same way any other does, so it must

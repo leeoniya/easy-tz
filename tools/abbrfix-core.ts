@@ -104,7 +104,8 @@ export function auditTableSet(
     tables.yearStart,
     tables.stepMs,
     INCLUDE_VAGUE,
-    boundaries
+    boundaries,
+    new Set(tables.approxZones)
   );
 }
 
@@ -117,7 +118,10 @@ export function auditAbbrFix(
   yearStart: number,
   stepMs: number,
   includeVague: boolean,
-  boundaries: Record<string, number[]> | null = null
+  boundaries: Record<string, number[]> | null = null,
+  // zones with no historical eras by design (gen-core's approxZones); defaults
+  // to every kind-2 zone for callers that audit a shipped table set
+  skipZones: ReadonlySet<string> = irregularZones(scheduleClasses)
 ): AbbrFixResult {
   const t0 = Date.now();
 
@@ -149,10 +153,10 @@ export function auditAbbrFix(
   };
 
   // Skipped here for the same reason gen-core skips them in history (see
-  // irregularZones). Correcting only the LABEL on a knowingly-approximate
+  // approxZones). Correcting only the LABEL on a knowingly-approximate
   // offset would dress it in an authoritative name, and these four zones alone
   // were 15-19% of the payload.
-  const irregular = irregularZones(scheduleClasses);
+  const irregular = skipZones;
 
   // every Jan 1 in the window, where the baked side can move on its own
   const yearStarts: number[] = [];
