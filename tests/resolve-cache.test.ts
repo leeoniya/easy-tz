@@ -3,7 +3,7 @@ import { getTimeZoneAt as one07, getTimeZonesAt as all07, clearCache as clear07 
 import { getTimeZonesAt as all04, clearCache as clear04 } from '../impls/04-live-intl/index.ts';
 import { scheduleClasses, YEAR_START, STEP_MS, genMeta } from '../shared/schedule.ts';
 import { alignedWith } from './aligned.ts';
-import { resolveClass } from '../shared/rules.ts';
+import { resolveClass, historyExcludedZones } from '../shared/rules.ts';
 import { classIdx, zoneIndexOf, scheduleZoneInfo } from '../shared/bakedSchedule.ts';
 import { HISTORY_TO_MS } from '../shared/bakedHistory.ts';
 import { zones } from '../shared/zones.ts';
@@ -101,10 +101,9 @@ describe('answers do not depend on the order they were asked in', () => {
       for (const z of all04(ts)) oracle.set(`${z.name}@${ts}`, `${z.abbr} ${z.offset}`);
     }
 
-    // the irregular classes hold only the generated year's segments and clamp
-    // outside it, so the Ramadan-rule zones knowingly diverge in other years
-    // (see tools/sweep-validity.ts); that's orthogonal to caching
-    const irregular = new Set(scheduleClasses.filter((c) => c.kind === 2).flatMap((c) => c.zones));
+    // Keep one-off policy changes in the oracle check; only the deliberately
+    // approximate Morocco/Palestine zones can diverge outside the bake year.
+    const excluded = historyExcludedZones(scheduleClasses);
 
     // Before the bake year the answer comes from the historical eras, which
     // store OFFSETS only and label an offset the schedule class doesn't have
@@ -114,7 +113,7 @@ describe('answers do not depend on the order they were asked in', () => {
     const strip = (v: string, historical: boolean) => (historical ? v.slice(v.indexOf(' ') + 1) : v);
 
     for (const name of zones) {
-      if (irregular.has(name)) continue;
+      if (excluded.has(name)) continue;
 
       for (const ts of oracleProbes) {
         const historical = ts < HISTORY_TO_MS;

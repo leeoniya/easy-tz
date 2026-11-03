@@ -24,7 +24,7 @@ import { liveParts } from '../shared/live.ts';
 import { zones } from '../shared/zones.ts';
 import type { GeneratedTables, GeneratedHistory } from './gen-core.ts';
 import { zoneAliases, zoneAbbrOverrides } from '../shared/abbrs.ts';
-import { resolveHistory, resolveClass, buildScheduleIndex, historyAbbr, irregularZones, type ScheduleClass, type HistoryClass } from '../shared/rules.ts';
+import { resolveHistory, resolveClass, buildScheduleIndex, historyAbbr, historyExcludedZones, type ScheduleClass, type HistoryClass } from '../shared/rules.ts';
 import { gmtLabel } from '../shared/fmt.ts';
 
 // probe stride for the boundary scan, in 15-min steps. 6d, the same bound
@@ -148,11 +148,9 @@ export function auditAbbrFix(
     return { abbr, vague: abbr.startsWith('GMT'), defer: false };
   };
 
-  // Skipped here for the same reason gen-core skips them in history (see
-  // irregularZones). Correcting only the LABEL on a knowingly-approximate
-  // offset would dress it in an authoritative name, and these four zones alone
-  // were 15-19% of the payload.
-  const irregular = irregularZones(scheduleClasses);
+  // Use the same exclusions as history: correcting only a label would make
+  // an approximate historical offset look authoritative.
+  const excluded = historyExcludedZones(scheduleClasses);
 
   // every Jan 1 in the window, where the baked side can move on its own
   const yearStarts: number[] = [];
@@ -190,7 +188,7 @@ export function auditAbbrFix(
 
     // Etc/* and anything the schedule doesn't index can't be corrected here;
     // they never reach the historical branch either
-    if (classIdx[z] === -1 || irregular.has(zone)) continue;
+    if (classIdx[z] === -1 || excluded.has(zone)) continue;
 
     const spans: FixSpan[] = [];
     let open: FixSpan | null = null;

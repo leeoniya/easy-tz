@@ -31,6 +31,7 @@ import { fmtCache, formatOffset, initialsAbbr, compactGmt, readZoneSample, WALL_
 import {
   ruleInstant,
   resolveClass,
+  historyExcludedZones,
   type ScheduleClass,
   type ZoneState,
   type Rule,
@@ -765,7 +766,7 @@ export function generateTables(): GeneratedTables {
 
 // ---- historical eras (sidecar history tables; see shared/rules.ts) ----
 //
-// Probes each non-irregular zone year by year from HISTORY_FROM up to the
+// Probes each included zone year by year from HISTORY_FROM up to the
 // bake year and compresses the observed offset behavior into eras: static
 // spans, two-rule DST spans (merged across consecutive years while the
 // fitted rules agree, with nth-encoding ambiguity resolved by candidate-set
@@ -855,7 +856,7 @@ const encodeSig = (segs: Seg[]): string =>
 function matchesSchedule(cls: ScheduleClass, year: number, segs: OffSeg[]): boolean {
   if (cls.kind === 0) return segs.length === 1 && segs[0]!.off === cls.states[0].offMin;
 
-  if (cls.kind !== 1) return false; // irregular zones are excluded anyway
+  if (cls.kind !== 1) return false; // bake-year segments cannot reproduce historical years
 
   if (segs.length !== 3) return false;
 
@@ -1055,15 +1056,12 @@ export function generateHistory(tables: GeneratedTables, fromYear: number = HIST
     return segs;
   };
 
-  // the irregular-class zones are excluded: their behavior isn't
-  // rule-expressible in ANY year, so history would be 31 raw years each
-  const irregular = new Set<string>();
+  const excluded = historyExcludedZones(tables.scheduleClasses);
   const classOf = new Map<string, ScheduleClass>();
 
   for (const c of tables.scheduleClasses) {
     for (const z of c.zones) {
-      if (c.kind === 2) irregular.add(z);
-      else classOf.set(z, c);
+      classOf.set(z, c);
     }
   }
 
@@ -1072,7 +1070,7 @@ export function generateHistory(tables: GeneratedTables, fromYear: number = HIST
   let coveredZones = 0;
 
   for (const zone of zones) {
-    if (irregular.has(zone)) continue;
+    if (excluded.has(zone)) continue;
 
     zoneCount++;
 
@@ -1101,7 +1099,7 @@ export function generateHistory(tables: GeneratedTables, fromYear: number = HIST
   const boundaries: Record<string, number[]> = {};
 
   for (const zone of zones) {
-    if (irregular.has(zone)) continue;
+    if (excluded.has(zone)) continue;
 
     const steps: number[] = [];
 
@@ -1145,9 +1143,10 @@ export function generateHistory(tables: GeneratedTables, fromYear: number = HIST
 
 // Replays the fitted schedule through the shipped resolver and compares it
 // against live Intl for every zone at semi-monthly instants plus every
-// transition edge, across ALL probed years (irregular classes: current year
-// only — beyond it they clamp by design).
+// transition edge, across ALL probed years. Only the deliberately excluded
+// Morocco/Palestine zones may disagree outside the bake year.
 export function verifyTables(tables: GeneratedTables): Verification {
+  const excluded = historyExcludedZones(tables.scheduleClasses);
   const scheduleOf = new Map<string, ScheduleClass>();
 
   for (const c of tables.scheduleClasses) {
@@ -1215,7 +1214,7 @@ export function verifyTables(tables: GeneratedTables): Verification {
       for (const zone of zones) {
         const cls = scheduleOf.get(zone)!;
 
-        if (cls.kind === 2 && y !== tables.year) continue; // clamps by design
+        if (y !== tables.year && excluded.has(zone)) continue; // known approximations
 
         checks++;
 

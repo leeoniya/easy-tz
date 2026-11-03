@@ -25,12 +25,13 @@ import { zones } from '../shared/zones.ts';
 import { aliasOfZone } from '../shared/zoneLinks.ts';
 import { scheduleClasses, genMeta, YEAR_START, STEP_MS } from '../shared/schedule.ts';
 import { historyClasses, HISTORY_FROM, HISTORY_TO } from '../shared/history.ts';
-import { resolveClass, resolveHistory, buildScheduleIndex } from '../shared/rules.ts';
+import { resolveClass, resolveHistory, buildScheduleIndex, historyExcludedZones } from '../shared/rules.ts';
 import { fmtCache, tzNameFromFormat, isoOffsetFromLongOffset } from '../shared/fmt.ts';
 
 export interface Mismatch {
   zone: string;
-  irregular: boolean; // kind-2 class: current-year segments, expected to hold just the bake year
+  irregular: boolean; // kind-2 storage, including one-off policy changes
+  approximate: boolean; // deliberately excluded Morocco/Palestine zone
   ts: number; // first offending weekly sample
   baked: number;
   actual: number;
@@ -95,7 +96,8 @@ export function runSweep(fromYear = 1995, toYear?: number, useHistory = true): S
   const classIdx = buildScheduleIndex(zones, scheduleClasses);
   const histIdx = buildScheduleIndex(zones, historyClasses);
 
-  const sweepZones: { name: string; ci: number; hi: number; irregular: boolean }[] = [];
+  const excluded = historyExcludedZones(scheduleClasses);
+  const sweepZones: { name: string; ci: number; hi: number; irregular: boolean; approximate: boolean }[] = [];
   const unknownZones: string[] = [];
   let skippedAliases = 0;
 
@@ -119,6 +121,7 @@ export function runSweep(fromYear = 1995, toYear?: number, useHistory = true): S
       ci,
       hi: useHistory ? histIdx[z]! : -1,
       irregular: scheduleClasses[ci]!.kind === 2,
+      approximate: excluded.has(name),
     });
   }
 
@@ -146,7 +149,7 @@ export function runSweep(fromYear = 1995, toYear?: number, useHistory = true): S
         const actual = baselineOffMin(z.name, ts);
 
         if (baked !== actual) {
-          mismatches.push({ zone: z.name, irregular: z.irregular, ts, baked, actual });
+          mismatches.push({ zone: z.name, irregular: z.irregular, approximate: z.approximate, ts, baked, actual });
           break;
         }
       }

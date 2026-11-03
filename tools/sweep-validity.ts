@@ -1,12 +1,10 @@
 // Measures the validity window of the vendored schedule table by sweeping
 // weekly samples of every baked zone against a runtime's own tz database
-// (ICU), one year at a time. This is the measurement behind the summary in
-// devinfo/README: all zones agree only in the bake year; the four
-// irregular-class zones (Casablanca, El Aaiun, Gaza, Hebron) hold only that
-// one year; going back, mismatches grow at each rule-regime change (2007 US
-// DST act, 1990s EU/xUSSR churn); going forward, a handful of zones drift
-// where "nth weekday" projection picks a different day than tzdata's "day on
-// or after" rules. Sweep mechanics live in tools/sweep-core.ts.
+// (ICU), one year at a time. Historical eras cover past rule changes except
+// for the deliberately omitted Morocco/Palestine zones. Future mismatches
+// expose stale policy or rule projections. Kind 2 alone is not an exemption:
+// one-off changes such as DST abolition must still agree with ICU.
+// Sweep mechanics live in tools/sweep-core.ts.
 //
 // Two modes:
 //   local (default) — sweeps the ACTIVE table variant against this host's
@@ -98,7 +96,7 @@ console.log(`runtime:   ${runtime}`);
 console.log(`table:     ${chrome ? 'chrome variant' : 'active variant'}: ${genMeta.host}${genMeta.icu !== null ? ` (icu ${genMeta.icu})` : ''}, generated ${genMeta.generated}, bake year ${bakeYear}`);
 console.log(`baseline:  ${result.temporal ? 'Temporal.Instant offsets' : "Intl 'longOffset' formatter"} (runtime ICU)`);
 console.log(
-  `history:   ${result.history !== null ? `${result.history.fromYear}-${result.history.toYear - 1} baked eras (${result.history.classes} classes; irregular zones excluded)` : 'disabled (--no-history)'}`
+  `history:   ${result.history !== null ? `${result.history.fromYear}-${result.history.toYear - 1} baked eras (${result.history.classes} classes; irregular Morocco/Palestine history excluded)` : 'disabled (--no-history)'}`
 );
 console.log(
   `zones:     ${sweptZones} swept (${irregularZones.length} irregular: ${irregularZones.join(', ')})` +
@@ -199,14 +197,14 @@ function window(ok: (ms: Mismatch[]) => boolean): [number, number] | null {
 
 if (mismatchesByYear.has(bakeYear)) {
   const strictWin = window((ms) => ms.length === 0);
-  const regularWin = window((ms) => ms.every((m) => m.irregular));
+  const regularWin = window((ms) => ms.every((m) => m.approximate));
 
   const fmtWin = (w: [number, number] | null) =>
     w === null ? 'none (bake year itself mismatches!)' : `${w[0]}-${w[1]}${w[0] === fromYear ? ' (hit sweep edge)' : ''}${w[1] === toYear ? ' (hit sweep edge)' : ''}`;
 
   console.log(`\nvalidity windows (contiguous around bake year ${bakeYear}):`);
   console.log(`  all zones agree:            ${fmtWin(strictWin)}`);
-  console.log(`  irregular zones excluded:   ${fmtWin(regularWin)}`);
+  console.log(`  known approximations excluded: ${fmtWin(regularWin)}`);
 
   if (regularWin !== null) {
     // what a production hybrid would bake alongside the table, with the future

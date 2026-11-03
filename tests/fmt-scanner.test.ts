@@ -1,5 +1,31 @@
 import { describe, expect, test } from 'bun:test';
+import { abbrOverrides } from '../shared/abbrs.ts';
 import { readZoneSample, type ZoneSample } from '../shared/fmt.ts';
+
+describe('Russian abbreviation overrides', () => {
+  // Literal CLDR vocabulary keeps these independent of the host ICU/tzdata.
+  // Summer values follow tzdata 2014j's letter abbreviations, not standard time.
+  test.each([
+    ['Moscow', 'MSK', 'MSD'],
+    ['Samara', 'SAMT', 'SAMST'],
+    ['Volgograd', 'MSK', 'VOLST'], // Preserve the existing modern standard override.
+    ['Yekaterinburg', 'YEKT', 'YEKST'],
+    ['Omsk', 'OMST', 'OMSST'],
+    ['Novosibirsk', 'NOVT', 'NOVST'],
+    ['Krasnoyarsk', 'KRAT', 'KRAST'],
+    ['Irkutsk', 'IRKT', 'IRKST'],
+    ['Yakutsk', 'YAKT', 'YAKST'],
+    ['Vladivostok', 'VLAT', 'VLAST'],
+    ['Magadan', 'MAGT', 'MAGST'],
+    ['Sakhalin', 'SAKT', 'SAKST'],
+    ['Anadyr', 'ANAT', 'ANAST'],
+    ['Petropavlovsk-Kamchatski', 'PETT', 'PETST'],
+    ['Kamchatka', 'PETT', 'PETST'],
+  ])('%s keeps standard and summer labels distinct', (name, standard, summer) => {
+    expect(abbrOverrides[`${name} Standard Time`]).toBe(standard);
+    expect(abbrOverrides[`${name} Summer Time`]).toBe(summer);
+  });
+});
 
 function fakeFormatter(parts: Intl.DateTimeFormatPart[]) {
   const formatted = parts.map((part) => part.value).join('');

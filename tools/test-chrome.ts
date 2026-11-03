@@ -55,6 +55,7 @@ function reportFailures(what: string, tallies: Tallies): boolean {
 }
 
 const VS04_IDS = ['08-verified-sharing', '10-audited-rules', '07-baked-rules'];
+const DST_ABOLITION_IDS = ['07-baked-rules', '10-audited-rules'];
 
 const code = await bundleBrowserEntry();
 const browser = await launchChrome();
@@ -74,6 +75,8 @@ try {
   const currentApis = new Map<string, Vs04>();
   const fixedOffsets = new Map<string, Vs04>();
   const canonicalOnly = new Map<string, Vs04>();
+  const dstAbolition = new Map<string, Vs04>();
+  const russianHistory = new Map<string, Vs04>();
 
   for (const id of implIds) {
     const r = (await page.evaluate(`__validate(${JSON.stringify(id)})`)) as ValidateResult;
@@ -83,6 +86,11 @@ try {
     currentApis.set(id, (await page.evaluate(`__verifyCurrentApis(${JSON.stringify(id)})`)) as Vs04);
     fixedOffsets.set(id, (await page.evaluate(`__verifyFixedOffsets(${JSON.stringify(id)})`)) as Vs04);
     canonicalOnly.set(id, (await page.evaluate(`__verifyCanonicalOnly(${JSON.stringify(id)})`)) as Vs04);
+    // 08 verifies sharing for the current year only. Its native-Temporal
+    // historical sharing is a separate known gap; its no-T path is checked below.
+    if (id !== '08-verified-sharing') {
+      russianHistory.set(id, (await page.evaluate(`__verifyRussianHistory(${JSON.stringify(id)})`)) as Vs04);
+    }
   }
 
   for (const id of VS04_IDS) {
@@ -91,13 +99,15 @@ try {
 
   const init08 = rows.find((r) => r.id === '08-verified-sharing')?.init as InitInfo | null | undefined;
 
-  // rollover resistance: past the generated year, 10 and 07 must remain
-  // output-identical to live 04 for rule/static zones (irregular zones are
-  // skipped: 07 clamps them by design; 10 recovers them with correct
-  // offsets but generic GMT-style labels)
-  type Future = Vs04 & { skipped: number };
+  // One-off policy changes are checked too. Skip only known approximations;
+  // 10's live recovery can also differ from 04 in its generic offset labels.
+  type Future = Vs04 & { skipped: number; bakeYear: number; year: number };
   const future10 = (await page.evaluate(`__verifyFuture('10-audited-rules', true)`)) as Future;
   const future07 = (await page.evaluate(`__verifyFuture('07-baked-rules', true)`)) as Future;
+
+  for (const id of DST_ABOLITION_IDS) {
+    dstAbolition.set(id, (await page.evaluate(`__verifyDstAbolition(${JSON.stringify(id)})`)) as Vs04);
+  }
 
   await page.close();
 
@@ -116,6 +126,14 @@ try {
 
     vs04.set(`${id} (no-T)`, (await noTempPage.evaluate(`__verifyVs04(${JSON.stringify(id)})`)) as Vs04);
     aliasPairs.set(`${id} (no-T)`, (await noTempPage.evaluate(`__verifyAliasPairs(${JSON.stringify(id)})`)) as Vs04);
+  }
+
+  for (const id of DST_ABOLITION_IDS) {
+    dstAbolition.set(`${id} (no-T)`, (await noTempPage.evaluate(`__verifyDstAbolition(${JSON.stringify(id)})`)) as Vs04);
+  }
+
+  for (const id of implIds) {
+    russianHistory.set(`${id} (no-T)`, (await noTempPage.evaluate(`__verifyRussianHistory(${JSON.stringify(id)})`)) as Vs04);
   }
 
   await noTempPage.close();
@@ -170,11 +188,17 @@ try {
   }
 
   console.log(
-    `10 rollover audit (2027 instants, table year 2026): ${future10.checked - future10.mismatchCount}/${future10.checked} match live 04 (${future10.skipped} irregular-zone checks recovered w/ generic labels)`
+    `10 rollover audit (${future10.year} instants, table year ${future10.bakeYear}): ${future10.checked - future10.mismatchCount}/${future10.checked} match live 04 (${future10.skipped} known-approximation checks skipped)`
   );
   console.log(
-    `07 rollover rules (2027 instants, table year 2026): ${future07.checked - future07.mismatchCount}/${future07.checked} match live 04 (${future07.skipped} irregular-zone checks clamped by design)`
+    `07 rollover rules (${future07.year} instants, table year ${future07.bakeYear}): ${future07.checked - future07.mismatchCount}/${future07.checked} match live 04 (${future07.skipped} known-approximation checks skipped)`
   );
+
+  const dst = totals(dstAbolition);
+  console.log(`Canada DST abolition: ${dst.passed}/${dst.checked} single/all-zone offsets + live-04 labels (including no-T)`);
+
+  const russian = totals(russianHistory);
+  console.log(`Russian history: ${russian.passed}/${russian.checked} single/all-zone corrections + intentional GMT fallbacks (including no-T)`);
 
   // --- assertions ---
   let failed = false;
@@ -200,6 +224,8 @@ try {
     [' current-instant APIs', currentApis],
     [' fixed-offset ids', fixedOffsets],
     [' canonical-only', canonicalOnly],
+    [' DST abolition', dstAbolition],
+    [' Russian history', russianHistory],
   ];
 
   for (const [what, tallies] of checks) {

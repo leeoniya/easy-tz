@@ -2,6 +2,7 @@ import { describe, test, expect } from 'bun:test';
 import { getTimeZonesAt as precomputed, clearCache as clear07 } from '../impls/07-baked-rules/index.ts';
 import { getTimeZonesAt as baseline, clearCache as clear04 } from '../impls/04-live-intl/index.ts';
 import { scheduleClasses, genMeta } from '../shared/schedule.ts';
+import { historyExcludedZones } from '../shared/rules.ts';
 import { alignedWith } from './aligned.ts';
 import { zones, runtimeZones } from '../shared/zones.ts';
 import { fixtures } from '../shared/fixtures.ts';
@@ -95,16 +96,10 @@ describe('07-baked-rules equivalence with 04 baseline', () => {
     }
   });
 
-  // the payoff of year-independent rules: 07 stays correct past the table's
-  // generation year for rule/static zones. irregular zones (non-Gregorian
-  // rules: Morocco, Palestine) clamp outside the generated year by design
-  // and are excluded here.
-  testIfAligned('identical output to 04 in the NEXT year (rules, not clamping)', () => {
-    const irregular = new Set<string>();
-
-    for (const c of scheduleClasses) {
-      if (c.kind === 2) for (const z of c.zones) irregular.add(z);
-    }
+  // One-off policy changes must stay correct too, even when their schedule
+  // uses kind 2. Only the known Morocco/Palestine approximations are excluded.
+  testIfAligned('identical output to 04 in the NEXT year outside known approximations', () => {
+    const excluded = historyExcludedZones(scheduleClasses);
 
     for (const ts of [
       Date.UTC(YEAR + 1, 0, 15, 12), // winter
@@ -114,7 +109,7 @@ describe('07-baked-rules equivalence with 04 baseline', () => {
     ]) {
       const [a, b] = both(ts);
 
-      expect(a.filter((z) => !irregular.has(z.name))).toEqual(b.filter((z) => !irregular.has(z.name)));
+      expect(a.filter((z) => !excluded.has(z.name))).toEqual(b.filter((z) => !excluded.has(z.name)));
     }
   });
 

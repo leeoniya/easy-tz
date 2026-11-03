@@ -256,7 +256,7 @@ export function emitHistoryTs(h: GeneratedHistory, t: GeneratedTables, meta: Gen
   const what = `Historical offset eras (${h.fromYear}-${h.toYear - 1}; the main schedule covers ${h.toYear}+):
 // static spans, two-rule DST spans, raw single years, and defer spans
 // (schedule class already exact — nothing stored). Offsets only — no
-// abbreviations. Irregular-class zones are excluded; fully schedule-covered
+// abbreviations. Irregular Morocco/Palestine zones are excluded; fully schedule-covered
 // zones (${s.coveredZones}) have no entry at all. Zones reference the schedule
 // table's zone enumeration by index; era payloads are dictionary-shared.
 // ${s.zones} zones -> ${s.classes} classes (${s.staticEras} static, ${s.ruleEras} rule, ${s.rawYears} raw, ${s.deferEras} defer eras; ${dict.length} distinct payloads, ${pairs.length} offset pairs, ${tuples.length} rule tuples)

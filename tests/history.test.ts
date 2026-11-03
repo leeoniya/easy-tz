@@ -5,8 +5,8 @@ import { getTimeZonesAt as baseline04, getTimeZoneAt as baselineAt04, clearCache
 import { scheduleClasses, genMeta, YEAR_START, STEP_MS } from '../shared/schedule.ts';
 import { alignedWith } from './aligned.ts';
 import { abbrFixClasses, ABBRFIX_FROM } from '../shared/abbrfix.ts';
-import { historyClasses } from '../shared/history.ts';
-import { resolveClass, buildScheduleIndex } from '../shared/rules.ts';
+import { historyClasses, HISTORY_TO } from '../shared/history.ts';
+import { resolveClass, buildScheduleIndex, historyExcludedZones } from '../shared/rules.ts';
 import { zones } from '../shared/zones.ts';
 import { SCHEDULE_STRIDE_DAYS, HISTORY_STRIDE_DAYS } from '../tools/gen-core.ts';
 
@@ -347,7 +347,7 @@ const nameOnly: { label: string; zone: string; ts: number; before: string; after
 // which the name-only fixtures above badly under-represent: most mislabelled
 // spans begin at an ordinary offset change, not at a name-only flip. Instants
 // are mid-span on purpose — the edges are already covered above.
-const identityDrift: { label: string; zone: string; ts: number; abbr: string }[] = [
+const identityDrift: { label: string; zone: string; ts: number; abbr?: string }[] = [
   // 20.8 years, the longest single correction in the table: Metlakatla ran on
   // Pacific time until 2015 while its modern class is Alaska
   { label: 'America/Metlakatla on Pacific time (2005)', zone: 'America/Metlakatla', ts: Date.UTC(2005, 5, 15, 12), abbr: 'PST' },
@@ -371,7 +371,8 @@ const identityDrift: { label: string; zone: string; ts: number; abbr: string }[]
   // pin it, since losing it would silently shrink the overlay again.
   { label: 'Europe/Astrakhan on Moscow time (2012, past a year-line era flip)', zone: 'Europe/Astrakhan', ts: Date.UTC(2012, 5, 15, 12), abbr: 'MSK' },
   { label: 'Europe/Ulyanovsk on Moscow time (2013, past a year-line era flip)', zone: 'Europe/Ulyanovsk', ts: Date.UTC(2013, 0, 15, 12), abbr: 'MSK' },
-  { label: 'Asia/Anadyr on Magadan time (2013, past a year-line era flip)', zone: 'Asia/Anadyr', ts: Date.UTC(2013, 5, 15, 12), abbr: 'MAGT' },
+  // CLDR versions assign this span to different metazones; compare to live ICU.
+  { label: 'Asia/Anadyr historical identity (2013, past a year-line era flip)', zone: 'Asia/Anadyr', ts: Date.UTC(2013, 5, 15, 12) },
   // Chile's 2015 permanent-DST year, likewise invisible to a live-only walk
   { label: 'America/Punta_Arenas during permanent CLST (2015)', zone: 'America/Punta_Arenas', ts: Date.UTC(2015, 5, 15, 12), abbr: 'CLST' },
 ];
@@ -408,7 +409,7 @@ describe('historical labels are corrected where the offset-keyed answer would li
     testIfAligned(label, () => {
       const b = baked(zone, ts);
 
-      expect(b.abbr).toBe(abbr);
+      if (abbr !== undefined) expect(b.abbr).toBe(abbr);
       expect(b.abbr).toBe(icu(zone, ts).abbr);
       expect(b.offset).toBe(icu(zone, ts).offset);
       expect(audited(zone, ts)).toEqual(b);
@@ -438,26 +439,15 @@ describe('labels stay vague where the offset matches no modern state', () => {
   });
 });
 
-// The four irregular-class zones are deliberately absent from history: Morocco
-// and Palestine suspend DST for Ramadan, which follows the lunar calendar, so
-// their behavior isn't expressible as a Gregorian rule in ANY year and baking
-// them would cost raw per-year segments end to end (tools/gen-core.ts: "the
-// irregular-class zones are excluded"). Historical instants therefore fall
-// through to the schedule class, which answers with the bake year's shape and
-// is knowingly wrong — Africa/Casablanca ran on WET until 2008, so it's off by
-// an hour in 244 of 372 monthly samples.
-//
-// The correction table has to honor the same exclusion. Labeling these spans
-// would put an authoritative name on an offset we already know is approximate,
-// which reads as MORE trustworthy than the GMT±N it replaced, and these four
-// zones alone were 15-19% of the payload. This block pins both halves so
-// re-including them anywhere has to be a deliberate act.
-const irregularZones = ['Africa/Casablanca', 'Africa/El_Aaiun', 'Asia/Gaza', 'Asia/Hebron'];
+// Morocco/Palestine history and label corrections remain omitted while their
+// schedules are irregular. Other kind-2 zones (e.g. a mid-year DST abolition)
+// must retain history rather than projecting the bake year's first state back.
+const irregularZones = [...historyExcludedZones(scheduleClasses)];
 
-describe('irregular Ramadan-rule zones stay out of the historical layer', () => {
-  test('the schedule table still classes exactly these four as irregular', () => {
-    const irregular = scheduleClasses.filter((c) => c.kind === 2).flatMap((c) => c.zones);
-    expect(irregular.toSorted()).toEqual(irregularZones.toSorted());
+describe('excluded irregular zones stay out of the historical layer', () => {
+  test('no history table entry touches them', () => {
+    const covered = new Set(historyClasses.flatMap((c) => c.zones));
+    expect(irregularZones.filter((z) => covered.has(z))).toEqual([]);
   });
 
   test('no correction table entry touches them', () => {
@@ -523,36 +513,40 @@ describe('corrected labels intern like any other TimeZoneInfo', () => {
 // these pin that, since a cache keyed one level too coarse would hand a zone
 // its sibling's label and no offset assertion would notice.
 describe('per-class caches do not leak corrected labels between zones', () => {
-  const sameOffsetDifferentLabel: { label: string; ts: number; pairs: [string, string][] }[] = [
+  const sameOffsetDifferentLabel: { label: string; ts: number; zones: string[] }[] = [
     {
       label: 'schedule class, corrected zone beside an uncorrected one',
       ts: Date.UTC(2000, 5, 15, 12),
-      pairs: [['America/Indiana/Knox', 'EST'], ['America/Chicago', 'CDT']],
+      zones: ['America/Indiana/Knox', 'America/Chicago'],
     },
     {
       label: 'schedule class, two zones on different correction payloads',
       ts: Date.UTC(1999, 10, 15, 12),
-      pairs: [['America/Argentina/Buenos_Aires', 'AST'], ['America/Argentina/San_Luis', 'WAST']],
+      zones: ['America/Argentina/Buenos_Aires', 'America/Argentina/San_Luis'],
     },
     {
       label: 'history class, two zones on different correction payloads',
       ts: Date.UTC(1999, 10, 15, 12),
-      pairs: [['Asia/Anadyr', 'ANAT'], ['Asia/Kamchatka', 'PETT']],
+      zones: ['Asia/Anadyr', 'Asia/Kamchatka'],
     },
   ];
 
-  for (const { label, ts, pairs } of sameOffsetDifferentLabel) {
-    test(label, () => {
+  for (const { label, ts, zones: names } of sameOffsetDifferentLabel) {
+    testIfAligned(label, () => {
       clear07();
 
       const all = new Map(baked07(ts).map((i) => [i.name, i]));
 
-      for (const [zone, abbr] of pairs) expect(all.get(zone)!.abbr).toBe(abbr);
+      // CLDR may rename historical metazones; the cache must preserve each
+      // zone's live label, rather than one particular version's spelling.
+      const expected = names.map((zone) => icu(zone, ts));
+      expect(new Set(expected.map((z) => z.abbr)).size).toBe(names.length);
+      expect(new Set(expected.map((z) => z.offset)).size).toBe(1);
 
-      // the premise: identical offset, so only the label distinguishes them
-      const offsets = new Set(pairs.map(([zone]) => all.get(zone)!.offset));
-
-      expect(offsets.size).toBe(1);
+      for (const info of expected) {
+        expect(all.get(info.name)!.abbr).toBe(info.abbr);
+        expect(all.get(info.name)!.offset).toBe(info.offset);
+      }
     });
   }
 
@@ -562,7 +556,7 @@ describe('per-class caches do not leak corrected labels between zones', () => {
 
     expect(corrected.length).toBeGreaterThan(50);
 
-    for (let y = ABBRFIX_FROM; y < 2026; y++) {
+    for (let y = ABBRFIX_FROM; y < HISTORY_TO; y++) {
       // February and July straddle the DST flip in both hemispheres
       for (const month of [1, 6]) {
         const ts = Date.UTC(y, month, 15, 12);

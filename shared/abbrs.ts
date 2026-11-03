@@ -42,6 +42,7 @@ export const abbrOverrides: Record<string, string> = {
   'Eastern European Standard Time': 'EET',
   'Western European Standard Time': 'WET',
   'Moscow Standard Time': 'MSK',
+  'Moscow Summer Time': 'MSD',
 
   // Africa
   'West Africa Standard Time': 'WAT',
@@ -117,23 +118,41 @@ export const abbrOverrides: Record<string, string> = {
   'Ulaanbaatar Standard Time': 'ULAT',
 
   // Russia (east of Moscow)
+  // Historical summer labels use the letter abbreviations from tzdata 2014j,
+  // before tzdata switched these zones to numeric abbreviations.
   'Samara Standard Time': 'SAMT',
+  'Samara Summer Time': 'SAMST',
   // Volgograd rejoined Moscow time 2020-12-27 (tzdata 2020e): a distinct
   // "Volgograd time" no longer exists, tzdata labels the zone MSK. Newer
   // CLDR (48 / Chrome 150) merged the metazone into Moscow; this entry only
   // fires on older CLDR (ICU 75 / bun) that still emits the long name
   'Volgograd Standard Time': 'MSK',
+  'Volgograd Summer Time': 'VOLST',
   'Yekaterinburg Standard Time': 'YEKT',
+  'Yekaterinburg Summer Time': 'YEKST',
   'Omsk Standard Time': 'OMST',
+  'Omsk Summer Time': 'OMSST',
   'Novosibirsk Standard Time': 'NOVT',
+  'Novosibirsk Summer Time': 'NOVST',
   'Krasnoyarsk Standard Time': 'KRAT',
+  'Krasnoyarsk Summer Time': 'KRAST',
   'Irkutsk Standard Time': 'IRKT',
+  'Irkutsk Summer Time': 'IRKST',
   'Yakutsk Standard Time': 'YAKT',
+  'Yakutsk Summer Time': 'YAKST',
   'Vladivostok Standard Time': 'VLAT',
+  'Vladivostok Summer Time': 'VLAST',
   'Magadan Standard Time': 'MAGT',
+  'Magadan Summer Time': 'MAGST',
   'Sakhalin Standard Time': 'SAKT',
+  'Sakhalin Summer Time': 'SAKST',
   'Anadyr Standard Time': 'ANAT',
+  'Anadyr Summer Time': 'ANAST',
+  // Older CLDR uses Petropavlovsk-Kamchatski; newer CLDR uses Kamchatka.
   'Petropavlovsk-Kamchatski Standard Time': 'PETT',
+  'Petropavlovsk-Kamchatski Summer Time': 'PETST',
+  'Kamchatka Standard Time': 'PETT',
+  'Kamchatka Summer Time': 'PETST',
 
   // Indian Ocean
   'Seychelles Time': 'SCT',
