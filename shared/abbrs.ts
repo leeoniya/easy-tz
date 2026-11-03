@@ -1,10 +1,10 @@
-// curation-reviewed: 2026-07-16 | IANA NEWS through tzdata 2026c | CLDR 48
-// (node 26.4) / ICU 75.1 (bun 1.4) | chrome-headless-shell 151.0.7922.34
-// | letter abbrs cross-checked against tzdata via moment-timezone (audit);
-// moment-timezone data PRs reviewed through 2026c (#1148) — no new links
-// NOTE: 'American Samoa Standard Time' shows as stale in the bun audit (ICU
-// 75 says 'Samoa Standard Time') but is live on CLDR 48 (node ICU 78,
-// Chrome 150+) — keep it
+// curation-reviewed: 2026-11-03 | IANA NEWS through tzdata 2026f | CLDR 48
+// audit: bun 1.4.4 (ICU 78.3), moment-timezone 0.6.6; browser checks:
+// chrome-headless-shell 156.0.8078.80; data PRs #1157, #1165, #1169 reviewed.
+// Canadian offsets match 2026d/e; labels retain CLDR's MDT/CDT, not CST/EST.
+// Havana's 2026f gap is stale ICU data, not a missing abbreviation mapping.
+// Keep 'American Samoa Standard Time' for CLDR 48 and 'Samoa Standard Time'
+// for older ICU releases.
 // Maintained by hand — see .cursor/skills/maintain-curated-tz-data/SKILL.md
 //
 // Curated map of CLDR "long" metazone names (en locale) -> common tzdata-style

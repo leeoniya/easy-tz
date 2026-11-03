@@ -1,7 +1,10 @@
-// curation-reviewed: 2026-07-16 | IANA NEWS through tzdata 2026c (no fixture
-// zones affected: Alberta/Morocco changes don't touch the zones below;
-// 2026b/2026c not yet in node tzdata 2026a or chrome-headless-shell 151);
-// tzdata cross-check via moment-timezone added Famagusta/Kirov/Troll coverage
+// curation-reviewed: 2026-11-03 | IANA NEWS through tzdata 2026f |
+// moment-timezone 0.6.6; chrome-headless-shell 156.0.8078.80 / bun ICU 78.3.
+// Canadian abolition fixtures live in tools/bench-browser-entry.ts.
+// Pending: Havana stays at -04 until 2027-11-07T05:00Z (2026f). Chrome still
+// applies the November 2026 fallback. Updated ICU also needs generator support
+// for the scheduled return to seasonal DST, not just permanent abolition.
+// Other 2026d-f historical corrections precede the supported 1995 window.
 // Maintained by hand — see .cursor/skills/maintain-curated-tz-data/SKILL.md
 //
 // Expected abbreviations/offsets for 2026, straddling DST boundaries in

@@ -1,8 +1,10 @@
 import type { TimeZoneInfo } from './types.ts';
 
-// curation-reviewed: 2026-07-16 | IANA NEWS through tzdata 2026c | zone-list
-// diff: bun 1.4 (ICU 75.1) vs chrome-headless-shell 151.0.7922.34 (418
-// zones, unchanged from 150 — no new spelling divergences)
+// curation-reviewed: 2026-11-03 | IANA NEWS through tzdata 2026f |
+// bun 1.4.4 (ICU 78.3) / chrome-headless-shell 156.0.8078.80 (418 zones).
+// moment-timezone 0.6.3 -> 0.6.6 adds no names; existing spelling pairs pass.
+// 2026d makes EST5EDT/CST6CDT/MST7MDT/PST8PDT zones, not geographic links;
+// these names remain outside the curated spelling bridge.
 // Maintained by hand — see .cursor/skills/maintain-curated-tz-data/SKILL.md
 //
 // Canonicalization bridge for IANA zone spelling variants (tzdata backward
